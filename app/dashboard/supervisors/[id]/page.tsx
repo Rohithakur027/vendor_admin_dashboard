@@ -394,13 +394,10 @@ export default function SupervisorDetailPage() {
               style={{
                 background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)",
                 borderRadius: 18,
-                padding: "22px 22px 20px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
+                padding: "18px 22px 20px",
                 position: "relative",
                 overflow: "hidden",
-                minHeight: 160,
+                alignSelf: "start",
               }}
             >
               {/* decorative circles */}
@@ -408,19 +405,10 @@ export default function SupervisorDetailPage() {
               <div style={{ position: "absolute", bottom: -30, right: 24, width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
 
               <div style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>
-                Wallet Balance
+                Today&apos;s Spend
               </div>
-              <div style={{ fontSize: 42, fontWeight: 800, color: "#fff", lineHeight: 1, marginBottom: 16, letterSpacing: -1.5 }}>
-                ₹{walletRemaining.toLocaleString("en-IN")}
-              </div>
-              <div>
-                <div style={{ width: "100%", height: 5, borderRadius: 10, background: "rgba(255,255,255,0.2)", overflow: "hidden", marginBottom: 8 }}>
-                  <div style={{ width: `${walletPct}%`, height: "100%", borderRadius: 10, background: "rgba(255,255,255,0.85)", transition: "width 0.6s" }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
-                  <span>₹{supervisor.walletUsed.toLocaleString("en-IN")} used</span>
-                  <span>of ₹{supervisor.walletLimit.toLocaleString("en-IN")}</span>
-                </div>
+              <div style={{ fontSize: 36, fontWeight: 800, color: "#fff", lineHeight: 1, letterSpacing: -1 }}>
+                ₹{supervisor.walletUsed.toLocaleString("en-IN")}
               </div>
             </div>
 
@@ -597,9 +585,9 @@ export default function SupervisorDetailPage() {
 
           {/* 3 stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-            <StatCard label="Total Spend"      value={`₹${totalSpend.toLocaleString()}`}  icon={IndianRupee} iconBg="#DBEAFE" iconColor="#2563EB" />
-            <StatCard label="Company Spend"    value={`₹${spendEntries.filter(([k]) => k !== "Individual").reduce((s,[,v]) => s+v, 0).toLocaleString()}`} icon={Building2} iconBg="#EDE9FE" iconColor="#6D28D9" />
-            <StatCard label="Individual Spend" value={`₹${(finalSpend["Individual"] ?? 0).toLocaleString()}`} icon={User} iconBg="#CFFAFE" iconColor="#0891B2" />
+            <StatCard label="Total Spend"      value={`₹${totalSpend.toLocaleString()}`}  icon={IndianRupee} iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Company Spend"    value={`₹${spendEntries.filter(([k]) => k !== "Individual").reduce((s,[,v]) => s+v, 0).toLocaleString()}`} icon={Building2} iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Individual Spend" value={`₹${(finalSpend["Individual"] ?? 0).toLocaleString()}`} icon={User} iconBg="#F1F5F9" iconColor="#64748B" />
           </div>
 
           {/* Daily bar chart */}
@@ -674,15 +662,15 @@ export default function SupervisorDetailPage() {
           {/* 3 stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
             <StatCard label="Total Billed" value={`₹${totalSpend.toLocaleString()}`} icon={Receipt}   iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Total Paid"   value={`₹${totalPaid.toLocaleString()}`}  icon={Wallet}    iconBg="#DCFCE7" iconColor="#15803D" />
-            <StatCard label="Outstanding"  value={`₹${outstanding.toLocaleString()}`} icon={TrendingUp} iconBg={outstanding > 0 ? "#FEE2E2" : "#F1F5F9"} iconColor={outstanding > 0 ? "#B91C1C" : "#64748B"} />
+            <StatCard label="Total Paid"   value={`₹${totalPaid.toLocaleString()}`}  icon={Wallet}    iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Outstanding"  value={`₹${outstanding.toLocaleString()}`} icon={TrendingUp} iconBg="#F1F5F9" iconColor="#64748B" />
           </div>
 
           {/* Record form */}
           <div style={CARD_STYLE}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px 12px" }}>
-              <div style={{ background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 9, padding: 7 }}>
-                <Receipt className="h-4 w-4" style={{ color: "#15803D" }} />
+              <div style={{ background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 9, padding: 7 }}>
+                <Receipt className="h-4 w-4" style={{ color: "#64748B" }} />
               </div>
               <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Record Transaction Received</p>
             </div>
@@ -726,8 +714,8 @@ export default function SupervisorDetailPage() {
                 {transactions.map(txn => (
                   <div key={txn.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #F8FAFC" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 9, background: "#DCFCE7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Check className="h-4 w-4" style={{ color: "#15803D" }} />
+                      <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <Check className="h-4 w-4" style={{ color: "#64748B" }} />
                       </div>
                       <div>
                         {txn.note && <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{txn.note}</p>}
@@ -780,11 +768,10 @@ export default function SupervisorDetailPage() {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                   {[
-                    { label: "Full Name",      key: "name",        type: "text"   },
-                    { label: "Email Address",  key: "email",       type: "email"  },
-                    { label: "Phone Number",   key: "phone",       type: "text"   },
-                    { label: "Zone / Area",    key: "zone",        type: "text"   },
-                    { label: "Wallet Limit (₹)", key: "walletLimit", type: "number" },
+                    { label: "Full Name",     key: "name",  type: "text"  },
+                    { label: "Email Address", key: "email", type: "email" },
+                    { label: "Phone Number",  key: "phone", type: "text"  },
+                    { label: "Zone / Area",   key: "zone",  type: "text"  },
                   ].map(({ label, key, type }) => (
                     <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>{label}</label>
@@ -811,7 +798,7 @@ export default function SupervisorDetailPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
                   <button
                     onClick={() => {
-                      updateSupervisor(supervisor.id, { name: editForm.name, email: editForm.email, phone: editForm.phone, zone: editForm.zone, walletLimit: Number(editForm.walletLimit), status: editForm.status as "Active" | "Inactive" });
+                      updateSupervisor(supervisor.id, { name: editForm.name, email: editForm.email, phone: editForm.phone, zone: editForm.zone, status: editForm.status as "Active" | "Inactive" });
                       setEditSaved(true);
                       setTimeout(() => setEditSaved(false), 2500);
                     }}

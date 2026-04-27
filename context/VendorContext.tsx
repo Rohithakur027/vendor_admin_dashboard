@@ -37,7 +37,8 @@ function toBooking(item: BookingApiItem): Booking {
     dropLocation:    item.dropLocation,
     scheduledTime:   item.scheduledTime,
     createdAt:       item.createdAt,
-    fare:            item.fare   ?? undefined,
+    fare:            item.fare       ?? undefined,
+    passengers:      item.passengers ?? undefined,
     bookingSource:   item.bookingSource,
   };
 }

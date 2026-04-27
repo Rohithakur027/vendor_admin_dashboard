@@ -46,8 +46,8 @@ export function StatCard({ title, value, icon: Icon, description, progress }: St
             <div style={{ width: `${pct}%`, height: "100%", borderRadius: 10, background: "rgba(255,255,255,0.85)", transition: "width 0.6s" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
-            <span>{progress.usedLabel} used</span>
-            <span>of {progress.totalLabel}</span>
+            <span>{progress.usedLabel}</span>
+            <span>{progress.totalLabel}</span>
           </div>
         </div>
       </div>

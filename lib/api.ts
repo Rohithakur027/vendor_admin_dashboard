@@ -352,6 +352,7 @@ export interface BookingApiItem {
   dropLocation: string;
   scheduledTime: string | null;
   fare: number | null;
+  passengers: number | null;
   createdAt: string;
   bookingSource: string;
   supervisorId: string | null;

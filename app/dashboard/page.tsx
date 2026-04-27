@@ -79,7 +79,7 @@ export default function DashboardPage() {
   const onlineSupervisors = supervisors.filter((s) => s.isOnline);
 
   const totalWalletLimit = supervisors.reduce((sum, s) => sum + s.walletLimit, 0);
-  const totalWalletUsed = supervisors.reduce((sum, s) => sum + s.walletUsed, 0);
+  const todaySpending = bookingsToday.reduce((sum, b) => sum + (b.fare ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -103,13 +103,13 @@ export default function DashboardPage() {
           description={`${bookingsToday.filter((b) => b.status === "Completed").length} completed`}
         />
         <StatCard
-          title="Wallet Balance"
-          value={`₹${(totalWalletLimit - totalWalletUsed).toLocaleString()}`}
+          title="Balance"
+          value={`₹${Math.max(totalWalletLimit - todaySpending, 0).toLocaleString("en-IN")}`}
           progress={{
-            used: totalWalletUsed,
-            total: totalWalletLimit,
-            usedLabel: `₹${totalWalletUsed.toLocaleString()}`,
-            totalLabel: `₹${totalWalletLimit.toLocaleString()}`,
+            used: todaySpending,
+            total: Math.max(totalWalletLimit, 1),
+            usedLabel: `₹${todaySpending.toLocaleString("en-IN")} used`,
+            totalLabel: `of ₹${totalWalletLimit.toLocaleString("en-IN")}`,
           }}
         />
       </div>
