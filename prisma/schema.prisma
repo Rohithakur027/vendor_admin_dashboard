@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model users {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email            String       @unique
+  password_hash    String
+  role             String       @default("supervisor")
+  full_name        String       @default("")
+  mobile_number    String?
+  vendor_id        String?      @db.Uuid
+  supervisor_id    String?      @db.Uuid
+  driver_id        String?      @db.Uuid
+  app_access       Boolean      @default(false)
+  dashboard_access Boolean      @default(false)
+  is_active        Boolean      @default(true)
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime     @updatedAt @db.Timestamptz(6)
+  supervisor       supervisors?
+}
+
+model vendors {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  contact_person String
+  email          String   @unique
+  phone          String
+  city           String
+  status         String   @default("Active")
+  secondary_pocs Json     @default("[]")
+  wallet_balance Decimal  @default(0) @db.Decimal(10, 2)
+  joined_at      DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model supervisors {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @unique @db.Uuid
+  user         users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  vendor_id    String   @db.Uuid
+  name         String
+  phone        String
+  zone         String   @default("")
+  status       String   @default("Active")
+  app_access   Boolean  @default(true)
+  wallet_limit Decimal  @default(10000) @db.Decimal(10, 2)
+  wallet_used  Decimal  @default(0) @db.Decimal(10, 2)
+  companies    String[]
+  is_online    Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+}
