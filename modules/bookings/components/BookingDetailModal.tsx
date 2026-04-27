@@ -86,11 +86,12 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
           {[
-            { label: "Created", value: booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString([], { day: "numeric", month: "short" }) : "—" },
-            { label: "Type",    value: booking?.type ?? "—" },
-            { label: "Fare",    value: booking?.fare ? `₹${booking.fare}` : "—" },
+            { label: "Created",    value: booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString([], { day: "numeric", month: "short" }) : "—" },
+            { label: "Type",       value: booking?.type ?? "—" },
+            { label: "Fare",       value: booking?.fare ? `₹${booking.fare}` : "—" },
+            { label: "Passengers", value: booking?.passengers != null ? `${booking.passengers}` : "—" },
           ].map((d) => (
             <div key={d.label} style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 12px", textAlign: "center" }}>
               <div style={{ fontSize: 10.5, color: "#9CA3AF", marginBottom: 3, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{d.label}</div>
