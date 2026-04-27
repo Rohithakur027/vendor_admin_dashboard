@@ -27,6 +27,7 @@ export interface Booking {
   status: BookingStatus;
   createdAt: string;
   fare?: number;              // trip fare in ₹
+  passengers?: number;        // number of passengers
   bookingSource?: string;    // company name or "Individual"
   // Scheduled booking specific
   interestedDrivers?: DriverInterest[];

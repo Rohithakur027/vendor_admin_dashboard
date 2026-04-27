@@ -1,14 +1,15 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { mockDrivers, mockBookings } from "@/lib/mock-data";
 import { superadminApi, type DriverApiItem } from "@/lib/api";
 import type { Driver, DriverStatus } from "@/modules/drivers/types";
 import {
   ArrowLeft, Phone, Car, TrendingUp, IndianRupee, User,
-  ArrowRight, FileText, ShieldCheck, Clock, CheckCircle2,
-  AlertCircle, Circle, ShieldBan, Trash2, TriangleAlert, Pencil,
+  ArrowRight, Clock, CheckCircle2,
+  AlertCircle, Circle, ShieldBan, Trash2, TriangleAlert,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 
@@ -23,6 +24,14 @@ const CARD_STYLE: React.CSSProperties = {
 
 
 const DUMMY_WEEKLY = [420, 0, 180, 650, 320, 780, 640];
+
+const MOCK_RECENT_TRIPS = [
+  { id: "m-001", pickupLocation: "MG Road, Bangalore",        dropLocation: "Kempegowda International Airport", supervisorName: "Kiran Gowda",  type: "Instant",   fare: 780, status: "Completed", createdAt: "2026-04-25T09:30:00" },
+  { id: "m-002", pickupLocation: "Koramangala 5th Block",      dropLocation: "Manyata Tech Park, Hebbal",        supervisorName: "Lakshmi Rao",  type: "Scheduled", fare: 420, status: "Completed", createdAt: "2026-04-24T14:15:00" },
+  { id: "m-003", pickupLocation: "Indiranagar 100 Feet Road",  dropLocation: "Electronic City Phase 1",          supervisorName: "Kiran Gowda",  type: "Instant",   fare: 650, status: "Completed", createdAt: "2026-04-23T08:00:00" },
+  { id: "m-004", pickupLocation: "Whitefield Main Road",       dropLocation: "Jayanagar 4th Block",              supervisorName: "Priya Sharma", type: "Scheduled", fare: 520, status: "Completed", createdAt: "2026-04-22T16:45:00" },
+  { id: "m-005", pickupLocation: "Bannerghatta Road Phase 2",  dropLocation: "Hebbal Flyover",                   supervisorName: "Lakshmi Rao",  type: "Instant",   fare: 380, status: "Cancelled", createdAt: "2026-04-21T11:20:00" },
+];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function initials(name: string) {
@@ -108,6 +117,84 @@ const DOC_STATUS_CFG: Record<DocStatus, { icon: React.ElementType; color: string
   "Pending":      { icon: Clock,        color: "#B45309", bg: "#FEF3C7", border: "#FDE68A", label: "Under Review" },
   "Not Uploaded": { icon: AlertCircle,  color: "#94A3B8", bg: "#F1F5F9", border: "#E2E8F0", label: "Not Uploaded" },
 };
+
+// ── calendar date picker ──────────────────────────────────────────────────────
+const CAL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const CAL_DAYS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function DocDatePicker({ value, onChange, hasExpiry }: { value: string; onChange: (v: string) => void; hasExpiry: boolean }) {
+  const [open, setOpen]           = useState(false);
+  const [viewYear, setViewYear]   = useState(() => value ? parseInt(value.split("-")[0]) : new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => value ? parseInt(value.split("-")[1]) - 1 : new Date().getMonth());
+  const wrapRef  = useRef<HTMLDivElement>(null);
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    if (!open) return;
+    function onOut(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOut);
+    return () => document.removeEventListener("mousedown", onOut);
+  }, [open]);
+
+  if (!hasExpiry) return <span style={{ fontSize: 12, color: "#CBD5E1", fontStyle: "italic" }}>No expiry</span>;
+
+  function prev() { viewMonth === 0 ? (setViewYear(y => y - 1), setViewMonth(11)) : setViewMonth(m => m - 1); }
+  function next() { viewMonth === 11 ? (setViewYear(y => y + 1), setViewMonth(0)) : setViewMonth(m => m + 1); }
+
+  const daysInMo = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const cells: (string | null)[] = Array(firstDay).fill(null);
+  for (let d = 1; d <= daysInMo; d++) cells.push(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const display = value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Not set";
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", display: "inline-block" }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, border: open ? `1.5px solid ${ACCENT}` : "1px solid #E2E8F0", background: open ? "#EFF6FF" : "#F8FAFC", cursor: "pointer", color: value ? "#334155" : "#94A3B8", fontSize: 12.5, fontWeight: value ? 600 : 400 }}
+      >
+        {display}
+        <ChevronRight style={{ width: 12, height: 12, transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 0.15s" }} />
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 999, background: "#fff", border: "1px solid #E2E8F0", borderRadius: 14, boxShadow: "0 8px 30px rgba(0,0,0,0.12)", padding: 14, width: 240 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button onClick={prev} style={{ padding: 4, border: "none", background: "none", cursor: "pointer", borderRadius: 6, display: "flex", alignItems: "center", color: "#64748B" }}>
+              <ChevronLeft style={{ width: 15, height: 15 }} />
+            </button>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>{CAL_MONTHS[viewMonth]} {viewYear}</span>
+            <button onClick={next} style={{ padding: 4, border: "none", background: "none", cursor: "pointer", borderRadius: 6, display: "flex", alignItems: "center", color: "#64748B" }}>
+              <ChevronRight style={{ width: 15, height: 15 }} />
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 4 }}>
+            {CAL_DAYS.map(d => <div key={d} style={{ textAlign: "center" as const, fontSize: 10, fontWeight: 700, color: "#94A3B8", paddingBottom: 4 }}>{d}</div>)}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
+            {cells.map((dt, i) => {
+              if (!dt) return <div key={i} style={{ height: 30 }} />;
+              const sel = dt === value, tdy = dt === todayStr;
+              return (
+                <button key={dt} onClick={() => { onChange(dt); setOpen(false); }}
+                  style={{ height: 30, borderRadius: "50%", border: "none", cursor: "pointer", fontSize: 12, fontWeight: sel ? 800 : tdy ? 700 : 400, background: sel ? ACCENT : "transparent", color: sel ? "#fff" : tdy ? ACCENT : "#334155", outline: tdy && !sel ? `1.5px solid ${ACCENT}` : "none", transition: "background 0.1s" }}
+                  onMouseEnter={e => { if (!sel) (e.currentTarget as HTMLElement).style.background = "#F1F5F9"; }}
+                  onMouseLeave={e => { if (!sel) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                >{parseInt(dt.split("-")[2])}</button>
+              );
+            })}
+          </div>
+          {value && (
+            <button onClick={() => { onChange(""); setOpen(false); }} style={{ marginTop: 10, width: "100%", padding: "6px 0", border: "1px solid #E2E8F0", borderRadius: 8, background: "#fff", color: "#94A3B8", fontSize: 11.5, cursor: "pointer" }}>Clear date</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── sub-components ────────────────────────────────────────────────────────────
 function StatCard({ label, value, icon: Icon, iconBg, iconColor }: {
@@ -198,7 +285,7 @@ export default function SuperAdminDriverProfilePage() {
   const [deleteInput,  setDeleteInput]  = useState("");
   const [actionDone,   setActionDone]   = useState<"blocked" | "unblocked" | "deleted" | null>(null);
   const [expiryEdits,  setExpiryEdits]  = useState<Record<string, string>>({});
-  const [expiryEditId, setExpiryEditId] = useState<string | null>(null);
+  const [docSubTab,    setDocSubTab]    = useState<"driver" | "vehicle">("driver");
 
   useEffect(() => {
     if (!id) return;
@@ -349,10 +436,10 @@ export default function SuperAdminDriverProfilePage() {
 
           {/* 4 stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-            <StatCard label="Total Trips"  value={driver.totalTrips}                        icon={Car}          iconBg="#0F172A" iconColor="#fff" />
-            <StatCard label="Completed"    value={completedTrips.length}                    icon={CheckCircle2} iconBg="#0F172A" iconColor="#fff" />
-            <StatCard label="Total Earned" value={`₹${displayEarned.toLocaleString()}`}    icon={IndianRupee}  iconBg="#0F172A" iconColor="#fff" />
-            <StatCard label="Avg per Trip" value={`₹${displayAvg.toLocaleString()}`}       icon={TrendingUp}   iconBg="#0F172A" iconColor="#fff" />
+            <StatCard label="Total Trips"  value={driver.totalTrips}                        icon={Car}          iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Completed"    value={completedTrips.length}                    icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Total Earned" value={`₹${displayEarned.toLocaleString()}`}    icon={IndianRupee}  iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Avg per Trip" value={`₹${displayAvg.toLocaleString()}`}       icon={TrendingUp}   iconBg="#F1F5F9" iconColor="#64748B" />
           </div>
 
           {/* Earnings card (blue) + right column */}
@@ -465,14 +552,16 @@ export default function SuperAdminDriverProfilePage() {
               <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
             ))}
           </div>
-          {driverBookings.length === 0 ? (
-            <p style={{ textAlign: "center" as const, padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>No trips yet.</p>
-          ) : (
+          {(() => {
+            const trips = driverBookings.length > 0 ? driverBookings : MOCK_RECENT_TRIPS as typeof driverBookings;
+            return trips.length === 0 ? (
+              <p style={{ textAlign: "center" as const, padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>No trips yet.</p>
+            ) : (
             <div>
-              {driverBookings.map((b, idx) => (
+              {trips.map((b, idx) => (
                 <div
                   key={b.id}
-                  style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.6fr 0.5fr 0.7fr", columnGap: 20, padding: "14px 24px", borderBottom: idx < driverBookings.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
+                  style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.6fr 0.5fr 0.7fr", columnGap: 20, padding: "14px 24px", borderBottom: idx < trips.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
@@ -496,7 +585,8 @@ export default function SuperAdminDriverProfilePage() {
                 </div>
               ))}
             </div>
-          )}
+          );
+          })()}
         </div>
       )}
 
@@ -504,9 +594,9 @@ export default function SuperAdminDriverProfilePage() {
       {activeTab === "earnings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-            <StatCard label="Total Earned"    value={`₹${displayEarned.toLocaleString()}`} icon={IndianRupee}  iconBg="#0F172A" iconColor="#fff" />
-            <StatCard label="Completed Trips" value={completedTrips.length}                 icon={CheckCircle2} iconBg="#0F172A" iconColor="#fff" />
-            <StatCard label="Avg per Trip"    value={`₹${displayAvg.toLocaleString()}`}    icon={TrendingUp}   iconBg="#0F172A" iconColor="#fff" />
+            <StatCard label="Total Earned"    value={`₹${displayEarned.toLocaleString()}`} icon={IndianRupee}  iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Completed Trips" value={completedTrips.length}                 icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Avg per Trip"    value={`₹${displayAvg.toLocaleString()}`}    icon={TrendingUp}   iconBg="#F1F5F9" iconColor="#64748B" />
           </div>
 
           <div style={CARD_STYLE}>
@@ -577,138 +667,119 @@ export default function SuperAdminDriverProfilePage() {
 
       {/* ══ TAB: DOCUMENTS ══ */}
       {activeTab === "documents" && (() => {
-        const DGRID = "2fr 1.4fr 1.1fr 1.8fr";
-        const COL_GAP = 20;
-        const ROW_PAD = "14px 24px";
+        const DRIVER_DOCS = [
+          { id: "dl",      name: "Driving License",         status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
+          { id: "aadhaar", name: "Aadhaar Card",             status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
+          { id: "photo",   name: "Profile Photo",            status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
+          { id: "address", name: "Current Address Proof",    status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
+          { id: "medical", name: "Medical Certificate",      status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
+          { id: "police",  name: "Police Verification",      status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
+          { id: "letter",  name: "Undertaking Letter",       status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
+          { id: "badge",   name: "Badge",                    status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
+        ];
+        const VEHICLE_DOCS = [
+          { id: "rc",      name: "Registration Certificate", status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+          { id: "tax",     name: "Tax Certificate",           status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+          { id: "permit",  name: "Permit",                    status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+          { id: "ins",     name: "Insurance",                 status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+          { id: "fitness", name: "Fitness Certificate",       status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+          { id: "form42",  name: "Form 42",                   status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "veh" },
+          { id: "puc",     name: "PUC",                       status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
+        ];
 
+        const activeDocs = docSubTab === "driver" ? DRIVER_DOCS : VEHICLE_DOCS;
+        const dApproved  = DRIVER_DOCS.filter(d => d.status === "Approved").length;
+        const vApproved  = VEHICLE_DOCS.filter(d => d.status === "Approved").length;
+        const approvedCt = activeDocs.filter(d => d.status === "Approved").length;
+        const rejectedCt = activeDocs.filter(d => d.status === "Rejected").length;
+        const pendingCt  = activeDocs.filter(d => d.status === "Pending").length;
+        const GRID = "2fr 1.3fr 1.4fr 1.6fr";
 
-        function ExpiryCell({ docKey, initialDate, hasExpiry }: { docKey: string; initialDate: string | null; hasExpiry: boolean }) {
-          const currentVal = expiryEdits[docKey] ?? initialDate ?? "";
-          const isEditing  = expiryEditId === docKey;
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-          if (!hasExpiry) return <span style={{ fontSize: 12, color: "#CBD5E1", fontStyle: "italic" }}>No expiry</span>;
+            {/* Sub-tabs + status badges */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+              {([
+                { value: "driver",  label: "Driver Documents",  approved: dApproved, total: DRIVER_DOCS.length },
+                { value: "vehicle", label: "Vehicle Documents", approved: vApproved, total: VEHICLE_DOCS.length },
+              ] as const).map(tab => {
+                const active = docSubTab === tab.value;
+                return (
+                  <button
+                    key={tab.value}
+                    onClick={() => setDocSubTab(tab.value)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 9, cursor: "pointer", fontFamily: font, fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? ACCENT : "#475569", background: active ? "#EFF6FF" : "#fff", border: active ? `2px solid ${ACCENT}` : "1.5px solid #E2E8F0", transition: "all 0.12s" }}
+                  >
+                    {tab.label}
+                    <span style={{ fontSize: 11.5, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: active ? ACCENT : "#E2E8F0", color: active ? "#fff" : "#64748B" }}>
+                      {tab.approved}/{tab.total}
+                    </span>
+                  </button>
+                );
+              })}
 
-          if (isEditing) return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="date"
-                value={currentVal}
-                autoFocus
-                onChange={e => setExpiryEdits(p => ({ ...p, [docKey]: e.target.value }))}
-                style={{ fontSize: 12, border: "1.5px solid #93C5FD", borderRadius: 7, padding: "3px 8px", color: "#0F172A", outline: "none", fontFamily: font }}
-              />
-              <button
-                onClick={() => setExpiryEditId(null)}
-                style={{ width: 24, height: 24, borderRadius: 6, border: "none", background: ACCENT, color: "#fff", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              >✓</button>
-              <button
-                onClick={() => { setExpiryEdits(p => { const n = { ...p }; delete n[docKey]; return n; }); setExpiryEditId(null); }}
-                style={{ width: 24, height: 24, borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", color: "#64748B", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-              >✕</button>
-            </div>
-          );
-
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12.5, color: currentVal ? "#334155" : "#94A3B8", fontWeight: currentVal ? 600 : 400 }}>
-                {currentVal ? fmtDate(currentVal) : "Not set"}
-              </span>
-              <button
-                onClick={() => { setExpiryEdits(p => ({ ...p, [docKey]: currentVal })); setExpiryEditId(docKey); }}
-                style={{ padding: 4, borderRadius: 5, border: "1px solid #E8EEF4", background: "#F8FAFC", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8" }}
-              >
-                <Pencil className="h-3 w-3" />
-              </button>
-            </div>
-          );
-        }
-
-        function DocTable({ title, docs }: { title: string; docs: { id: string; name: string; status: string; hasExpiry: boolean; expiryDate: string | null; prefix: string }[] }) {
-          return (
-            <div style={CARD_STYLE}>
-              <div style={{ padding: "14px 24px 12px", borderBottom: "1px solid #F1F5F9" }}>
-                <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{title}</p>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: DGRID, columnGap: COL_GAP, padding: "10px 24px", background: "#F8FAFC" }}>
-                {["DOCUMENT", "EXPIRY DATE", "STATUS", "ACTION"].map(h => (
-                  <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                {[
+                  { label: `${approvedCt} Approved`, color: ACCENT,    bg: "#EFF6FF", border: "#BFDBFE" },
+                  { label: `${rejectedCt} Rejected`, color: "#B91C1C", bg: "#FEE2E2", border: "#FECACA" },
+                  { label: `${pendingCt} Pending`,   color: "#B45309", bg: "#FEF3C7", border: "#FDE68A" },
+                ].map(p => (
+                  <span key={p.label} style={{ fontSize: 12.5, fontWeight: 600, color: p.color, background: p.bg, border: `1px solid ${p.border}`, borderRadius: 20, padding: "4px 12px", whiteSpace: "nowrap" as const }}>{p.label}</span>
                 ))}
               </div>
-              {docs.map((doc, idx) => {
-                const isPending   = doc.status === "Pending";
-                const sc          = STATUS_STYLES[doc.status] ?? STATUS_STYLES["Not Submitted"];
-                const docKey      = `${doc.prefix}-${doc.id}`;
+            </div>
+
+            {/* Document table */}
+            <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: GRID, columnGap: 16, padding: "11px 24px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                {["DOCUMENT", "STATUS", "EXPIRY DATE", "ACTION"].map(h => (
+                  <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em", paddingLeft: h === "ACTION" ? 48 : 0 }}>{h}</span>
+                ))}
+              </div>
+
+              {activeDocs.map((doc, idx) => {
+                const sc        = STATUS_STYLES[doc.status] ?? STATUS_STYLES["Offline"];
+                const docKey    = `${doc.prefix}-${doc.id}`;
+                const expiry    = expiryEdits[docKey] ?? doc.expiryDate ?? "";
+                const submitted = doc.status !== "Not Submitted" && doc.status !== "Not Uploaded";
                 return (
                   <div
                     key={doc.id}
-                    style={{ display: "grid", gridTemplateColumns: DGRID, columnGap: COL_GAP, padding: ROW_PAD, borderTop: "1px solid #F8FAFC", alignItems: "center" }}
+                    style={{ display: "grid", gridTemplateColumns: GRID, columnGap: 16, padding: "15px 24px", alignItems: "center", borderBottom: idx < activeDocs.length - 1 ? "1px solid #F1F5F9" : "none", transition: "background 0.12s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
-                    {/* DOCUMENT */}
-                    <span style={{ fontSize: 13.5, fontWeight: isPending ? 700 : 500, color: isPending ? "#0F172A" : "#94A3B8" }}>{doc.name}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: submitted ? 700 : 500, color: submitted ? "#0F172A" : "#94A3B8" }}>{doc.name}</span>
 
-                    {/* EXPIRY DATE */}
-                    <ExpiryCell docKey={docKey} initialDate={doc.expiryDate} hasExpiry={doc.hasExpiry} />
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}`, whiteSpace: "nowrap" as const, width: "fit-content" }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot, flexShrink: 0 }} />
+                      {doc.status}
+                    </span>
 
-                    {/* STATUS */}
-                    {isPending ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, color: sc.text, background: sc.bg, border: `1px solid ${sc.border}`, padding: "3px 10px", borderRadius: 20, whiteSpace: "nowrap" as const, width: "fit-content" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot, flexShrink: 0 }} />Pending
-                      </span>
-                    ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "#CBD5E1" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#CBD5E1", flexShrink: 0 }} />Not Submitted
-                      </span>
-                    )}
+                    <div onClick={e => e.stopPropagation()}>
+                      <DocDatePicker value={expiry} onChange={v => setExpiryEdits(p => ({ ...p, [docKey]: v }))} hasExpiry={doc.hasExpiry} />
+                    </div>
 
-                    {/* ACTION */}
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                      {isPending ? (
-                        <>
-                          <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#334155", fontFamily: font }}>View</button>
-                          <button style={{ padding: "4px 12px", borderRadius: 6, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve</button>
-                          <button style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #E2E8F0", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", color: "#334155", fontFamily: font }}>Reject</button>
-                        </>
+                    <div style={{ paddingLeft: 48 }}>
+                      {!submitted ? (
+                        <span style={{ fontSize: 12.5, color: "#94A3B8", fontStyle: "italic" }}>Awaiting upload</span>
+                      ) : doc.status === "Approved" ? (
+                        <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject instead</button>
+                      ) : doc.status === "Rejected" ? (
+                        <button style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve instead</button>
                       ) : (
-                        <span style={{ fontSize: 12, color: "#94A3B8", fontStyle: "italic" }}>Awaiting upload</span>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>View</button>
+                          <button style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve</button>
+                          <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject</button>
+                        </div>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-          );
-        }
-
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-              <StatCard label="Total Documents" value={15} icon={FileText}    iconBg="#0F172A" iconColor="#fff" />
-              <StatCard label="Submitted"       value={7}  icon={ShieldCheck} iconBg="#0F172A" iconColor="#fff" />
-              <StatCard label="Approved"        value={0}  icon={CheckCircle2} iconBg="#0F172A" iconColor="#fff" />
-            </div>
-
-            <DocTable title="Driver Documents" docs={[
-              { id: "dl",      name: "Driving License",       status: "Pending",       hasExpiry: true,  expiryDate: "2028-01-11", prefix: "drv" },
-              { id: "aadhaar", name: "Aadhaar Card",           status: "Pending",       hasExpiry: false, expiryDate: null,         prefix: "drv" },
-              { id: "photo",   name: "Profile Photo",          status: "Pending",       hasExpiry: false, expiryDate: null,         prefix: "drv" },
-              { id: "address", name: "Current Address Proof",  status: "Pending",       hasExpiry: false, expiryDate: null,         prefix: "drv" },
-              { id: "medical", name: "Medical Certificate",    status: "Not Submitted", hasExpiry: true,  expiryDate: null,         prefix: "drv" },
-              { id: "police",  name: "Police Verification",    status: "Not Submitted", hasExpiry: false, expiryDate: null,         prefix: "drv" },
-              { id: "letter",  name: "Undertaking Letter",     status: "Not Submitted", hasExpiry: false, expiryDate: null,         prefix: "drv" },
-              { id: "badge",   name: "Badge",                  status: "Not Submitted", hasExpiry: true,  expiryDate: null,         prefix: "drv" },
-            ]} />
-
-            <DocTable title="Vehicle Documents" docs={[
-              { id: "rc",      name: "Registration Certificate", status: "Pending",       hasExpiry: true,  expiryDate: "2034-03-20", prefix: "veh" },
-              { id: "tax",     name: "Tax Certificate",           status: "Pending",       hasExpiry: true,  expiryDate: null,         prefix: "veh" },
-              { id: "permit",  name: "Permit",                    status: "Pending",       hasExpiry: true,  expiryDate: null,         prefix: "veh" },
-              { id: "ins",     name: "Insurance",                 status: "Not Submitted", hasExpiry: true,  expiryDate: null,         prefix: "veh" },
-              { id: "fitness", name: "Fitness Certificate",       status: "Not Submitted", hasExpiry: true,  expiryDate: null,         prefix: "veh" },
-              { id: "form42",  name: "Form 42",                   status: "Not Submitted", hasExpiry: false, expiryDate: null,         prefix: "veh" },
-              { id: "puc",     name: "PUC",                       status: "Not Submitted", hasExpiry: true,  expiryDate: null,         prefix: "veh" },
-            ]} />
           </div>
         );
       })()}

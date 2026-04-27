@@ -486,6 +486,7 @@ export const mockBookings: Booking[] = [
     status: "Ongoing",
     createdAt: "2024-04-22T10:20:00",
     fare: 780,
+    passengers: 2,
     bookingSource: "Infosys",
     timeline: [
       { time: "10:20 AM", event: "Booking created by Kiran Gowda" },
@@ -509,6 +510,7 @@ export const mockBookings: Booking[] = [
     status: "Ongoing",
     createdAt: "2024-04-22T10:45:00",
     fare: 420,
+    passengers: 1,
     bookingSource: "Flipkart",
     timeline: [
       { time: "10:45 AM", event: "Booking created by Lakshmi Rao" },
@@ -530,6 +532,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-22T09:00:00",
     fare: 210,
+    passengers: 3,
     bookingSource: "Individual",
     timeline: [
       { time: "09:00 AM", event: "Booking created by Lakshmi Rao" },
@@ -553,6 +556,7 @@ export const mockBookings: Booking[] = [
     status: "Ongoing",
     createdAt: "2024-04-22T10:40:00",
     fare: 310,
+    passengers: 1,
     bookingSource: "Swiggy",
     timeline: [
       { time: "10:40 AM", event: "Booking created by Deepa Shetty" },
@@ -574,6 +578,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-22T08:10:00",
     fare: 540,
+    passengers: 2,
     bookingSource: "Razorpay",
     timeline: [
       { time: "08:10 AM", event: "Booking created by Deepa Shetty" },
@@ -596,6 +601,7 @@ export const mockBookings: Booking[] = [
     status: "Ongoing",
     createdAt: "2024-04-22T11:00:00",
     fare: 390,
+    passengers: 4,
     bookingSource: "Infosys",
     timeline: [
       { time: "11:00 AM", event: "Booking created by Kiran Gowda" },
@@ -616,6 +622,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-21T14:30:00",
     fare: 650,
+    passengers: 1,
     bookingSource: "Infosys",
     timeline: [
       { time: "02:30 PM", event: "Booking created" },
@@ -637,6 +644,7 @@ export const mockBookings: Booking[] = [
     status: "Cancelled",
     createdAt: "2024-04-22T09:30:00",
     fare: 0,
+    passengers: 2,
     bookingSource: "Flipkart",
     timeline: [
       { time: "09:30 AM", event: "Booking created by Lakshmi Rao" },
@@ -657,6 +665,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T09:00:00",
     fare: 280,
+    passengers: 3,
     bookingSource: "Individual",
     supervisorDecisionAt: "2024-04-22T09:45:00",
     interestedDrivers: [
@@ -678,6 +687,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T10:00:00",
     fare: 370,
+    passengers: 1,
     bookingSource: "Flipkart",
     supervisorDecisionAt: null,
     interestedDrivers: [
@@ -698,6 +708,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-20T18:00:00",
     fare: 490,
+    passengers: 2,
     bookingSource: "Zerodha",
     supervisorDecisionAt: "2024-04-20T19:30:00",
     interestedDrivers: [
@@ -718,6 +729,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-20T20:00:00",
     fare: 320,
+    passengers: 1,
     bookingSource: "Infosys",
     supervisorDecisionAt: "2024-04-20T21:00:00",
     interestedDrivers: [
@@ -739,6 +751,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T11:00:00",
     fare: 460,
+    passengers: 4,
     bookingSource: "Swiggy",
     supervisorDecisionAt: null,
     interestedDrivers: [],
@@ -756,6 +769,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T08:00:00",
     fare: 720,
+    passengers: 2,
     bookingSource: "Biocon",
     supervisorDecisionAt: "2024-04-22T08:30:00",
     interestedDrivers: [
@@ -776,6 +790,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-21T16:00:00",
     fare: 260,
+    passengers: 1,
     bookingSource: "Individual",
     timeline: [
       { time: "04:00 PM", event: "Booking created" },
@@ -797,6 +812,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-21T18:30:00",
     fare: 180,
+    passengers: 2,
     bookingSource: "Individual",
     timeline: [
       { time: "06:30 PM", event: "Booking created" },
@@ -818,6 +834,7 @@ export const mockBookings: Booking[] = [
     status: "Completed",
     createdAt: "2024-04-22T07:20:00",
     fare: 340,
+    passengers: 1,
     bookingSource: "Mphasis",
     timeline: [
       { time: "07:20 AM", event: "Booking created" },
@@ -838,6 +855,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T09:00:00",
     fare: 290,
+    passengers: 3,
     bookingSource: "Biocon",
     supervisorDecisionAt: "2024-04-22T09:30:00",
     interestedDrivers: [
@@ -857,6 +875,7 @@ export const mockBookings: Booking[] = [
     status: "Cancelled",
     createdAt: "2024-04-22T07:50:00",
     fare: 0,
+    passengers: 1,
     bookingSource: "Individual",
     timeline: [
       { time: "07:50 AM", event: "Booking created" },
@@ -876,6 +895,7 @@ export const mockBookings: Booking[] = [
     status: "Pending",
     createdAt: "2024-04-22T10:30:00",
     fare: 410,
+    passengers: 2,
     bookingSource: "Infosys",
     supervisorDecisionAt: null,
     interestedDrivers: [
