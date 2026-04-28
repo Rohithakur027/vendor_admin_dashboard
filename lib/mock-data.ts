@@ -12,9 +12,11 @@ export interface Vendor {
   status: "Active" | "Inactive";
   joinedAt: string;
   totalDrivers: number;
+  totalSupervisors?: number;
   totalBookingsToday: number;
   totalBookingsAllTime: number;
   secondaryPOCs?: { name: string; email: string; phone: string }[];
+  wallet_balance?: number;
 }
 
 export const mockVendors: Vendor[] = [

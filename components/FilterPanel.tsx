@@ -1,9 +1,9 @@
 "use client";
 
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { X } from "lucide-react";
 import { TbFilter } from "react-icons/tb";
 import { cn } from "@/lib/utils";
-import { useEffect, useRef, useState, useCallback } from "react";
 
 interface FilterPanelProps {
   open: boolean;
@@ -161,24 +161,27 @@ interface FilterTriggerProps {
   activeCount?: number;
 }
 
-export function FilterTrigger({ onClick, activeCount = 0 }: FilterTriggerProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-2 h-9 px-3 rounded-lg border text-sm font-medium transition-colors",
-        activeCount > 0
-          ? "border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100"
-          : "border-border bg-white text-muted-foreground hover:text-foreground hover:border-foreground/30"
-      )}
-    >
-      <TbFilter className="h-4 w-4" />
-      Filter
-      {activeCount > 0 && (
-        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
-          {activeCount}
-        </span>
-      )}
-    </button>
-  );
-}
+export const FilterTrigger = React.forwardRef<HTMLButtonElement, FilterTriggerProps>(
+  function FilterTrigger({ onClick, activeCount = 0 }, ref) {
+    return (
+      <button
+        ref={ref}
+        onClick={onClick}
+        className={cn(
+          "relative flex items-center gap-2 h-[42px] px-4 rounded-xl border font-semibold text-[13px] shadow-sm transition-colors",
+          activeCount > 0
+            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+        )}
+      >
+        <TbFilter className="h-[15px] w-[15px] shrink-0" />
+        Filter
+        {activeCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-[10px] font-bold text-white flex items-center justify-center">
+            {activeCount}
+          </span>
+        )}
+      </button>
+    );
+  }
+);

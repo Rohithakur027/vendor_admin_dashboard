@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { SearchBar } from "@/components/SearchBar";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { TbFilter } from "react-icons/tb";
 import { cn } from "@/lib/utils";
 import type { SupervisorStatus } from "../types";
@@ -315,15 +315,11 @@ export function SupervisorFilters({
   return (
     <div className="flex gap-3 items-center">
       {/* Search */}
-      <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name or email…"
-          className="pl-9 h-[42px] rounded-xl border-slate-200"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
+      <SearchBar
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search by name or email…"
+      />
 
       {/* Filter button */}
       <div className="relative">

@@ -34,4 +34,7 @@ export interface Booking {
   supervisorDecisionAt?: string | null;
   // Instant booking specific
   timeline?: BookingTimelineEvent[];
+  // Live tracking
+  bookingRef?: string | null;
+  driverPhone?: string | null;
 }

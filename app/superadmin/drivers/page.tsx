@@ -3,18 +3,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { superadminApi, type DriverApiItem } from "@/lib/api";
-import { Search, Users, Navigation, CircleCheck, WifiOff } from "lucide-react";
-import { TbFilter } from "react-icons/tb";
+import { Users, Navigation, CircleCheck, WifiOff } from "lucide-react";
+import { SearchBar } from "@/components/SearchBar";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   FilterPanel,
   FilterSection,
   FilterPill,
+  FilterTrigger,
 } from "@/components/FilterPanel";
 
-const ACCENT = "#2563EB";
-const FONT   = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
-const GRID   = "2fr 1.2fr 120px 80px 170px";
+const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
 type StatusFilter = "All" | "Available" | "On Trip" | "Offline";
 
@@ -27,23 +27,11 @@ function fmtDateTime(iso: string) {
   );
 }
 
-function SkeletonRow() {
-  return (
-    <div style={{
-      display: "grid", gridTemplateColumns: GRID, columnGap: 16,
-      padding: "15px 24px", alignItems: "center",
-      borderBottom: "1px solid #F8FAFC",
-    }}>
-      <div>
-        <div style={{ height: 13, width: "55%", borderRadius: 6, background: "#F1F5F9", marginBottom: 6 }} />
-        <div style={{ height: 10, width: "40%", borderRadius: 5, background: "#F1F5F9" }} />
-      </div>
-      <div style={{ height: 12, width: "60%", borderRadius: 6, background: "#F1F5F9" }} />
-      <div style={{ height: 24, width: 76, borderRadius: 99, background: "#F1F5F9" }} />
-      <div style={{ height: 12, width: 24, borderRadius: 6, background: "#F1F5F9" }} />
-      <div style={{ height: 11, width: "70%", borderRadius: 5, background: "#F1F5F9" }} />
-    </div>
-  );
+function fmtPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  return phone;
 }
 
 export default function SuperAdminDriversPage() {
@@ -87,14 +75,6 @@ export default function SuperAdminDriversPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
-      <style>{`
-        @keyframes shimmer {
-          0%   { opacity: 1; }
-          50%  { opacity: 0.4; }
-          100% { opacity: 1; }
-        }
-        .sk-pulse { animation: shimmer 1.4s ease-in-out infinite; }
-      `}</style>
 
       {/* ── Stat cards ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
@@ -128,49 +108,14 @@ export default function SuperAdminDriversPage() {
 
       {/* ── Toolbar ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ position: "relative", flex: "0 1 380px" }}>
-          <Search
-            className="h-4 w-4"
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }}
-          />
-          <input
-            placeholder="Search drivers…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              width: "100%", paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9,
-              border: "1.5px solid #E8EEF4", borderRadius: 10, fontSize: 13.5, fontFamily: FONT,
-              color: "#0F172A", background: "#fff", outline: "none", boxSizing: "border-box" as const,
-            }}
-          />
-        </div>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name or phone…"
+        />
 
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button
-            onClick={() => setFilterOpen(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "9px 14px",
-              border:      activeFilterCount > 0 ? "1.5px solid #93C5FD" : "1.5px solid #E8EEF4",
-              borderRadius: 10,
-              background:  activeFilterCount > 0 ? "#EFF6FF" : "#fff",
-              color:       activeFilterCount > 0 ? "#1D4ED8"  : "#334155",
-              fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              letterSpacing: "0.04em", transition: "all 0.15s",
-            }}
-          >
-            <TbFilter style={{ width: 15, height: 15 }} />
-            FILTER
-            {activeFilterCount > 0 && (
-              <span style={{
-                background: ACCENT, color: "#fff", fontSize: 9, fontWeight: 800,
-                borderRadius: "50%", width: 15, height: 15,
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
+        <div className="relative shrink-0">
+          <FilterTrigger onClick={() => setFilterOpen(v => !v)} activeCount={activeFilterCount} />
 
           <FilterPanel
             open={filterOpen}
@@ -188,60 +133,81 @@ export default function SuperAdminDriversPage() {
       </div>
 
       {/* ── Table ── */}
-      <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, overflow: "hidden" }}>
+      {(() => {
+        const COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.4fr)]";
+        const ROW  = `grid ${COLS} items-center gap-8 px-7 py-4`;
+        return (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
 
-        {/* Header row */}
-        <div style={{
-          display: "grid", gridTemplateColumns: GRID,
-          padding: "12px 24px", background: "#F8FAFC", borderBottom: "1px solid #F1F5F9",
-          columnGap: 16,
-        }}>
-          {["DRIVER", "PHONE", "STATUS", "TRIPS", "LAST ACTIVE"].map(h => (
-            <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>
-              {h}
-            </span>
-          ))}
-        </div>
-
-        {/* Body */}
-        {loading ? (
-          <div className="sk-pulse">
-            {Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)}
-          </div>
-        ) : error ? (
-          <div style={{ padding: "48px 0", textAlign: "center" as const, color: "#EF4444", fontSize: 13 }}>
-            {error}
-          </div>
-        ) : drivers.length === 0 ? (
-          <div style={{ padding: "48px 0", textAlign: "center" as const, color: "#94A3B8", fontSize: 13 }}>
-            No drivers found.
-          </div>
-        ) : (
-          drivers.map((d, idx) => (
-            <div
-              key={d.id}
-              onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
-              style={{
-                display: "grid", gridTemplateColumns: GRID, columnGap: 16,
-                padding: "15px 24px", alignItems: "center", cursor: "pointer",
-                borderBottom: idx < drivers.length - 1 ? "1px solid #F8FAFC" : "none",
-                transition: "background 0.12s",
-              }}
-              onMouseEnter={e  => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{d.name}</div>
-                <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2, fontWeight: 500 }}>{d.id}</div>
-              </div>
-              <span style={{ fontSize: 13, color: "#334155" }}>{d.phone}</span>
-              <StatusBadge status={d.status} size="sm" />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{d.totalTrips}</span>
-              <span style={{ fontSize: 11.5, color: "#94A3B8" }}>{fmtDateTime(d.lastActiveAt)}</span>
+            {/* Header */}
+            <div className={`grid ${COLS} items-center gap-8 px-7 py-3.5 border-b border-slate-100 bg-slate-50/50`}>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">DRIVER</div>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">PHONE</div>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-center">STATUS</div>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-center">TRIPS</div>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-right">LAST ACTIVE</div>
             </div>
-          ))
-        )}
-      </div>
+
+            {/* Body */}
+            <div className="flex flex-col divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={ROW}>
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-3/5" />
+                      <Skeleton className="h-3 w-2/5" />
+                    </div>
+                    <Skeleton className="h-3.5 w-32" />
+                    <div className="flex justify-center"><Skeleton className="h-6 w-20 rounded-full" /></div>
+                    <div className="flex justify-center"><Skeleton className="h-3.5 w-5" /></div>
+                    <div className="flex justify-end"><Skeleton className="h-3 w-36" /></div>
+                  </div>
+                ))
+              ) : error ? (
+                <div className="py-12 text-center text-sm text-red-500">{error}</div>
+              ) : drivers.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-sm font-medium text-slate-500">No drivers found.</p>
+                </div>
+              ) : (
+                drivers.map((d) => (
+                  <div
+                    key={d.id}
+                    onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
+                    className={`${ROW} hover:bg-slate-50 transition-colors cursor-pointer`}
+                  >
+                    {/* Driver — widest, left */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-extrabold text-[#111827] text-[13.5px] truncate leading-snug">{d.name}</span>
+                      <span className="text-[11px] text-slate-400 font-medium mt-0.5">{d.driverRef ?? d.id}</span>
+                    </div>
+
+                    {/* Phone — left */}
+                    <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>
+
+                    {/* Status — centered */}
+                    <div className="flex justify-center">
+                      <StatusBadge status={d.status} size="sm" />
+                    </div>
+
+                    {/* Trips — centered anchor */}
+                    <div className="flex justify-center">
+                      <span className={`text-[14px] font-bold ${d.totalTrips === 0 ? "text-slate-300" : "text-slate-800"}`}>
+                        {d.totalTrips}
+                      </span>
+                    </div>
+
+                    {/* Last Active — right-flush */}
+                    <span className="text-[12.5px] text-slate-500 font-medium whitespace-nowrap text-right">
+                      {fmtDateTime(d.lastActiveAt)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
