@@ -13,7 +13,7 @@ import type { Supervisor, SupervisorFormData, SupervisorStatus } from "@/modules
 function SupervisorsSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="space-y-2">
           <Skeleton className="h-6 w-32" />
           <Skeleton className="h-4 w-44" />
@@ -122,7 +122,7 @@ export default function SupervisorsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Supervisors</h2>
           <p className="text-sm text-muted-foreground">{supervisors.length} total supervisors</p>

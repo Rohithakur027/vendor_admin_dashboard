@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import {
   Drawer,
   DrawerContent,
@@ -10,6 +11,11 @@ import { Clock, CheckCircle2, XCircle, Loader2, Phone } from "lucide-react";
 import type { Booking, BookingStatus } from "../types";
 import { useVendor } from "@/context/VendorContext";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+
+const LiveTrackingMap = dynamic(
+  () => import("@/components/LiveTrackingMap"),
+  { ssr: false },
+);
 
 const ACCENT = "#2563EB";
 
@@ -253,21 +259,14 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     <>
       {/* Map */}
       {booking && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, overflow: "hidden" }}>
-          <div style={{ padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1.5px solid #EBEBEB", background: "#fff" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Live Map</div>
-            <span style={{ fontSize: 12, color: "#374151", fontWeight: 600 }}>↗ Route View</span>
-          </div>
-          <div style={{ height: 220, position: "relative", overflow: "hidden" }}>
-            <iframe
-              title={`Map for ${booking.id}`}
-              src={`https://maps.google.com/maps?saddr=${encodeURIComponent(booking.pickupLocation)}&daddr=${encodeURIComponent(booking.dropLocation)}&output=embed`}
-              style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-          </div>
-        </div>
+        <LiveTrackingMap
+          booking_id={booking.id}
+          pickup_address={booking.pickupLocation}
+          drop_address={booking.dropLocation}
+          driver_name={booking.driverName}
+          driver_phone={booking.driverPhone ?? driver?.phone ?? null}
+          booking_ref={booking.bookingRef ?? null}
+        />
       )}
 
       {/* Timeline */}

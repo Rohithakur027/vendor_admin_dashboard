@@ -2,16 +2,15 @@
 
 import { useState, Fragment } from "react";
 import { useVendor } from "@/context/VendorContext";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Input } from "@/components/ui/input";
 import {
   FilterPanel,
   FilterSection,
   FilterPill,
+  FilterTrigger,
 } from "@/components/FilterPanel";
-import { Search, Car, ArrowRight } from "lucide-react";
-import { TbFilter } from "react-icons/tb";
+import { Car, ArrowRight } from "lucide-react";
+import { SearchBar } from "@/components/SearchBar";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
@@ -141,28 +140,13 @@ export default function ActiveBookingsPage() {
 
       {/* SEARCH AND FILTER BUTTONS */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by ID, pickup or drop location..."
-            className="pl-10 h-[42px] border-slate-200 bg-white rounded-xl shadow-sm text-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 shrink-0 relative">
-          <Button 
-            variant="outline" 
-            className="h-[42px] rounded-xl border-slate-200 text-slate-700 font-medium bg-white shadow-sm gap-2 px-4 hover:bg-slate-50 hover:text-slate-900 transition-colors relative"
-            onClick={() => setFilterOpen((v) => !v)}
-          >
-            <TbFilter className="h-[15px] w-[15px]" /> FILTER
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-[10px] font-bold text-white flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by ID, pickup or drop location..."
+        />
+        <div className="relative shrink-0">
+          <FilterTrigger onClick={() => setFilterOpen((v) => !v)} activeCount={activeFilterCount} />
           <FilterPanel
             open={filterOpen}
             onClose={() => setFilterOpen(false)}
@@ -185,8 +169,6 @@ export default function ActiveBookingsPage() {
               ))}
             </FilterSection>
           </FilterPanel>
-
-
         </div>
       </div>
 

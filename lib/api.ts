@@ -81,15 +81,48 @@ export interface CreateVendorPayload {
   walletAmount?: number;
 }
 
+export interface VendorDetailApiItem extends Vendor {
+  wallet_balance: number;
+  secondaryPOCs: { name: string; email: string; phone: string }[];
+}
+
+export interface WalletTransaction {
+  id:             string;
+  type:           string;
+  amount:         number;
+  note:           string | null;
+  balance_before: number | null;
+  balance_after:  number | null;
+  created_at:     string;
+}
+
 export const vendorsApi = {
   list: () =>
     apiFetch<{ success: true; data: Vendor[] }>("/api/vendor/vendors"),
+
+  get: (id: string) =>
+    apiFetch<{ success: true; data: VendorDetailApiItem }>(`/api/vendor/vendors/${id}`),
 
   create: (payload: CreateVendorPayload) =>
     apiFetch<{ success: true; data: Vendor }>("/api/vendor/vendors", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  update: (id: string, payload: { status?: "Active" | "Inactive"; name?: string; city?: string }) =>
+    apiFetch<{ success: true; data: VendorDetailApiItem }>(`/api/vendor/vendors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+
+  recharge: (id: string, amount: number) =>
+    apiFetch<{ success: true; data: { wallet_balance: number } }>(`/api/vendor/vendors/${id}/recharge`, {
+      method: "POST",
+      body: JSON.stringify({ amount }),
+    }),
+
+  transactions: (id: string) =>
+    apiFetch<{ success: true; data: WalletTransaction[] }>(`/api/vendor/vendors/${id}/transactions`),
 };
 
 // ── Supervisors ──────────────────────────────────────────────────────────────
@@ -149,6 +182,7 @@ export const supervisorsApi = {
 
 export interface DriverApiItem {
   id: string;
+  driverRef: string | null;
   userId: string;
   name: string;
   phone: string;

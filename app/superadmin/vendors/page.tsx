@@ -5,62 +5,63 @@ import { useRouter } from "next/navigation";
 import { vendorsApi, type CreateVendorPayload } from "@/lib/api";
 import type { Vendor } from "@/lib/mock-data";
 import {
-  Building2, Plus, Search, CheckCircle2, XCircle, X, RefreshCw,
-  Eye, EyeOff, Wallet, Check, Loader2, AlertCircle,
-  ChevronRight, ChevronLeft, Info,
+  Plus, X, RefreshCw,
+  Eye, EyeOff, Wallet, Check, Loader2, AlertCircle, CheckCircle2,
+  ChevronRight, ChevronLeft,
 } from "lucide-react";
-import { TbFilter } from "react-icons/tb";
-import { FilterPanel, FilterSection, FilterPill } from "@/components/FilterPanel";
+import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
+import { SearchBar } from "@/components/SearchBar";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type StatusFilter = "All" | "Active" | "Inactive";
 
+function fmtPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  return phone;
+}
+
 function VendorsSkeleton() {
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border p-4 flex items-center gap-3">
-            <Skeleton className="h-8 w-8 rounded-lg" />
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-10" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-          </div>
-        ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-28" />
+          <Skeleton className="h-4 w-36" />
+        </div>
+        <Skeleton className="h-10 w-40 rounded-xl" />
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <Skeleton className="h-9 flex-1 max-w-sm rounded-lg" />
-        <Skeleton className="h-9 w-24 rounded-lg" />
-        <Skeleton className="h-10 w-36 rounded-xl ml-auto" />
+      <div className="flex gap-3">
+        <Skeleton className="h-[42px] flex-1 rounded-xl" />
+        <Skeleton className="h-[42px] w-24 rounded-xl" />
       </div>
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.8fr)_90px_100px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          {["VENDOR","CONTACT","EMAIL","STATUS","JOINED"].map((h) => (
-            <Skeleton key={h} className="h-3 w-16" />
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+          {[160, 120, 100, 110, 70, 60].map((w, i) => (
+            <Skeleton key={i} className="h-3" style={{ width: w }} />
           ))}
         </div>
         <div className="flex flex-col divide-y divide-slate-100">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_110px_90px_100px] items-center gap-4 px-6 py-4">
+            <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5">
               <div className="space-y-1.5">
                 <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-              <div className="space-y-1.5">
-                <Skeleton className="h-3.5 w-2/3" />
                 <Skeleton className="h-3 w-1/3" />
               </div>
-              <Skeleton className="h-4 w-8" />
+              <Skeleton className="h-3.5 w-2/3" />
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="h-3.5 w-1/2" />
               <Skeleton className="h-6 w-16 rounded-full" />
-              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3.5 w-14" />
             </div>
           ))}
         </div>
@@ -91,7 +92,6 @@ export default function SuperAdminVendorsPage() {
   const [step,         setStep]        = useState<1 | 2>(1);
   const [filterOpen,   setFilterOpen]  = useState(false);
   const [cityFilter,   setCityFilter]  = useState("All");
-  const [mockInfoVendor, setMockInfoVendor] = useState<Vendor | null>(null);
 
   // Step 1 fields
   const [form, setForm] = useState({ name: "", contactPerson: "", email: "", phone: "", city: "" });
@@ -215,78 +215,39 @@ export default function SuperAdminVendorsPage() {
     setSubmitSuccess(false);
   }
 
-  const totalActive   = vendors.filter((v) => v.status === "Active").length;
-  const totalInactive = vendors.filter((v) => v.status === "Inactive").length;
-
   if (loadingList) return <VendorsSkeleton />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: "Total Vendors",    value: vendors.length, icon: Building2,    bg: "bg-slate-100" },
-          { label: "Active Vendors",   value: totalActive,    icon: CheckCircle2, bg: "bg-slate-100" },
-          { label: "Inactive Vendors", value: totalInactive,  icon: XCircle,      bg: "bg-slate-100" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border p-4 flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${s.bg}`}>
-              <s.icon className="h-4 w-4 text-slate-500" />
-            </div>
-            <div>
-              <p className="text-xl font-bold">{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-            </div>
-          </div>
-        ))}
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Vendors</h2>
+          <p className="text-sm text-slate-500">{vendors.length} total vendors</p>
+        </div>
+        <Button
+          className="bg-blue-600 hover:bg-blue-700 gap-2 rounded-xl px-5 h-10 text-[13px] font-semibold"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <span className="flex items-center justify-center h-5 w-5 rounded-full border border-white/50 shrink-0">
+            <Plus className="h-3 w-3" />
+          </span>
+          Onboard Vendor
+        </Button>
       </div>
 
-      {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-
-        {/* Search */}
-        <div style={{ position: "relative", flex: "0 1 380px" }}>
-          <Search className="h-4 w-4" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-          <input
-            placeholder="Search vendors…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              width: "100%", paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9,
-              border: "1.5px solid #E8EEF4", borderRadius: 10, fontSize: 13.5,
-              color: "#0F172A", background: "#fff", outline: "none", boxSizing: "border-box" as const,
-            }}
-          />
-        </div>
+      {/* ── Search + Filter ── */}
+      <div className="flex gap-3 items-center">
+        <SearchBar
+          value={search}
+          onChange={setSearch}
+          placeholder="Search by name or city…"
+        />
 
         {/* Filter button */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button
-            onClick={() => setFilterOpen(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "9px 14px",
-              border: activeVendorFilterCount > 0 ? "1.5px solid #93C5FD" : "1.5px solid #E8EEF4",
-              borderRadius: 10,
-              background: activeVendorFilterCount > 0 ? "#EFF6FF" : "#fff",
-              color: activeVendorFilterCount > 0 ? "#1D4ED8" : "#334155",
-              fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-              letterSpacing: "0.04em", transition: "all 0.15s",
-            }}
-          >
-            <TbFilter style={{ width: 15, height: 15 }} />
-            FILTER
-            {activeVendorFilterCount > 0 && (
-              <span style={{
-                background: "#2563EB", color: "#fff", fontSize: 9, fontWeight: 800,
-                borderRadius: "50%", width: 15, height: 15,
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {activeVendorFilterCount}
-              </span>
-            )}
-          </button>
+        <div className="relative shrink-0">
+          <FilterTrigger onClick={() => setFilterOpen(v => !v)} activeCount={activeVendorFilterCount} />
           <FilterPanel
             open={filterOpen}
             onClose={() => setFilterOpen(false)}
@@ -308,17 +269,6 @@ export default function SuperAdminVendorsPage() {
             )}
           </FilterPanel>
         </div>
-
-        {/* Onboard Vendor — pushed to right */}
-        <div style={{ marginLeft: "auto" }}>
-          <Button className="bg-blue-600 hover:bg-blue-700 gap-1.5 rounded-xl h-10 text-[13px] font-semibold px-5"
-            onClick={() => setDrawerOpen(true)}>
-            <span className="flex items-center justify-center h-5 w-5 rounded-full border border-white/50 shrink-0">
-              <Plus className="h-3 w-3" />
-            </span>
-            Onboard Vendor
-          </Button>
-        </div>
       </div>
 
       {listError && (
@@ -328,32 +278,58 @@ export default function SuperAdminVendorsPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="min-w-[860px]">
-            <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.8fr)_90px_100px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-              {["VENDOR","CONTACT","EMAIL","STATUS","JOINED"].map((h) => (
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[900px]">
+            {/* Header */}
+            <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+              {["VENDOR", "EMAIL", "PHONE", "CONTACT PERSON", "STATUS", "JOINED"].map((h) => (
                 <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
               ))}
             </div>
+            {/* Body */}
             <div className="flex flex-col divide-y divide-slate-100">
               {filtered.length === 0 ? (
-                <div className="text-center py-14 text-slate-400 text-sm">No vendors found.</div>
+                <div className="text-center py-14 text-slate-500">
+                  <p className="text-sm font-medium">No vendors found.</p>
+                </div>
               ) : (
                 filtered.map((v) => (
-                  <div key={v.id} onClick={() => setMockInfoVendor(v)} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1.8fr)_90px_100px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer">
-                    <div className="min-w-0">
-                      <p className="font-extrabold text-[13px] text-[#111827] truncate">{v.name}</p>
+                  <div
+                    key={v.id}
+                    onClick={() => router.push(`/superadmin/vendors/${v.id}`)}
+                    className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    {/* Vendor name + city */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
+                      <span className="text-[11px] text-slate-400 font-medium truncate">{v.city}</span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-700 truncate">{v.contactPerson}</p>
-                      <p className="text-[11px] text-slate-400">{v.phone}</p>
+
+                    {/* Email */}
+                    <div className="flex items-center min-w-0">
+                      <span className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>
                     </div>
-                    <div className="text-[12px] text-slate-500 truncate min-w-0">{v.email}</div>
+
+                    {/* Phone — separate column */}
+                    <div className="flex items-center">
+                      <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>
+                    </div>
+
+                    {/* Contact person */}
+                    <div className="flex items-center min-w-0">
+                      <span className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>
+                    </div>
+
+                    {/* Status */}
                     <div>
                       <StatusBadge status={v.status} size="sm" />
                     </div>
-                    <div className="text-[12px] text-slate-400 font-medium">{v.joinedAt}</div>
+
+                    {/* Joined */}
+                    <div>
+                      <span className="text-[13px] text-slate-600 font-medium">{v.joinedAt}</span>
+                    </div>
                   </div>
                 ))
               )}
@@ -361,43 +337,6 @@ export default function SuperAdminVendorsPage() {
           </div>
         </div>
       </div>
-
-      {/* ── Mock Data Info Dialog ── */}
-      <Dialog open={!!mockInfoVendor} onOpenChange={(o) => !o && setMockInfoVendor(null)}>
-        <DialogContent className="sm:max-w-[400px] p-0 gap-0 rounded-2xl overflow-hidden">
-          <div className="px-6 pt-6 pb-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                <Info className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <DialogTitle className="text-[15px] font-bold text-slate-800 leading-tight">
-                  {mockInfoVendor?.name}
-                </DialogTitle>
-                <p className="text-[12px] text-slate-400 mt-0.5">Vendor preview</p>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3.5">
-              <p className="text-[13px] text-amber-800 font-semibold leading-snug">
-                This is a placeholder setup.
-              </p>
-              <p className="text-[12.5px] text-amber-700 mt-1.5 leading-relaxed">
-                Full vendor details — bookings, assigned drivers, supervisors, and analytics — will be available automatically once this vendor is properly onboarded and starts using the platform.
-              </p>
-            </div>
-
-            <div className="flex justify-end mt-5">
-              <Button
-                onClick={() => setMockInfoVendor(null)}
-                className="rounded-xl h-9 px-5 text-[13px] bg-slate-900 hover:bg-slate-700"
-              >
-                Got it
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* ── Onboard Vendor Modal ── */}
       <Dialog open={drawerOpen} onOpenChange={(o) => !o && closeModal()}>

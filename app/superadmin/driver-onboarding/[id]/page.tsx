@@ -1,10 +1,11 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { driverOnboardingApi, type OnboardingDetail, type OnboardingDoc } from "@/lib/api";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const BLUE = "#1d4ed8";
 const FONT = "'DM Sans', system-ui, sans-serif";
@@ -43,45 +44,46 @@ function fmtDate(iso: string | null) {
 
 function buildSections(r: OnboardingDetail) {
   const fmt = (v: string | null | undefined) => v || "—";
-  const sections: { title: string; fields: { label: string; value: string }[] }[] = [
+  type Field = { label: string; value: string; raw: string; key: string };
+  const sections: { title: string; fields: Field[] }[] = [
     {
       title: "PERSONAL INFORMATION",
       fields: [
-        { label: "FULL NAME",       value: fmt(r.full_name) },
-        { label: "DATE OF BIRTH",   value: fmtDate(r.date_of_birth) },
-        { label: "GENDER",          value: fmt(r.gender) },
-        { label: "PHONE NUMBER",    value: fmt(r.phone) },
-        { label: "ALTERNATE PHONE", value: fmt(r.alternate_phone) },
-        { label: "EMAIL ADDRESS",   value: fmt(r.email) },
+        { label: "FULL NAME",       value: fmt(r.full_name),         raw: r.full_name ?? "",         key: "full_name" },
+        { label: "DATE OF BIRTH",   value: fmtDate(r.date_of_birth), raw: r.date_of_birth ?? "",     key: "date_of_birth" },
+        { label: "GENDER",          value: fmt(r.gender),            raw: r.gender ?? "",            key: "gender" },
+        { label: "PHONE NUMBER",    value: fmt(r.phone),             raw: r.phone ?? "",             key: "phone" },
+        { label: "ALTERNATE PHONE", value: fmt(r.alternate_phone),   raw: r.alternate_phone ?? "",   key: "alternate_phone" },
+        { label: "EMAIL ADDRESS",   value: fmt(r.email),             raw: r.email ?? "",             key: "email" },
       ],
     },
     {
       title: "ADDRESS DETAILS",
       fields: [
-        { label: "CURRENT ADDRESS",   value: fmt(r.current_address) },
-        { label: "CITY",              value: fmt(r.city) },
-        { label: "STATE",             value: fmt(r.state) },
-        { label: "PINCODE",           value: fmt(r.pincode) },
-        { label: "PERMANENT ADDRESS", value: fmt(r.permanent_address) },
-        { label: "NATIONALITY",       value: fmt(r.nationality) },
+        { label: "CURRENT ADDRESS",   value: fmt(r.current_address),   raw: r.current_address ?? "",   key: "current_address" },
+        { label: "CITY",              value: fmt(r.city),              raw: r.city ?? "",              key: "city" },
+        { label: "STATE",             value: fmt(r.state),             raw: r.state ?? "",             key: "state" },
+        { label: "PINCODE",           value: fmt(r.pincode),           raw: r.pincode ?? "",           key: "pincode" },
+        { label: "PERMANENT ADDRESS", value: fmt(r.permanent_address), raw: r.permanent_address ?? "", key: "permanent_address" },
+        { label: "NATIONALITY",       value: fmt(r.nationality),       raw: r.nationality ?? "",       key: "nationality" },
       ],
     },
     {
       title: "LICENSE & EMPLOYMENT",
       fields: [
-        { label: "LICENSE NUMBER",      value: fmt(r.license_number) },
-        { label: "LICENSE CLASS",       value: fmt(r.license_class) },
-        { label: "LICENSE EXPIRY",      value: fmtDate(r.license_expiry) },
-        { label: "YEARS OF EXPERIENCE", value: r.years_of_experience != null ? `${r.years_of_experience} Years` : "—" },
-        { label: "JOINING DATE",        value: fmtDate(r.joining_date) },
+        { label: "LICENSE NUMBER",      value: fmt(r.license_number),                                                         raw: r.license_number ?? "",                                      key: "license_number" },
+        { label: "LICENSE CLASS",       value: fmt(r.license_class),                                                          raw: r.license_class ?? "",                                       key: "license_class" },
+        { label: "LICENSE EXPIRY",      value: fmtDate(r.license_expiry),                                                     raw: r.license_expiry ?? "",                                      key: "license_expiry" },
+        { label: "YEARS OF EXPERIENCE", value: r.years_of_experience != null ? `${r.years_of_experience} Years` : "—",        raw: r.years_of_experience != null ? String(r.years_of_experience) : "", key: "years_of_experience" },
+        { label: "JOINING DATE",        value: fmtDate(r.joining_date),                                                       raw: r.joining_date ?? "",                                        key: "joining_date" },
       ],
     },
     {
       title: "EMERGENCY CONTACT",
       fields: [
-        { label: "CONTACT NAME",  value: fmt(r.emergency_contact_name) },
-        { label: "RELATIONSHIP",  value: fmt(r.emergency_contact_relationship) },
-        { label: "CONTACT PHONE", value: fmt(r.emergency_contact_phone) },
+        { label: "CONTACT NAME",  value: fmt(r.emergency_contact_name),         raw: r.emergency_contact_name ?? "",         key: "emergency_contact_name" },
+        { label: "RELATIONSHIP",  value: fmt(r.emergency_contact_relationship), raw: r.emergency_contact_relationship ?? "", key: "emergency_contact_relationship" },
+        { label: "CONTACT PHONE", value: fmt(r.emergency_contact_phone),        raw: r.emergency_contact_phone ?? "",        key: "emergency_contact_phone" },
       ],
     },
   ];
@@ -90,10 +92,10 @@ function buildSections(r: OnboardingDetail) {
     sections.push({
       title: "VEHICLE INFORMATION",
       fields: [
-        { label: "PLATE NUMBER", value: fmt(r.vehicle.plate_number) },
-        { label: "MODEL",        value: fmt(r.vehicle.model) },
-        { label: "COLOR",        value: fmt(r.vehicle.color) },
-        { label: "TYPE",         value: fmt(r.vehicle.type) },
+        { label: "PLATE NUMBER", value: fmt(r.vehicle.plate_number), raw: r.vehicle.plate_number ?? "", key: "vehicle.plate_number" },
+        { label: "MODEL",        value: fmt(r.vehicle.model),        raw: r.vehicle.model ?? "",        key: "vehicle.model" },
+        { label: "COLOR",        value: fmt(r.vehicle.color),        raw: r.vehicle.color ?? "",        key: "vehicle.color" },
+        { label: "TYPE",         value: fmt(r.vehicle.type),         raw: r.vehicle.type ?? "",         key: "vehicle.type" },
       ],
     });
   }
@@ -329,18 +331,23 @@ function DatePickerCell({ value, onChange, hasExpiry }: { value: string; onChang
 
 // ── Document table ────────────────────────────────────────────────────────────
 function DocTable({
-  docs, onApprove, onReject, onView,
+  docs, onApprove, onReject, onView, onUpload,
 }: {
   docs:      Doc[];
   onApprove: (id: string) => void;
   onReject:  (id: string, reason: string) => void;
   onView:    (doc: Doc) => void;
+  onUpload:  (id: string, file: File) => void;
 }) {
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [reason,      setReason]      = useState("");
-  const [expiryEdits, setExpiryEdits] = useState<Record<string, string>>({});
+  const [rejectingId,   setRejectingId]   = useState<string | null>(null);
+  const [reason,        setReason]        = useState("");
+  const [expiryEdits,   setExpiryEdits]   = useState<Record<string, string>>({});
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
 
-  const GRID = "2fr 1.3fr 1.4fr 1.6fr";
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const pendingDocId  = useRef<string>("");
+
+  const GRID = "2fr 1.2fr 1.3fr 1.7fr 1.3fr";
   const GAP  = 16;
 
   function confirmReject(id: string) {
@@ -349,16 +356,42 @@ function DocTable({
     setReason("");
   }
 
+  const triggerUpload = useCallback((docId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    pendingDocId.current = docId;
+    fileInputRef.current?.click();
+  }, []);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file && pendingDocId.current) {
+      const docId = pendingDocId.current;
+      setUploadedFiles(prev => ({ ...prev, [docId]: file.name }));
+      onUpload(docId, file);
+    }
+    e.target.value = "";
+  }
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+      {/* Hidden file input shared across all rows */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+
       <div style={{ display: "grid", gridTemplateColumns: GRID, columnGap: GAP, padding: "11px 24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-        {["DOCUMENT", "STATUS", "EXPIRY DATE", "ACTION"].map(h => (
-          <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em", paddingLeft: h === "ACTION" ? 48 : 0 }}>{h}</span>
+        {["DOCUMENT", "STATUS", "EXPIRY DATE", "ACTION", "UPLOAD FILE"].map(h => (
+          <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
         ))}
       </div>
 
       {docs.map((doc, idx) => {
-        const currentExpiry = expiryEdits[doc.id] ?? doc.expiryDate ?? "";
+        const currentExpiry  = expiryEdits[doc.id] ?? doc.expiryDate ?? "";
+        const uploadedName   = uploadedFiles[doc.id];
         return (
           <div key={doc.id}>
             <div
@@ -373,8 +406,18 @@ function DocTable({
               onMouseEnter={e => { if (doc.submitted) (e.currentTarget as HTMLElement).style.background = "#f8fafc"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
             >
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: doc.submitted ? "#0f172a" : "#94a3b8" }}>{doc.name}</span>
+              {/* Document name */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: doc.submitted ? "#0f172a" : "#94a3b8" }}>{doc.name}</span>
+                {uploadedName && (
+                  <span style={{ fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                    📎 {uploadedName}
+                  </span>
+                )}
+              </div>
+
               <StatusBadge status={doc.status} />
+
               <div onClick={e => e.stopPropagation()}>
                 <DatePickerCell
                   value={currentExpiry}
@@ -382,7 +425,9 @@ function DocTable({
                   onChange={v => setExpiryEdits(p => ({ ...p, [doc.id]: v }))}
                 />
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 6, paddingLeft: 48 }} onClick={e => e.stopPropagation()}>
+
+              {/* Action column */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
                 {!doc.submitted ? (
                   <span style={{ fontSize: 12.5, color: "#94a3b8", fontStyle: "italic" }}>Awaiting upload</span>
                 ) : (
@@ -400,6 +445,26 @@ function DocTable({
                       </>
                     )}
                   </>
+                )}
+              </div>
+
+              {/* Upload File column */}
+              <div onClick={e => e.stopPropagation()}>
+                {uploadedName ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, maxWidth: 140 }}>
+                      📎 {uploadedName}
+                    </span>
+                    <button
+                      onClick={e => triggerUpload(doc.id, e)}
+                      style={{ padding: "3px 8px", borderRadius: 6, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: FONT, width: "fit-content" }}
+                    >Change</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={e => triggerUpload(doc.id, e)}
+                    style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #bfdbfe", background: "#eff6ff", color: BLUE, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}
+                  >Upload yourself</button>
                 )}
               </div>
             </div>
@@ -439,6 +504,89 @@ function DocTable({
   );
 }
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+function DriverReviewSkeleton() {
+  return (
+    <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Back button */}
+      <div>
+        <Skeleton className="h-9 w-20 rounded-[10px]" />
+      </div>
+
+      {/* Breadcrumb bar */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 20px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Skeleton className="h-3.5 w-32" />
+          <span style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 300 }}>/</span>
+          <Skeleton className="h-3.5 w-28" />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Skeleton className="h-8 w-32 rounded-lg" />
+          <Skeleton className="h-8 w-36 rounded-lg" />
+        </div>
+      </div>
+
+      {/* Profile card */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
+        <Skeleton className="h-14 w-14 rounded-full shrink-0" />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3.5 w-32" />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+          {[76, 76, 76].map((w, i) => (
+            <div key={i} style={{ padding: "12px 22px", borderRadius: 12, border: "1px solid #e2e8f0", textAlign: "center" as const, minWidth: w, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <Skeleton className="h-7 w-8" />
+              <Skeleton className="h-3 w-14" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Skeleton className="h-10 w-28 rounded-[9px]" />
+        <Skeleton className="h-10 w-36 rounded-[9px]" />
+        <Skeleton className="h-10 w-36 rounded-[9px]" />
+      </div>
+
+      {/* Basic details content */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+        {[
+          { title: "PERSONAL INFORMATION", rows: 2 },
+          { title: "ADDRESS DETAILS",      rows: 2 },
+          { title: "LICENSE & EMPLOYMENT", rows: 2 },
+        ].map((section, si, arr) => (
+          <div key={section.title} style={{ borderBottom: si < arr.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+            {/* Section header */}
+            <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+              <Skeleton className="h-3 w-40" />
+            </div>
+            {/* Field rows — 3 columns, 2 rows */}
+            {Array.from({ length: section.rows }).map((_, ri) => (
+              <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: ri < section.rows - 1 ? "1px solid #f1f5f9" : "none" }}>
+                {[0, 1, 2].map((ci) => (
+                  <div key={ci} style={{ padding: "16px 20px", borderRight: ci < 2 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                    <Skeleton className="h-2.5 w-20" />
+                    <Skeleton className="h-3.5 w-32" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DriverReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -450,6 +598,35 @@ export default function DriverReviewPage() {
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState<"basic" | "driver" | "vehicle">("basic");
   const [viewDoc,     setViewDoc]     = useState<{ doc: Doc; kind: "driver" | "vehicle" } | null>(null);
+
+  // basic-details inline editing
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [sectionDraft,   setSectionDraft]   = useState<Record<string, string>>({});
+
+  function startEdit(section: ReturnType<typeof buildSections>[0]) {
+    setEditingSection(section.title);
+    const draft: Record<string, string> = {};
+    for (const f of section.fields) draft[f.key] = f.raw;
+    setSectionDraft(draft);
+  }
+
+  function saveEdit() {
+    setRecord(prev => {
+      if (!prev) return prev;
+      const next = { ...prev } as typeof prev & { vehicle: typeof prev.vehicle };
+      for (const [key, val] of Object.entries(sectionDraft)) {
+        if (key.startsWith("vehicle.")) {
+          const vKey = key.split(".")[1] as "plate_number" | "model" | "color" | "type";
+          if (next.vehicle) next.vehicle = { ...next.vehicle, [vKey]: val || null };
+        } else {
+          (next as unknown as Record<string, unknown>)[key] = val || null;
+        }
+      }
+      return next;
+    });
+    setEditingSection(null);
+    setSectionDraft({});
+  }
 
   // onboarding-level reject modal
   const [rejectModal,    setRejectModal]    = useState(false);
@@ -475,6 +652,15 @@ export default function DriverReviewPage() {
     const t = setTimeout(() => setToast(""), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  function applyUpload(docId: string, kind: "driver" | "vehicle") {
+    const setter = kind === "driver" ? setDriverDocs : setVehicleDocs;
+    setter(prev => prev.map(d =>
+      d.id === docId && !d.submitted
+        ? { ...d, submitted: true, status: "Pending" as DocStatus }
+        : d
+    ));
+  }
 
   function applyApprove(docId: string, kind: "driver" | "vehicle") {
     const setter = kind === "driver" ? setDriverDocs : setVehicleDocs;
@@ -526,11 +712,7 @@ export default function DriverReviewPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div style={{ fontFamily: FONT, padding: 40, color: "#64748b", fontSize: 14 }}>Loading…</div>
-    );
-  }
+  if (loading) return <DriverReviewSkeleton />;
 
   if (!record) {
     return (
@@ -701,34 +883,74 @@ export default function DriverReviewPage() {
       {/* Tab: Basic Details */}
       {activeTab === "basic" && (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-          {basicSections.map((section, si) => (
-            <div key={section.title} style={{ borderBottom: si < basicSections.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-              <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{section.title}</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
-                {section.fields.map((field, fi) => {
-                  const cols    = 3;
-                  const total   = section.fields.length;
-                  const lastRow = Math.floor((total - 1) / cols);
-                  const row     = Math.floor(fi / cols);
-                  return (
-                    <div
-                      key={field.label}
-                      style={{
-                        padding: "16px 20px",
-                        borderRight:  fi % cols !== cols - 1 ? "1px solid #f1f5f9" : "none",
-                        borderBottom: row < lastRow ? "1px solid #f1f5f9" : "none",
-                      }}
-                    >
-                      <p style={{ fontSize: 10.5, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6 }}>{field.label}</p>
-                      <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>{field.value}</p>
+          {basicSections.map((section, si) => {
+            const isEditing = editingSection === section.title;
+            const cols = 3;
+            return (
+              <div key={section.title} style={{ borderBottom: si < basicSections.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+
+                {/* Section header */}
+                <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.08em" }}>{section.title}</span>
+                  {isEditing ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        onClick={saveEdit}
+                        style={{ padding: "4px 14px", borderRadius: 6, border: "none", background: BLUE, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT }}
+                      >Save</button>
+                      <button
+                        onClick={() => { setEditingSection(null); setSectionDraft({}); }}
+                        style={{ padding: "4px 10px", borderRadius: 6, border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}
+                      >Cancel</button>
                     </div>
-                  );
-                })}
+                  ) : (
+                    <button
+                      onClick={() => startEdit(section)}
+                      style={{ padding: "4px 12px", borderRadius: 6, border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}
+                    >Edit</button>
+                  )}
+                </div>
+
+                {/* Fields grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr" }}>
+                  {section.fields.map((field, fi) => {
+                    const total   = section.fields.length;
+                    const lastRow = Math.floor((total - 1) / cols);
+                    const row     = Math.floor(fi / cols);
+                    return (
+                      <div
+                        key={field.label}
+                        style={{
+                          padding: "14px 20px",
+                          borderRight:  fi % cols !== cols - 1 ? "1px solid #f1f5f9" : "none",
+                          borderBottom: row < lastRow ? "1px solid #f1f5f9" : "none",
+                          background: isEditing ? "#fafbfc" : "transparent",
+                        }}
+                      >
+                        <p style={{ fontSize: 10.5, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em", marginBottom: 6 }}>{field.label}</p>
+                        {isEditing ? (
+                          <input
+                            value={sectionDraft[field.key] ?? ""}
+                            onChange={e => setSectionDraft(prev => ({ ...prev, [field.key]: e.target.value }))}
+                            style={{
+                              width: "100%", padding: "7px 10px", border: "1.5px solid #e2e8f0",
+                              borderRadius: 7, fontSize: 13, fontFamily: FONT, color: "#0f172a",
+                              background: "#fff", outline: "none", boxSizing: "border-box" as const,
+                            }}
+                            onFocus={e  => { (e.target as HTMLInputElement).style.borderColor = BLUE; }}
+                            onBlur={e   => { (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"; }}
+                          />
+                        ) : (
+                          <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>{field.value}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -739,6 +961,7 @@ export default function DriverReviewPage() {
           onApprove={docId => applyApprove(docId, docKind)}
           onReject={(docId, reason) => applyReject(docId, reason, docKind)}
           onView={doc => setViewDoc({ doc, kind: docKind })}
+          onUpload={(docId) => applyUpload(docId, docKind)}
         />
       )}
 
