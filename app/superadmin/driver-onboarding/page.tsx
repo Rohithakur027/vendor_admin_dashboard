@@ -2,19 +2,81 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Clock, ScanEye, AlertCircle } from "lucide-react";
-import { TbFilter } from "react-icons/tb";
+import { Clock, ScanEye, AlertCircle, Plus } from "lucide-react";
+import { SearchBar } from "@/components/SearchBar";
 import { driverOnboardingApi, type OnboardingListItem } from "@/lib/api";
-import { FilterPanel, FilterSection, FilterPill } from "@/components/FilterPanel";
-import { getStatusStyle } from "@/components/StatusBadge";
+import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const ACCENT = "#2563EB";
 const FONT   = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
 type StatusFilter = "All" | "Pending" | "In Review" | "Rejected" | "Approved";
 
+function DriverOnboardingSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
+      {/* Page header */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <Skeleton className="h-6 w-52" />
+        <Skeleton className="h-4 w-80" />
+      </div>
+
+      {/* Stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} style={{ background: "#fff", borderRadius: 14, border: "1.5px solid #E8EEF4", padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+            <Skeleton className="h-[38px] w-[38px] shrink-0 rounded-[10px]" />
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <Skeleton className="h-6 w-10" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Skeleton className="h-[38px] rounded-[10px]" style={{ flex: 1, maxWidth: 380 }} />
+        <Skeleton className="h-[38px] w-24 rounded-[10px]" />
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+          {[160, 100, 80, 80, 60].map((w, i) => (
+            <Skeleton key={i} className="h-3" style={{ width: w }} />
+          ))}
+        </div>
+        <div className="flex flex-col divide-y divide-slate-100">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5">
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-8 w-[70px] rounded-[9px]" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fmtPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+  if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  return phone;
 }
 
 export default function DriverOnboardingPage() {
@@ -54,12 +116,32 @@ export default function DriverOnboardingPage() {
 
   const activeFilterCount = statusFilter !== "All" ? 1 : 0;
 
+  if (loading) return <DriverOnboardingSkeleton />;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
 
       {/* Page header */}
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Driver Onboarding</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Driver Onboarding</h2>
+          <button
+            style={{
+              display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+              padding: "9px 16px", borderRadius: 10, border: "none", cursor: "pointer",
+              background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FONT,
+              whiteSpace: "nowrap" as const,
+            }}
+          >
+            <span style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 18, height: 18, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.5)",
+            }}>
+              <Plus style={{ width: 10, height: 10 }} />
+            </span>
+            Onboard Driver
+          </button>
+        </div>
         <p style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>Review and verify pending driver registrations</p>
       </div>
 
@@ -88,45 +170,16 @@ export default function DriverOnboardingPage() {
         ))}
       </div>
 
-      {/* Search + Filter */}
+      {/* Search + Filter + Onboard */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ position: "relative", maxWidth: 380, flex: 1 }}>
-          <Search className="h-4 w-4" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94A3B8" }} />
-          <input
-            placeholder="Search by name or phone…"
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            style={{
-              width: "100%", paddingLeft: 36, paddingRight: 14, paddingTop: 9, paddingBottom: 9,
-              border: "1.5px solid #E8EEF4", borderRadius: 10, fontSize: 13.5, fontFamily: FONT,
-              color: "#0F172A", background: "#fff", outline: "none",
-            }}
-          />
-        </div>
+        <SearchBar
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search by name or phone…"
+        />
 
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          <button
-            onClick={() => setFilterOpen(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "9px 13px",
-              border: activeFilterCount > 0 ? "1.5px solid #93C5FD" : "1.5px solid #E8EEF4",
-              borderRadius: 10,
-              background: activeFilterCount > 0 ? "#EFF6FF" : "#fff",
-              color:      activeFilterCount > 0 ? "#1D4ED8" : "#334155",
-              fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-              letterSpacing: "0.04em", transition: "all 0.15s",
-            }}
-          >
-            <TbFilter style={{ width: 15, height: 15 }} />
-            FILTER
-            {activeFilterCount > 0 && (
-              <span style={{
-                background: "#2563EB", color: "#fff", fontSize: 9, fontWeight: 800,
-                borderRadius: "50%", width: 15, height: 15,
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-              }}>{activeFilterCount}</span>
-            )}
-          </button>
+        <div className="relative shrink-0">
+          <FilterTrigger onClick={() => setFilterOpen(v => !v)} activeCount={activeFilterCount} />
 
           <FilterPanel
             open={filterOpen}
@@ -141,76 +194,68 @@ export default function DriverOnboardingPage() {
             </FilterSection>
           </FilterPanel>
         </div>
+
       </div>
 
       {/* Table */}
-      <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, overflow: "hidden" }}>
-        {/* Header */}
-        <div style={{
-          display: "grid", gridTemplateColumns: "2.5fr 1.4fr 160px 150px 130px",
-          gap: 0, padding: "12px 24px", background: "#F8FAFC", borderBottom: "1px solid #F1F5F9",
-        }}>
-          {["DRIVER", "PHONE", "REGISTERED", "STATUS", "ACTION"].map(h => (
-            <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
-          ))}
-        </div>
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+        <div className="w-full overflow-x-auto">
+          <div className="min-w-[900px]">
 
-        {loading ? (
-          <div style={{ padding: "60px 0", textAlign: "center" as const, color: "#94A3B8", fontSize: 13 }}>
-            Loading…
+            {/* Header */}
+            <div className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+              {["DRIVER", "PHONE", "REGISTERED", "STATUS", "ACTION"].map(h => (
+                <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
+              ))}
+            </div>
+
+            {/* Body */}
+            <div className="flex flex-col divide-y divide-slate-100">
+              {items.length === 0 ? (
+                <div className="py-16 text-center">
+                  <p className="text-sm font-medium text-slate-500">
+                    {search || statusFilter !== "All" ? "No drivers match your search." : "No driver onboarding records found."}
+                  </p>
+                </div>
+              ) : (
+                items.map((d) => (
+                  <div
+                    key={d.id}
+                    onClick={() => router.push(`/superadmin/driver-onboarding/${d.id}`)}
+                    className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    {/* Driver name + doc progress */}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-extrabold text-[#111827] text-[13px] truncate">{d.full_name}</span>
+                      <span className="text-[11px] text-slate-400 font-medium">{d.approved_docs}/{d.total_docs} docs approved</span>
+                    </div>
+
+                    {/* Phone */}
+                    <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>
+
+                    {/* Registered date */}
+                    <span className="text-[13px] text-slate-600 font-medium">{fmtDate(d.created_at)}</span>
+
+                    {/* Status */}
+                    <div>
+                      <StatusBadge status={d.status} size="sm" />
+                    </div>
+
+                    {/* Action */}
+                    <div>
+                      <button
+                        onClick={e => { e.stopPropagation(); router.push(`/superadmin/driver-onboarding/${d.id}`); }}
+                        className="px-4 py-2 rounded-[9px] bg-blue-600 text-white text-[12.5px] font-bold shadow-[0_2px_10px_#2563EB40] hover:opacity-85 transition-opacity"
+                      >
+                        Review
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        ) : items.length === 0 ? (
-          <div style={{ padding: "60px 0", textAlign: "center" as const, color: "#94A3B8", fontSize: 13 }}>
-            {search || statusFilter !== "All" ? "No drivers match your search." : "No driver onboarding records found."}
-          </div>
-        ) : (
-          items.map((d, idx) => {
-            const vstyle = getStatusStyle(d.status);
-            return (
-              <div
-                key={d.id}
-                onClick={() => router.push(`/superadmin/driver-onboarding/${d.id}`)}
-                style={{
-                  display: "grid", gridTemplateColumns: "2.5fr 1.4fr 160px 150px 130px",
-                  gap: 0, padding: "16px 24px", alignItems: "center",
-                  borderBottom: idx < items.length - 1 ? "1px solid #F8FAFC" : "none",
-                  transition: "background 0.12s", cursor: "pointer",
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-              >
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{d.full_name}</p>
-                  <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{d.approved_docs}/{d.total_docs} docs approved</p>
-                </div>
-                <span style={{ fontSize: 13, color: "#334155" }}>{d.phone}</span>
-                <span style={{ fontSize: 12.5, color: "#64748B" }}>{fmtDate(d.created_at)}</span>
-                <div>
-                  <span style={{
-                    background: vstyle.bg, color: vstyle.text, border: `1px solid ${vstyle.border}`,
-                    fontSize: 11.5, fontWeight: 700, padding: "4px 11px", borderRadius: 20,
-                    display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" as const,
-                  }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: vstyle.dot, flexShrink: 0 }} />
-                    {vstyle.label ?? d.status}
-                  </span>
-                </div>
-                <div>
-                  <button
-                    onClick={e => { e.stopPropagation(); router.push(`/superadmin/driver-onboarding/${d.id}`); }}
-                    style={{
-                      padding: "8px 18px", borderRadius: 9, background: ACCENT, border: "none",
-                      color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT,
-                      boxShadow: `0 2px 10px ${ACCENT}40`, transition: "opacity 0.15s",
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "0.85"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
-                  >Review</button>
-                </div>
-              </div>
-            );
-          })
-        )}
+        </div>
       </div>
     </div>
   );

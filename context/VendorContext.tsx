@@ -40,6 +40,8 @@ function toBooking(item: BookingApiItem): Booking {
     fare:            item.fare       ?? undefined,
     passengers:      item.passengers ?? undefined,
     bookingSource:   item.bookingSource,
+    bookingRef:      item.bookingRef,
+    driverPhone:     item.driverPhone,
   };
 }
 
