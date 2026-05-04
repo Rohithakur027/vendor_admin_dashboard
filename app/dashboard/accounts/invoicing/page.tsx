@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText, Loader2, Ban } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText, Loader2, Ban, ChevronDown, CalendarDays } from "lucide-react";
 import {
   invoicesApi,
   companiesApi,
@@ -12,6 +11,9 @@ import {
   type InvoiceTripItem,
   type CompanyApiItem,
 } from "@/lib/api";
+import { DateRangePicker } from "@/modules/reports/DateRangePicker";
+import { toIsoDate } from "@/modules/reports/primitives";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const A    = "#2563EB";
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -36,34 +38,17 @@ function fmtDate(d: string) {
 function fmtPeriod(from: string, to: string) {
   const fd = new Date(from + "T12:00:00");
   const td = new Date(to   + "T12:00:00");
-  // Same calendar month → "Apr 2026". Otherwise show explicit range.
   if (fd.getMonth() === td.getMonth() && fd.getFullYear() === td.getFullYear()) {
     return fd.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
   }
   return `${fd.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} — ${td.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-// Backend already projects Pending+past-due → Overdue, but a stale list row
-// could still display the wrong badge between actions. Recompute defensively.
 function effectiveStatus(inv: { status: InvStatus; dueDate: string }): InvStatus {
   if (inv.status === "Pending" && new Date(inv.dueDate) < new Date(new Date().toDateString())) {
     return "Overdue";
   }
   return inv.status;
-}
-
-function monthOptions() {
-  const opts: { label: string; from: string; to: string }[] = [];
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const y = d.getFullYear(), m = d.getMonth();
-    const from = `${y}-${String(m+1).padStart(2,"0")}-01`;
-    const last = new Date(y, m+1, 0).getDate();
-    const to   = `${y}-${String(m+1).padStart(2,"0")}-${String(last).padStart(2,"0")}`;
-    opts.push({ label: d.toLocaleDateString("en-IN",{month:"short",year:"numeric"}), from, to });
-  }
-  return opts;
 }
 
 function generatePDF(inv: InvoiceDetail, vendorName: string) {
@@ -114,7 +99,7 @@ function generatePDF(inv: InvoiceDetail, vendorName: string) {
   setTimeout(() => { w.focus(); w.print(); }, 400);
 }
 
-function Drawer({ open, onClose, children }: { open:boolean; onClose:()=>void; children:React.ReactNode }) {
+function DrawerPanel({ open, onClose, children }: { open:boolean; onClose:()=>void; children:React.ReactNode }) {
   return (
     <>
       {open && <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.35)", zIndex:40 }}/>}
@@ -155,7 +140,7 @@ function TripsMiniTable({ rows, total }: { rows: InvoiceTripItem[]; total: numbe
         <div key={t.tripId} style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"11px 14px",
           borderBottom: i < rows.length - 1 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
           <div>
-            <div style={{ fontSize:12.5, fontWeight:600, color:"#0F172A", fontFamily:"monospace" }}>{t.tripRef || t.tripId.slice(0, 8)}</div>
+            <div style={{ fontSize:12.5, fontWeight:600, color:"#0F172A", fontFamily:"monospace" }}>{t.tripRef || "—"}</div>
             <div style={{ fontSize:11, color:"#94A3B8", marginTop:2 }}>{(t.pickupAddress || "").split(",")[0]} → {(t.dropAddress || "").split(",")[0]}</div>
           </div>
           <div style={{ fontSize:12, color:"#475569" }}>
@@ -178,7 +163,7 @@ function TripsMiniTable({ rows, total }: { rows: InvoiceTripItem[]; total: numbe
 ══════════════════════════════════════ */
 export default function InvoicingPage() {
   const vendorName = "SK Travels";
-  const MONTHS = useMemo(() => monthOptions(), []);
+  const todayStr   = toIsoDate(new Date());
 
   const [invoices,    setInvoices]    = useState<InvoiceListItem[]>([]);
   const [summary,     setSummary]     = useState<InvoiceSummary>({ totalBilled: 0, collected: 0, outstanding: 0, totalCount: 0, paidCount: 0, unpaidCount: 0 });
@@ -188,11 +173,16 @@ export default function InvoicingPage() {
 
   const [drawerMode,  setDrawerMode]  = useState<"new"|"view"|null>(null);
   const [step,        setStep]        = useState<1|2>(1);
+
+  // Company selector
   const [selCompany,  setSelCompany]  = useState("");
-  const [periodMode,  setPeriodMode]  = useState<"month"|"custom">("month");
-  const [selMonthIdx, setSelMonthIdx] = useState(0);
-  const [customFrom,  setCustomFrom]  = useState("");
-  const [customTo,    setCustomTo]    = useState("");
+  const [companyOpen, setCompanyOpen] = useState(false);
+
+  // Period — now a single date range
+  const [periodFrom,  setPeriodFrom]  = useState(todayStr);
+  const [periodTo,    setPeriodTo]    = useState(todayStr);
+  const [pickerOpen,  setPickerOpen]  = useState(false);
+
   const [notes,       setNotes]       = useState("");
   const [generating,  setGenerating]  = useState(false);
   const [generateErr, setGenerateErr] = useState<string | null>(null);
@@ -204,6 +194,8 @@ export default function InvoicingPage() {
   const [marking,     setMarking]     = useState(false);
   const [voiding,     setVoiding]     = useState(false);
   const [hovRow,      setHovRow]      = useState<number|null>(null);
+
+  const step1Valid = !!selCompany && !!periodFrom && !!periodTo;
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -225,17 +217,15 @@ export default function InvoicingPage() {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const periodFrom = periodMode==="month" ? MONTHS[selMonthIdx]?.from ?? "" : customFrom;
-  const periodTo   = periodMode==="month" ? MONTHS[selMonthIdx]?.to   ?? "" : customTo;
-  const step1Valid = !!selCompany && !!periodFrom && !!periodTo;
-
   function openNew() {
-    setSelCompany(""); setPeriodMode("month"); setSelMonthIdx(0);
-    setCustomFrom(""); setCustomTo(""); setNotes("");
+    setSelCompany(""); setCompanyOpen(false);
+    setPeriodFrom(todayStr); setPeriodTo(todayStr); setPickerOpen(false);
+    setNotes("");
     setStep(1); setGenerateErr(null); setGeneratedInv(null); setDrawerMode("new");
   }
   function closeDrawer() {
     setDrawerMode(null);
+    setCompanyOpen(false); setPickerOpen(false);
     setViewInv(null); setViewError(null); setGeneratedInv(null); setGenerateErr(null);
   }
 
@@ -302,7 +292,6 @@ export default function InvoicingPage() {
     }
   }
 
-  // List rows don't include line-item trips. Fetch full detail before printing.
   async function downloadPdfFromList(id: string) {
     try {
       const res = await invoicesApi.get(id);
@@ -311,6 +300,11 @@ export default function InvoicingPage() {
       // best-effort; ignore
     }
   }
+
+  const selCompanyName = companies.find(c => c.id === selCompany)?.name ?? "";
+  const periodLabel    = periodFrom === periodTo
+    ? new Date(periodFrom + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : fmtPeriod(periodFrom, periodTo);
 
   /* ── RENDER ── */
   return (
@@ -331,20 +325,27 @@ export default function InvoicingPage() {
       {/* Stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
         {[
-          { label:"Total Billed", value:fmt(summary.totalBilled),  sub:`${summary.totalCount} invoice${summary.totalCount===1?"":"s"}`, Icon:IndianRupee, ib:"#F1F5F9", ic:"#94A3B8" },
-          { label:"Collected",    value:fmt(summary.collected),    sub:`${summary.paidCount} paid`, Icon:CheckCircle2, ib:"#F1F5F9", ic:"#94A3B8" },
-          { label:"Outstanding",  value:fmt(summary.outstanding),  sub:`${summary.unpaidCount} unpaid`, Icon:Clock, ib:"#F1F5F9", ic:"#94A3B8" },
-        ].map(({ label, value, sub, Icon, ib, ic }) => (
+          { label:"Total Billed", value:fmt(summary.totalBilled),  sub:`${summary.totalCount} invoice${summary.totalCount===1?"":"s"}`, Icon:IndianRupee },
+          { label:"Collected",    value:fmt(summary.collected),    sub:`${summary.paidCount} paid`,    Icon:CheckCircle2 },
+          { label:"Outstanding",  value:fmt(summary.outstanding),  sub:`${summary.unpaidCount} unpaid`, Icon:Clock },
+        ].map(({ label, value, sub, Icon }) => (
           <div key={label} style={{ ...CARD, padding:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-            <div>
+            <div style={{ flex:1, minWidth:0 }}>
               <p style={{ fontSize:11, color:"#64748B", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</p>
-              <p style={{ fontSize:28, fontWeight:800, color:"#0F172A", lineHeight:1.1, marginTop:4 }}>
-                {loading ? "—" : value}
-              </p>
-              <p style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>{loading ? "Loading…" : sub}</p>
+              {loading ? (
+                <>
+                  <Skeleton className="h-7 w-24 mt-2" />
+                  <Skeleton className="h-3 w-16 mt-2" />
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize:28, fontWeight:800, color:"#0F172A", lineHeight:1.1, marginTop:4 }}>{value}</p>
+                  <p style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>{sub}</p>
+                </>
+              )}
             </div>
-            <div style={{ background:ib, borderRadius:11, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <Icon style={{ color:ic }} className="h-5 w-5"/>
+            <div style={{ background:"#F1F5F9", borderRadius:11, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <Icon style={{ color:"#94A3B8" }} className="h-5 w-5"/>
             </div>
           </div>
         ))}
@@ -354,7 +355,9 @@ export default function InvoicingPage() {
       <div style={CARD}>
         <div style={{ padding:"16px 20px", borderBottom:"1px solid #F1F5F9", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <p style={{ fontSize:15, fontWeight:800 }}>All Invoices</p>
-          <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>
+          {loading
+            ? <Skeleton className="h-3 w-20" />
+            : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
         </div>
         <div style={{ overflowX:"auto" }}>
           <div style={{ minWidth:700 }}>
@@ -365,8 +368,21 @@ export default function InvoicingPage() {
               ))}
             </div>
             {loading ? (
-              <div style={{ padding:"48px 0", textAlign:"center", color:"#94A3B8", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-                <Loader2 className="h-4 w-4 animate-spin"/> Loading invoices…
+              <div>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} style={{ display:"grid", gridTemplateColumns:"110px 1fr 130px 120px 110px 90px", gap:12,
+                    padding:"13px 20px", borderBottom: i < 4 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
+                    <Skeleton className="h-3.5 w-20" />
+                    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                      <Skeleton className="h-3.5 w-2/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="h-7 w-14 rounded-md" />
+                  </div>
+                ))}
               </div>
             ) : error ? (
               <div style={{ padding:"40px 24px", textAlign:"center" }}>
@@ -414,7 +430,7 @@ export default function InvoicingPage() {
       {/* ══════════════════════════════════════
           DRAWER
       ══════════════════════════════════════ */}
-      <Drawer open={drawerMode !== null} onClose={closeDrawer}>
+      <DrawerPanel open={drawerMode !== null} onClose={closeDrawer}>
 
         {/* ── NEW INVOICE ── */}
         {drawerMode === "new" && (<>
@@ -440,67 +456,85 @@ export default function InvoicingPage() {
           {/* Step 1 — Company & Period */}
           {step === 1 && (
             <div style={{ flex:1, overflowY:"auto", padding:"24px" }}>
+
+              {/* ── Company custom dropdown ── */}
               <div style={{ marginBottom:22 }}>
                 <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em" }}>Company</label>
-                <Select value={selCompany} onValueChange={(v) => setSelCompany(v ?? "")}>
-                  <SelectTrigger className="w-full h-[42px] rounded-[10px] border-[1.5px] border-slate-200 bg-white px-3.5 text-sm text-slate-900 data-placeholder:text-slate-400 font-[var(--font-plus-jakarta-sans),'Plus_Jakarta_Sans',sans-serif]">
-                    <SelectValue placeholder="Select company…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.length > 0 ? (
-                      companies.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="__none__" disabled>No companies found</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div style={{ position:"relative" }}>
+                  <button
+                    onClick={() => { setCompanyOpen(o => !o); setPickerOpen(false); }}
+                    style={{
+                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                      height:42, padding:"0 14px", border:"1.5px solid #E2E8F0", borderRadius:10,
+                      background:"#fff", cursor:"pointer", fontFamily:FONT, fontSize:14,
+                      color: selCompany ? "#0F172A" : "#94A3B8", textAlign:"left",
+                    }}
+                  >
+                    <span>{selCompanyName || "Select company…"}</span>
+                    <ChevronDown style={{ width:16, height:16, color:"#94A3B8", flexShrink:0, transform: companyOpen ? "rotate(180deg)" : "none", transition:"transform .15s" }}/>
+                  </button>
+                  {companyOpen && (
+                    <>
+                      <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setCompanyOpen(false)}/>
+                      <div style={{
+                        position:"absolute", top:"calc(100% + 4px)", left:0, right:0, zIndex:99,
+                        background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
+                        boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden",
+                        maxHeight:220, overflowY:"auto",
+                      }}>
+                        {companies.length === 0 ? (
+                          <div style={{ padding:"12px 14px", fontSize:13, color:"#94A3B8" }}>No companies found</div>
+                        ) : companies.map((c) => (
+                          <button key={c.id}
+                            onClick={() => { setSelCompany(c.id); setCompanyOpen(false); }}
+                            style={{
+                              display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
+                              border:"none", cursor:"pointer", fontFamily:FONT, fontSize:14,
+                              background: selCompany === c.id ? "#EFF6FF" : "#fff",
+                              color: selCompany === c.id ? A : "#0F172A",
+                              fontWeight: selCompany === c.id ? 700 : 400,
+                            }}
+                            onMouseEnter={e => { if (selCompany !== c.id) (e.currentTarget as HTMLButtonElement).style.background = "#F8FAFC"; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = selCompany === c.id ? "#EFF6FF" : "#fff"; }}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
+              {/* ── Billing Period — DateRangePicker ── */}
               <div style={{ marginBottom:22 }}>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.06em" }}>Billing Period</label>
-                <div style={{ display:"inline-flex", background:"#F1F5F9", borderRadius:9, padding:3, marginBottom:14 }}>
-                  {(["month","custom"] as const).map(m => (
-                    <button key={m} onClick={() => setPeriodMode(m)}
-                      style={{ padding:"6px 16px", borderRadius:7, border:"none",
-                        background:periodMode===m?"#fff":"transparent",
-                        fontSize:13, fontWeight:periodMode===m?700:500,
-                        color:periodMode===m?"#0F172A":"#64748B",
-                        cursor:"pointer", fontFamily:FONT,
-                        boxShadow:periodMode===m?"0 1px 4px rgba(0,0,0,0.07)":"none",
-                        transition:"all .15s" }}>
-                      {m === "month" ? "Month" : "Custom Range"}
-                    </button>
-                  ))}
+                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em" }}>Billing Period</label>
+                <div style={{ position:"relative" }}>
+                  <button
+                    onClick={() => { setPickerOpen(o => !o); setCompanyOpen(false); }}
+                    style={{
+                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+                      height:42, padding:"0 14px", border:"1.5px solid #E2E8F0", borderRadius:10,
+                      background:"#fff", cursor:"pointer", fontFamily:FONT, fontSize:14,
+                      color: "#0F172A", textAlign:"left",
+                    }}
+                  >
+                    <span style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <CalendarDays style={{ width:15, height:15, color:"#94A3B8", flexShrink:0 }}/>
+                      {periodLabel}
+                    </span>
+                    <ChevronDown style={{ width:16, height:16, color:"#94A3B8", flexShrink:0, transform: pickerOpen ? "rotate(180deg)" : "none", transition:"transform .15s" }}/>
+                  </button>
+                  {pickerOpen && (
+                    <DateRangePicker
+                      from={periodFrom}
+                      to={periodTo}
+                      onApply={(f, t) => { setPeriodFrom(f); setPeriodTo(t); }}
+                      onClose={() => setPickerOpen(false)}
+                      direction="past"
+                    />
+                  )}
                 </div>
-
-                {periodMode === "month" ? (
-                  <Select value={String(selMonthIdx)} onValueChange={(v) => setSelMonthIdx(Number(v ?? 0))}>
-                    <SelectTrigger className="w-full h-[42px] rounded-[10px] border-[1.5px] border-slate-200 bg-white px-3.5 text-sm text-slate-900 font-[var(--font-plus-jakarta-sans),'Plus_Jakarta_Sans',sans-serif]">
-                      <SelectValue placeholder="Select month…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MONTHS.map((mo, i) => (
-                        <SelectItem key={i} value={String(i)}>{mo.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                    {[
-                      { label:"From", val:customFrom, max:customTo||undefined, onChange:(v:string)=>setCustomFrom(v) },
-                      { label:"To",   val:customTo,   min:customFrom||undefined, onChange:(v:string)=>setCustomTo(v) },
-                    ].map(f => (
-                      <div key={f.label}>
-                        <div style={{ fontSize:11.5, color:"#94A3B8", marginBottom:6, fontWeight:600 }}>{f.label}</div>
-                        <input type="date" value={f.val} min={f.min} max={f.max}
-                          onChange={e => f.onChange(e.target.value)}
-                          style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #E2E8F0", borderRadius:9, fontSize:13, fontFamily:FONT, color:"#374151", outline:"none", boxSizing:"border-box" }}/>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div>
@@ -531,8 +565,8 @@ export default function InvoicingPage() {
                   <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", marginBottom:20, border:"1px solid #E8EEF4" }}>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
                       {[
-                        { lbl:"Company", val:companies.find(c=>c.id===selCompany)?.name ?? "—" },
-                        { lbl:"Period",  val:periodMode==="month" ? MONTHS[selMonthIdx].label : `${customFrom} — ${customTo}` },
+                        { lbl:"Company", val:selCompanyName || "—" },
+                        { lbl:"Period",  val:periodLabel },
                       ].map(({ lbl, val }) => (
                         <div key={lbl}>
                           <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{lbl}</div>
@@ -583,8 +617,7 @@ export default function InvoicingPage() {
               <button disabled={generating} onClick={confirmGenerate}
                 style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10,
                   background: generating ? "#93C5FD" : A,
-                  color:"#fff",
-                  fontSize:14, fontWeight:700,
+                  color:"#fff", fontSize:14, fontWeight:700,
                   cursor: generating ? "default" : "pointer", fontFamily:FONT,
                   display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
                 {generating && <Loader2 className="h-4 w-4 animate-spin"/>}
@@ -701,7 +734,7 @@ export default function InvoicingPage() {
             )}
           </>
         )}
-      </Drawer>
+      </DrawerPanel>
     </div>
   );
 }

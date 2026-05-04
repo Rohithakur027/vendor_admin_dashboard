@@ -10,14 +10,12 @@ import { getSocket } from "@/lib/socket";
 const ACCENT = "#2563EB";
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 const BANGALORE_CENTER: [number, number] = [77.5946, 12.9716];
-const STALE_AFTER_MS = 60 * 1000;
 const REFETCH_MS = 60 * 1000;
 
 /* ── Map pin with car icon ──────────────────────────────────────────
    Teardrop pin (Google-Maps style) with a small car silhouette in the
    white inner disc. Color encodes status: green = Available,
-   blue = On Trip, gray = Offline, amber = Stale, red = SOS (with
-   dashed outer ring). */
+   blue = On Trip, gray = Offline, red = SOS (with dashed outer ring). */
 function carSvg(body: string, sos = false): string {
   const ring = sos
     ? `<circle cx="20" cy="18" r="19" fill="none" stroke="${body}" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.85"/>`
@@ -40,7 +38,7 @@ function carSvg(body: string, sos = false): string {
 </svg>`;
 }
 
-function popupHtml(d: LiveDriver, stale: boolean): string {
+function popupHtml(d: LiveDriver): string {
   const plate = d.vehicle?.plate ?? "—";
   const veh   = d.vehicle ? `${d.vehicle.model ?? ""}${d.vehicle.type ? `  ·  ${d.vehicle.type}` : ""}` : "No vehicle";
   const ref   = d.driver_ref ?? d.driver_id.slice(0, 8);
@@ -49,10 +47,6 @@ function popupHtml(d: LiveDriver, stale: boolean): string {
   const badge = !d.is_online
     ? `<span style="background:#F1F5F9;color:#475569;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;">
          <span style="width:5px;height:5px;border-radius:50%;background:#94A3B8;display:inline-block;"></span>Offline
-       </span>`
-    : stale
-    ? `<span style="background:#FEF3C7;color:#A16207;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;">
-         <span style="width:5px;height:5px;border-radius:50%;background:#CA8A04;display:inline-block;"></span>Stale
        </span>`
     : `<span style="background:#DCFCE7;color:#15803D;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;">
          <span style="width:5px;height:5px;border-radius:50%;background:#16A34A;display:inline-block;"></span>${d.status}
@@ -100,10 +94,9 @@ function injectCss() {
 type MarkerVisual = { body: string; glow: string; sos: boolean };
 
 // Pick the pin color by driver status. Offline = gray, Available = green,
-// On Trip = blue, Stale (online but no recent location update) = amber,
-// SOS = red with a dashed outer ring (selected just makes the pin a hair
-// darker so it pops above siblings).
-function markerColors(d: LiveDriver, selected: boolean, stale: boolean): MarkerVisual {
+// On Trip = blue, SOS = red with a dashed outer ring (selected just makes
+// the pin a hair darker so it pops above siblings).
+function markerColors(d: LiveDriver, selected: boolean): MarkerVisual {
   // SOS / panic — not yet wired to a backend flag, but reserved for the
   // moment we add it. Until then this branch is unreachable.
   const sos = (d as unknown as { sos?: boolean }).sos === true;
@@ -112,9 +105,6 @@ function markerColors(d: LiveDriver, selected: boolean, stale: boolean): MarkerV
   }
   if (!d.is_online) {
     return { body: "#94A3B8", glow: "drop-shadow(0 1px 4px rgba(100,116,139,0.35))", sos: false };
-  }
-  if (stale) {
-    return { body: "#F59E0B", glow: "drop-shadow(0 1px 5px rgba(245,158,11,0.45))", sos: false };
   }
   if (d.status === "On Trip") {
     return {
@@ -135,10 +125,10 @@ function markerColors(d: LiveDriver, selected: boolean, stale: boolean): MarkerV
   };
 }
 
-function createMarkerEl(d: LiveDriver, selected: boolean, stale: boolean): HTMLDivElement {
+function createMarkerEl(d: LiveDriver, selected: boolean): HTMLDivElement {
   const el = document.createElement("div");
   el.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;";
-  const c = markerColors(d, selected, stale);
+  const c = markerColors(d, selected);
   const plate = d.vehicle?.plate ?? d.driver_ref ?? "DRIVER";
   el.innerHTML = `
     <div class="car-wrap" style="filter:${c.glow};transition:filter 0.2s;">${carSvg(c.body, c.sos)}</div>
@@ -147,20 +137,16 @@ function createMarkerEl(d: LiveDriver, selected: boolean, stale: boolean): HTMLD
   return el;
 }
 
-function updateMarkerStyle(el: HTMLDivElement, d: LiveDriver, selected: boolean, stale: boolean, plate: string) {
+function updateMarkerStyle(el: HTMLDivElement, d: LiveDriver, selected: boolean, plate: string) {
   const wrap = el.querySelector(".car-wrap") as HTMLDivElement | null;
   const lbl  = el.querySelector(".reg-lbl")  as HTMLSpanElement | null;
   if (!wrap || !lbl) return;
-  const c = markerColors(d, selected, stale);
+  const c = markerColors(d, selected);
   wrap.innerHTML = carSvg(c.body, c.sos);
   wrap.style.filter = c.glow;
   lbl.style.background = selected ? ACCENT : "#fff";
   lbl.style.color      = selected ? "#fff" : "#0F172A";
   lbl.textContent = plate;
-}
-
-function isStale(updatedAt: string): boolean {
-  return Date.now() - new Date(updatedAt).getTime() > STALE_AFTER_MS;
 }
 
 interface MarkerRef {
@@ -180,7 +166,6 @@ export default function LiveMapPage() {
   const [search,     setSearch]     = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panelOpen,  setPanelOpen]  = useState(true);
-  const [, setNow]                  = useState(0); // tick for stale recompute
   const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -207,12 +192,6 @@ export default function LiveMapPage() {
     const t = setInterval(loadSnapshot, REFETCH_MS);
     return () => clearInterval(t);
   }, [loadSnapshot]);
-
-  /* ── Tick every 15s so markers gray out when stale ──────────── */
-  useEffect(() => {
-    const t = setInterval(() => setNow((n) => n + 1), 15_000);
-    return () => clearInterval(t);
-  }, []);
 
   /* ── Socket subscription ────────────────────────────────────── */
   useEffect(() => {
@@ -276,7 +255,6 @@ export default function LiveMapPage() {
 
     drivers.forEach((d) => {
       seen.add(d.driver_id);
-      const stale    = isStale(d.updated_at);
       const selected = d.driver_id === selectedId;
       const plate    = d.vehicle?.plate ?? d.driver_ref ?? "DRIVER";
       const existing = markersRef.current[d.driver_id];
@@ -284,24 +262,24 @@ export default function LiveMapPage() {
       // SVG / popup HTML. Pure position updates (lat/lng only) don't appear
       // here, so they don't trigger a DOM rebuild — that's what kept the
       // hover popup flickering on every socket tick.
-      const visKey   = `${selected}|${stale}|${d.is_online}|${d.status}|${plate}`;
+      const visKey   = `${selected}|${d.is_online}|${d.status}|${plate}`;
       const popupKey = `${visKey}|${d.name}|${d.phone}|${d.vendor?.name ?? ""}|${d.vehicle?.model ?? ""}|${d.vehicle?.type ?? ""}|${d.trip?.from ?? ""}|${d.trip?.to ?? ""}|${d.trip?.booking_ref ?? ""}|${d.driver_ref ?? ""}`;
 
       if (existing) {
         existing.marker.setLngLat([d.lng, d.lat]);
         existing.popup.setLngLat([d.lng, d.lat]);
         if (existing.popupKey !== popupKey) {
-          existing.popup.setHTML(popupHtml(d, stale));
+          existing.popup.setHTML(popupHtml(d));
           existing.popupKey = popupKey;
         }
         if (existing.visKey !== visKey) {
-          updateMarkerStyle(existing.el, d, selected, stale, plate);
+          updateMarkerStyle(existing.el, d, selected, plate);
           existing.visKey = visKey;
         }
         return;
       }
 
-      const el = createMarkerEl(d, selected, stale);
+      const el = createMarkerEl(d, selected);
       const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([d.lng, d.lat])
         .addTo(map);
@@ -313,7 +291,7 @@ export default function LiveMapPage() {
         maxWidth: "270px",
       })
         .setLngLat([d.lng, d.lat])
-        .setHTML(popupHtml(d, stale));
+        .setHTML(popupHtml(d));
 
       // Small grace period on mouseleave so cursor sliding from the marker
       // into the popup (which sits ~66px above) doesn't immediately tear it
@@ -421,7 +399,6 @@ export default function LiveMapPage() {
         {[
           { color: "#22C55E", label: "Available" },
           { color: "#3B82F6", label: "On Trip"   },
-          { color: "#F59E0B", label: "Stale"     },
           { color: "#94A3B8", label: "Offline"   },
         ].map((it) => (
           <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "#334155" }}>
@@ -530,7 +507,6 @@ export default function LiveMapPage() {
                 </p>
               ) : filtered.map(d => {
                 const isSel  = d.driver_id === selectedId;
-                const stale  = isStale(d.updated_at);
                 const plate  = d.vehicle?.plate ?? "—";
                 return (
                   <div
@@ -549,8 +525,8 @@ export default function LiveMapPage() {
                       <span style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.3px" }}>
                         {plate}
                       </span>
-                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, color: !d.is_online ? "#94A3B8" : stale ? "#CA8A04" : "#16A34A" }}>
-                        <Circle className="h-2 w-2 fill-current" /> {!d.is_online ? "Offline" : stale ? "Stale" : "Live"}
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, color: !d.is_online ? "#94A3B8" : "#16A34A" }}>
+                        <Circle className="h-2 w-2 fill-current" /> {!d.is_online ? "Offline" : "Live"}
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
@@ -573,7 +549,6 @@ export default function LiveMapPage() {
 
         {/* Selected detail card */}
         {selected && (() => {
-          const stale = isStale(selected.updated_at);
           const speedKmh = selected.speed != null ? Math.round(selected.speed) : null;
           const lastSeen = (() => {
             const ms = Date.now() - new Date(selected.updated_at).getTime();
@@ -599,12 +574,12 @@ export default function LiveMapPage() {
               </span>
               <span style={{
                 display: "flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700,
-                color: !selected.is_online ? "#475569" : stale ? "#A16207" : "#15803D",
-                background: !selected.is_online ? "#F1F5F9" : stale ? "#FEF3C7" : "#DCFCE7",
+                color: !selected.is_online ? "#475569" : "#15803D",
+                background: !selected.is_online ? "#F1F5F9" : "#DCFCE7",
                 padding: "3px 9px", borderRadius: 12,
               }}>
                 <Circle className="h-2 w-2 fill-current" />
-                {!selected.is_online ? "Offline" : stale ? "Stale" : selected.status}
+                {!selected.is_online ? "Offline" : selected.status}
               </span>
               <button
                 onClick={() => setSelectedId(null)}
@@ -652,7 +627,7 @@ export default function LiveMapPage() {
               </div>
               <div>
                 <div style={{ fontSize: 9.5, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{selected.is_online ? "Last update" : "Last seen"}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: !selected.is_online ? "#94A3B8" : stale ? "#A16207" : "#0F172A", fontVariantNumeric: "tabular-nums" }}>{lastSeen}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: !selected.is_online ? "#94A3B8" : "#0F172A", fontVariantNumeric: "tabular-nums" }}>{lastSeen}</div>
               </div>
             </div>
           </div>

@@ -130,6 +130,13 @@ function fmtDateTime(iso: string): string {
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
 }
+function splitDT(iso: string) {
+  const d = new Date(iso);
+  return {
+    day:  d.toLocaleDateString("en-IN",  { day:"2-digit", month:"short" }),
+    time: d.toLocaleTimeString("en-IN",   { hour:"2-digit", minute:"2-digit", hour12:true }),
+  };
+}
 
 function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
   const [tab, setTab]         = useState<VendorTab>("Overview");
@@ -468,7 +475,7 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
         </div>
       )}
 
-      {/* ── Bookings ─────────────────────────────────────────────── */}
+      {/* ── Trips ────────────────────────────────────────────────── */}
       {tab === "Trips" && (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
@@ -497,28 +504,105 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
           {bookingsLoading ? <SharedReportSkeleton hideHeader statCount={3}/> : (
             <Card>
               <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <THead headers={["Trip Ref","Supervisor","Route","Type","Status","Fare","Date"]}/>
-                  <tbody>
-                    {bookingsData.length===0
-                      ? <tr><td colSpan={7}><EmptyState msg="No trips in this date range"/></td></tr>
-                      : bookingsData.map((b, i) => {
-                        const date = new Date(b.createdAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-                        return (
-                          <TR key={i} hovered={hovered===i} onEnter={()=>setHovered(i)} onLeave={()=>setHovered(null)} cells={[
-                            <span style={{ fontFamily:"monospace", fontSize:12, background:"#F1F5F9", padding:"2px 8px", borderRadius:5, color:"#111827", fontWeight:700 }}>{b.bookingRef ?? "—"}</span>,
-                            <span style={{ fontSize:13, color:"#475569" }}>{b.supervisorName ?? "—"}</span>,
-                            <span style={{ fontSize:13, color:"#475569" }}>{b.pickupLocation.split(",")[0]} → {b.dropLocation.split(",")[0]}</span>,
-                            <TypeBadge type={b.type}/>,
-                            <BookingBadge status={b.status}/>,
-                            <span style={{ fontSize:14, fontWeight:700, color:b.fare?"#1E293B":"#CBD5E1" }}>{b.fare?fmt(b.fare):"—"}</span>,
-                            <span style={{ fontSize:13, color:"#475569" }}>{date}</span>,
-                          ]}/>
-                        );
-                      })
-                    }
-                  </tbody>
-                </table>
+                <div style={{ minWidth:860 }}>
+                  {/* Header */}
+                  <div style={{ display:"grid", gridTemplateColumns:"110px 2fr 150px 1.3fr 110px 90px", gap:16,
+                    padding:"10px 20px", borderBottom:"1px solid #F1F5F9", background:"#FAFBFC" }}>
+                    {["TRIP ID & TYPE","ROUTE","SUPERVISOR","VEHICLE","STATUS","CREATED AT"].map(h => (
+                      <div key={h} style={{ fontSize:10.5, fontWeight:700, color:"#CBD5E1", textTransform:"uppercase", letterSpacing:"0.06em" }}>{h}</div>
+                    ))}
+                  </div>
+                  {bookingsData.length === 0 ? (
+                    <EmptyState msg="No trips in this date range"/>
+                  ) : bookingsData.map((b, i) => {
+                    const { day, time } = splitDT(b.createdAt);
+                    const statusColors: Record<string,{bg:string;color:string;dot:string}> = {
+                      Completed: {bg:"#DCFCE7",color:"#15803D",dot:"#22C55E"},
+                      Ongoing:   {bg:"#DBEAFE",color:"#1D4ED8",dot:"#3B82F6"},
+                      Pending:   {bg:"#FEF3C7",color:"#B45309",dot:"#F59E0B"},
+                      Cancelled: {bg:"#FEE2E2",color:"#B91C1C",dot:"#EF4444"},
+                    };
+                    const sc = statusColors[b.status] ?? statusColors.Pending;
+                    return (
+                      <div key={i}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "#fff"}
+                        style={{ display:"grid", gridTemplateColumns:"110px 2fr 150px 1.3fr 110px 90px", gap:16,
+                          padding:"13px 20px", borderBottom:"1px solid #F1F5F9", alignItems:"center",
+                          background:"#fff", transition:"background 0.12s" }}>
+
+                        {/* TRIP ID & TYPE */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                          <span style={{ fontWeight:800, fontSize:13, color:"#111827", fontFamily:"monospace" }}>
+                            {b.bookingRef ?? b.id.slice(0,8)}
+                          </span>
+                          <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 7px", borderRadius:6,
+                            background:b.type==="Instant"?"#EEF2FF":"#FEF3C7",
+                            color:b.type==="Instant"?"#3730A3":"#92400E",
+                            fontSize:10, fontWeight:700, width:"fit-content" }}>
+                            {b.type}
+                          </span>
+                        </div>
+
+                        {/* ROUTE */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:2, minWidth:0, paddingRight:8 }}>
+                          <span style={{ fontWeight:600, fontSize:13, color:"#1E293B", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {b.pickupLocation.split(",")[0]}
+                          </span>
+                          <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                            <div style={{ width:40, height:2, borderRadius:99, background:"linear-gradient(to right,#A5B4FC,#2563EB)", flexShrink:0 }}/>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5h6M5.5 2.5L8 5l-2.5 2.5" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </div>
+                          <span style={{ fontSize:11.5, color:"#64748B", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {b.dropLocation.split(",")[0]}
+                          </span>
+                        </div>
+
+                        {/* SUPERVISOR */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+                          <span style={{ fontSize:13, color:"#475569", fontWeight:500, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {b.supervisorName ?? "—"}
+                          </span>
+                          {b.bookingSource && (
+                            <span style={{ display:"inline-flex", padding:"1px 7px", borderRadius:5,
+                              background:"#E2E8F0", color:"#475569", border:"1px solid #CBD5E1",
+                              fontSize:10.5, fontWeight:600, width:"fit-content", maxWidth:130,
+                              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {b.bookingSource}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* VEHICLE */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                          {b.vehicleReg ? (
+                            <>
+                              <span style={{ fontSize:13, fontWeight:500, color:"#475569" }}>{b.vehicleReg}</span>
+                              {b.vehicleModel && <span style={{ fontSize:11, color:"#94A3B8", fontWeight:500 }}>{b.vehicleModel}</span>}
+                            </>
+                          ) : (
+                            <span style={{ fontSize:13, color:"#CBD5E1", fontStyle:"italic" }}>—</span>
+                          )}
+                        </div>
+
+                        {/* STATUS */}
+                        <div>
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:sc.bg, color:sc.color,
+                            border:`1px solid ${sc.bg}`, borderRadius:20, fontSize:11.5, fontWeight:700, padding:"4px 10px", whiteSpace:"nowrap" }}>
+                            <span style={{ width:5, height:5, borderRadius:"50%", background:sc.dot, flexShrink:0 }}/>
+                            {b.status}
+                          </span>
+                        </div>
+
+                        {/* CREATED AT */}
+                        <div style={{ display:"flex", flexDirection:"column", gap:1 }}>
+                          <span style={{ fontSize:13, fontWeight:500, color:"#334155" }}>{day}</span>
+                          <span style={{ fontSize:11, color:"#94A3B8" }}>{time}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </Card>
           )}
@@ -662,7 +746,7 @@ function PanelDriverReport({ driver }: { driver: Driver }) {
           <div>
             <div style={{ fontSize:18, fontWeight:800, color:"#0F172A" }}>{driver.name}</div>
             <div style={{ fontSize:12, color:"#64748B", marginTop:3 }}>
-              {[driver.phone, driver.vehicle?`${driver.vehicle}${driver.vehicleReg?" · "+driver.vehicleReg:""}`:null].filter(Boolean).join(" · ")||driver.id}
+              {[driver.phone, driver.vehicle?`${driver.vehicle}${driver.vehicleReg?" · "+driver.vehicleReg:""}`:null].filter(Boolean).join(" · ")||"—"}
             </div>
           </div>
         </div>

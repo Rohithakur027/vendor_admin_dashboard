@@ -18,6 +18,7 @@ export interface Driver {
   vehicleReg?: string;
   vehicleColor?: string;
   vehicleType?: string;
+  vehicleMakeYear?: number;
   status: DriverStatus;
   assignedSupervisorId: string | null;
   assignedSupervisorName: string | null;

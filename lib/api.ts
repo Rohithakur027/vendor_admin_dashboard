@@ -392,6 +392,7 @@ export interface OnboardingDoc {
   expiry_date:    string | null;
   rejection_note: string | null;
   file_url:       string | null;
+  file_url_back:  string | null;
 }
 
 export interface OnboardingDetail {
@@ -411,6 +412,9 @@ export interface OnboardingDetail {
   state:              string | null;
   pincode:            string | null;
   permanent_address:  string | null;
+  permanent_city:     string | null;
+  permanent_state:    string | null;
+  permanent_pincode:  string | null;
   nationality:        string | null;
   license_number:     string | null;
   license_class:      string | null;
@@ -426,6 +430,8 @@ export interface OnboardingDetail {
     model:        string | null;
     color:        string | null;
     type:         string | null;
+    make:         string | null;
+    year:         number | null;
   } | null;
   documents: {
     driver:  OnboardingDoc[];
@@ -453,6 +459,21 @@ export const driverOnboardingApi = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
+  uploadDocumentFile: async (id: string, docType: string, side: "front" | "back", file: File) => {
+    const token = getToken();
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("side", side);
+    const res = await fetch(`${API_URL}/api/superadmin/driver-onboarding/${id}/document/${docType}/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: fd,
+    });
+    const body = await res.json().catch(() => ({})) as { success?: boolean; data?: OnboardingDoc; error?: string };
+    if (!res.ok || !body.success) throw new Error(body.error ?? `Upload failed (${res.status})`);
+    return body.data!;
+  },
 
   patchStatus: (id: string, body: { status: "In Review" | "Rejected"; rejection_note?: string }) =>
     apiFetch<{ success: true; data: unknown }>(`/api/superadmin/driver-onboarding/${id}/status`, {
@@ -524,6 +545,7 @@ export interface TripApiItem {
   vehicleModel: string | null;
   vehicleType: string | null;
   vehicleColor: string | null;
+  vehicleMakeYear: number | null;
 }
 
 // ── Supervisor Report ────────────────────────────────────────────────────────
@@ -641,9 +663,12 @@ export interface VendorBookingItem {
   fare: number | null;
   passengers: number | null;
   createdAt: string;
+  bookingSource: string | null;
   supervisorName: string | null;
   driverName: string | null;
   driverPhone: string | null;
+  vehicleReg: string | null;
+  vehicleModel: string | null;
 }
 
 export const vendorReportApi = {

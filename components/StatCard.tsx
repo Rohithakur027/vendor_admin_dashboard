@@ -47,15 +47,7 @@ export function StatCard({ title, value, icon: Icon, description, progress, load
             {value}
           </div>
         )}
-        <div>
-          <div style={{ width: "100%", height: 5, borderRadius: 10, background: "rgba(255,255,255,0.2)", overflow: "hidden", marginBottom: 7 }}>
-            <div style={{ width: `${loading ? 0 : pct}%`, height: "100%", borderRadius: 10, background: "rgba(255,255,255,0.85)", transition: "width 0.6s" }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
-            <span>{progress.usedLabel}</span>
-            <span>{progress.totalLabel}</span>
-          </div>
-        </div>
+        <div />
       </div>
     );
   }

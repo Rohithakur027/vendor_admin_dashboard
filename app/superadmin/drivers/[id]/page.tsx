@@ -353,7 +353,8 @@ export default function SuperAdminDriverProfilePage() {
   const [driver,       setDriver]       = useState<Driver | null>(null);
   const [driverLoading,setDriverLoading]= useState(true);
   const [tripsData,    setTripsData]    = useState<DriverTripsResponse | null>(null);
-  const [tripsLoading, setTripsLoading] = useState(true);
+  const [tripsLoading, setTripsLoading] = useState(false);
+  const tripsLoadedRef = useRef(false);
   const [activeTab,    setActiveTab]    = useState("overview");
   const [isBlocked,    setIsBlocked]    = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);
@@ -374,13 +375,15 @@ export default function SuperAdminDriverProfilePage() {
   }, [id]);
 
   useEffect(() => {
-    if (!id) return;
+    const needsTrips = activeTab === "trips" || activeTab === "earnings";
+    if (!id || !needsTrips || tripsLoadedRef.current) return;
+    tripsLoadedRef.current = true;
     setTripsLoading(true);
     superadminApi.drivers.trips(id, { limit: 200 })
       .then(res => setTripsData(res.data))
       .catch(() => setTripsData(null))
       .finally(() => setTripsLoading(false));
-  }, [id]);
+  }, [id, activeTab]);
 
   if (driverLoading) {
     const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -496,8 +499,6 @@ export default function SuperAdminDriverProfilePage() {
     ...d,
     label: new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" }),
   })) ?? [];
-  const documents  = getDocuments(driver.id);
-  const verifiedCt = documents.filter(d => d.status === "Verified").length;
 
   const TABS = [
     { value: "overview",  label: "Overview" },
@@ -582,7 +583,7 @@ export default function SuperAdminDriverProfilePage() {
               </div>
               <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" as const }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
-                  <Phone className="h-3.5 w-3.5" style={{ color: "#94A3B8" }} />{driver.phone}
+                  <Phone className="h-3.5 w-3.5" style={{ color: "#94A3B8" }} />+91 {driver.phone}
                 </span>
                 {driver.assignedSupervisorName && (
                   <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
@@ -650,7 +651,7 @@ export default function SuperAdminDriverProfilePage() {
                   {[
                     { label: "Vehicle",        value: driver.vehicle ?? "—" },
                     { label: "Vehicle Number", value: driver.vehicleReg ?? "—" },
-                    { label: "Phone",          value: driver.phone },
+                    { label: "Phone",          value: `+91 ${driver.phone}` },
                     { label: "Driver ID",      value: driver.driverRef ?? "—" },
                     { label: "Last Active",    value: fmtDate(driver.lastActive) },
                   ].map(({ label, value }) => (

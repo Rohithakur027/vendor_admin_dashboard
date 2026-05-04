@@ -131,10 +131,10 @@ export default function SuperAdminOverviewPage() {
 
               <div>
                 {loading
-                  ? Array.from({ length: 4 }).map((_, i) => (
+                  ? Array.from({ length: 5 }).map((_, i) => (
                       <SkeletonRow key={i} cols="1fr 110px 90px" />
                     ))
-                  : vendors.slice(0, 4).map((vendor, i) => (
+                  : vendors.slice(0, 5).map((vendor, i) => (
                       <div
                         key={vendor.id}
                         style={{
@@ -142,7 +142,7 @@ export default function SuperAdminOverviewPage() {
                           gridTemplateColumns: "1fr 110px 90px",
                           gap: 12,
                           padding: "13px 20px",
-                          borderBottom: i < Math.min(vendors.length, 4) - 1 ? "1.5px solid #F8FAFC" : "none",
+                          borderBottom: i < Math.min(vendors.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
                           alignItems: "center",
                         }}
                       >
@@ -166,11 +166,6 @@ export default function SuperAdminOverviewPage() {
             </div>
           </div>
 
-          <div style={{ padding: "11px 20px", borderTop: "1.5px solid #F1F5F9", background: "#F8FAFC", borderRadius: "0 0 14px 14px" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#22C55E" }}>
-              ● {loading ? <span style={{ display: "inline-block", height: 10, width: 14, background: "#E2E8F0", borderRadius: 4, verticalAlign: "middle" }} /> : activeVendors} vendors active now
-            </span>
-          </div>
         </div>
 
         {/* ── Drivers panel ── */}
@@ -195,7 +190,7 @@ export default function SuperAdminOverviewPage() {
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <SkeletonRow key={i} cols="1fr 110px 100px" />
                     ))
-                  : drivers.slice(0, 4).map((driver, i) => {
+                  : drivers.slice(0, 5).map((driver, i) => {
                       const badge = getStatusStyle(driver.status);
                       return (
                         <div
@@ -205,7 +200,7 @@ export default function SuperAdminOverviewPage() {
                             gridTemplateColumns: "1fr 110px 100px",
                             gap: 12,
                             padding: "13px 20px",
-                            borderBottom: i < Math.min(drivers.length, 4) - 1 ? "1.5px solid #F8FAFC" : "none",
+                            borderBottom: i < Math.min(drivers.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
                             alignItems: "center",
                           }}
                         >
@@ -228,11 +223,6 @@ export default function SuperAdminOverviewPage() {
             </div>
           </div>
 
-          <div style={{ padding: "11px 20px", borderTop: "1.5px solid #F1F5F9", background: "#F8FAFC", borderRadius: "0 0 14px 14px" }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#3B82F6" }}>
-              ● {loading ? <span style={{ display: "inline-block", height: 10, width: 14, background: "#E2E8F0", borderRadius: 4, verticalAlign: "middle" }} /> : driversOnTrip} drivers on trip now
-            </span>
-          </div>
         </div>
 
       </div>

@@ -280,9 +280,9 @@ export const mockDrivers: Driver[] = [
     totalTrips: 342,
     lastActive: "2024-04-22T10:30:00",
     recentTrips: [
-      { bookingId: "trp-001", from: "MG Road", to: "Kempegowda Airport", date: "2024-04-22", supervisorName: "Kiran Gowda" },
-      { bookingId: "trp-007", from: "Jayanagar 4th Block", to: "Whitefield", date: "2024-04-21", supervisorName: "Kiran Gowda" },
-      { bookingId: "trp-013", from: "Rajajinagar", to: "HSR Layout", date: "2024-04-20", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-001", from: "MG Road", to: "Kempegowda Airport", date: "2024-04-22", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-007", from: "Jayanagar 4th Block", to: "Whitefield", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-013", from: "Rajajinagar", to: "HSR Layout", date: "2024-04-20", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -299,8 +299,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 218,
     lastActive: "2024-04-22T09:45:00",
     recentTrips: [
-      { bookingId: "trp-003", from: "Koramangala 5th Block", to: "Brigade Road", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
-      { bookingId: "trp-009", from: "JP Nagar", to: "Bannerghatta Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-003", from: "Koramangala 5th Block", to: "Brigade Road", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-009", from: "JP Nagar", to: "Bannerghatta Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
     ],
   },
   {
@@ -317,7 +317,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 189,
     lastActive: "2024-04-22T08:20:00",
     recentTrips: [
-      { bookingId: "trp-005", from: "Indiranagar 100ft Road", to: "Yelahanka", date: "2024-04-22", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-005", from: "Indiranagar 100ft Road", to: "Yelahanka", date: "2024-04-22", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -334,7 +334,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 97,
     lastActive: "2024-04-21T18:00:00",
     recentTrips: [
-      { bookingId: "trp-015", from: "Malleshwaram", to: "Basavanagudi", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-015", from: "Malleshwaram", to: "Basavanagudi", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
   {
@@ -351,8 +351,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 456,
     lastActive: "2024-04-22T11:00:00",
     recentTrips: [
-      { bookingId: "trp-002", from: "BTM Layout", to: "Manyata Tech Park", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
-      { bookingId: "trp-010", from: "Electronic City Phase 1", to: "Sarjapur Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-002", from: "BTM Layout", to: "Manyata Tech Park", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-010", from: "Electronic City Phase 1", to: "Sarjapur Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
     ],
   },
   {
@@ -369,7 +369,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 312,
     lastActive: "2024-04-22T07:30:00",
     recentTrips: [
-      { bookingId: "trp-017", from: "Hebbal Flyover", to: "Yelahanka New Town", date: "2024-04-22", supervisorName: "Meena Prasad" },
+      { tripRef: null, bookingId: "trp-017", from: "Hebbal Flyover", to: "Yelahanka New Town", date: "2024-04-22", supervisorName: "Meena Prasad" },
     ],
   },
   {
@@ -401,8 +401,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 528,
     lastActive: "2024-04-22T10:50:00",
     recentTrips: [
-      { bookingId: "trp-004", from: "Domlur", to: "Jayanagar 9th Block", date: "2024-04-22", supervisorName: "Deepa Shetty" },
-      { bookingId: "trp-011", from: "HAL Airport Road", to: "MG Road", date: "2024-04-21", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-004", from: "Domlur", to: "Jayanagar 9th Block", date: "2024-04-22", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-011", from: "HAL Airport Road", to: "MG Road", date: "2024-04-21", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -419,7 +419,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 145,
     lastActive: "2024-04-22T06:00:00",
     recentTrips: [
-      { bookingId: "trp-016", from: "Majestic Bus Stand", to: "Yeshwanthpur", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-016", from: "Majestic Bus Stand", to: "Yeshwanthpur", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
   {
@@ -436,7 +436,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 267,
     lastActive: "2024-04-22T09:15:00",
     recentTrips: [
-      { bookingId: "trp-018", from: "Nagawara", to: "Thanisandra Main Road", date: "2024-04-22", supervisorName: "Meena Prasad" },
+      { tripRef: null, bookingId: "trp-018", from: "Nagawara", to: "Thanisandra Main Road", date: "2024-04-22", supervisorName: "Meena Prasad" },
     ],
   },
   {
@@ -468,8 +468,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 412,
     lastActive: "2024-04-22T11:10:00",
     recentTrips: [
-      { bookingId: "trp-006", from: "Sadashivanagar", to: "Vijayanagar", date: "2024-04-22", supervisorName: "Kiran Gowda" },
-      { bookingId: "trp-012", from: "RT Nagar", to: "Banashankari", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-006", from: "Sadashivanagar", to: "Vijayanagar", date: "2024-04-22", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-012", from: "RT Nagar", to: "Banashankari", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
 ];
