@@ -8,27 +8,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/dashboard/supervisors": "Supervisors",
   "/dashboard/drivers": "Drivers",
-  "/dashboard/bookings": "Bookings",
-  "/dashboard/bookings/active": "Active Bookings",
-  "/dashboard/bookings/past": "Past Bookings",
-  "/dashboard/bookings/scheduled": "Scheduled Bookings",
+  "/dashboard/bookings": "Trips",
+  "/dashboard/bookings/active": "Active Trips",
+  "/dashboard/bookings/past": "Past Trips",
+  "/dashboard/bookings/scheduled": "Scheduled Trips",
 };
 
-export function Header() {
+export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const title = pageTitles[pathname] ?? "Dashboard";
 
   return (
-    <header className="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0">
-      <h1 className="text-base font-semibold">{title}</h1>
+    <header className="h-14 border-b bg-white flex items-center justify-between px-4 md:px-6 shrink-0">
+      <div className="flex items-center gap-2">
+        {/* Hamburger — mobile only, minimum 44×44 tap target */}
+        <button
+          className="md:hidden flex items-center justify-center w-11 h-11 -ml-1.5 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          onClick={onMobileMenuClick}
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <h1 className="text-base font-semibold">{title}</h1>
+      </div>
+
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
           <span className="text-sm font-medium">SK Travels</span>

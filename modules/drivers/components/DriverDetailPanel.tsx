@@ -60,7 +60,7 @@ export function DriverDetailPanel({ driver, onClose }: DriverDetailPanelProps) {
                 {driver.recentTrips.map((trip) => (
                   <div key={trip.bookingId} className="bg-gray-50 rounded-lg p-3 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono text-muted-foreground">{trip.bookingId}</span>
+                      <span className="text-xs font-mono text-muted-foreground">{trip.tripRef ?? trip.bookingId}</span>
                       <span className="text-xs text-muted-foreground">{trip.date}</span>
                     </div>
                     <div className="flex items-start gap-1.5">

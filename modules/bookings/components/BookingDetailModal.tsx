@@ -7,10 +7,11 @@ import {
   DrawerContent,
   DrawerClose,
 } from "@/components/ui/drawer";
-import { Clock, CheckCircle2, XCircle, Loader2, Phone } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, Loader2, Phone, FileText, ExternalLink } from "lucide-react";
 import type { Booking, BookingStatus } from "../types";
 import { useVendor } from "@/context/VendorContext";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+import { superadminApi, type DriverDocuments } from "@/lib/api";
 
 const LiveTrackingMap = dynamic(
   () => import("@/components/LiveTrackingMap"),
@@ -26,10 +27,29 @@ interface BookingDetailModalProps {
 
 export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps) {
   const { drivers, supervisors } = useVendor();
-  const [activeTab, setActiveTab] = useState<"details" | "live">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "documents" | "live">("details");
+  const [driverDocs, setDriverDocs]     = useState<DriverDocuments | null>(null);
+  const [docsLoading, setDocsLoading]   = useState(false);
+  const [docsError, setDocsError]       = useState<string | null>(null);
 
   // reset to details tab whenever a new booking is opened
-  useEffect(() => { setActiveTab("details"); }, [booking?.id]);
+  useEffect(() => {
+    setActiveTab("details");
+    setDriverDocs(null);
+    setDocsError(null);
+  }, [booking?.id]);
+
+  // fetch documents when tab becomes active
+  useEffect(() => {
+    if (activeTab !== "documents" || !booking?.driverId) return;
+    if (driverDocs || docsLoading) return;
+    setDocsLoading(true);
+    setDocsError(null);
+    superadminApi.drivers.documents(booking.driverId)
+      .then((res) => setDriverDocs(res.data))
+      .catch((err) => setDocsError(err.message ?? "Failed to load documents"))
+      .finally(() => setDocsLoading(false));
+  }, [activeTab, booking?.driverId]);
 
   const driver     = booking?.driverId     ? drivers.find((d) => d.id === booking.driverId)         : null;
   const supervisor = booking?.supervisorId ? supervisors.find((s) => s.id === booking.supervisorId) : null;
@@ -42,7 +62,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     const status = booking.status;
 
     const base = [
-      { label: "Booking Created", done: events.length >= 1, active: false },
+      { label: "Trip Created", done: events.length >= 1, active: false },
       { label: "Driver Assigned", done: events.length >= 2, active: false },
       { label: "Trip Started",    done: events.length >= 3, active: false },
       { label: "In Progress",     done: status === "Ongoing" || status === "Completed", active: status === "Ongoing" },
@@ -254,6 +274,101 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     </>
   );
 
+  /* ── Documents content ── */
+  const DocumentsContent = () => {
+    if (!booking?.driverId) return (
+      <div style={{ textAlign: "center", padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>
+        No driver assigned to this trip.
+      </div>
+    );
+    if (docsLoading) return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "40px 0", color: "#94A3B8" }}>
+        <Loader2 size={16} className="animate-spin" />
+        <span style={{ fontSize: 13 }}>Loading documents…</span>
+      </div>
+    );
+    if (docsError) return (
+      <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 12, padding: "14px 16px", color: "#DC2626", fontSize: 13 }}>
+        {docsError}
+      </div>
+    );
+    if (!driverDocs) return null;
+
+    const docs = [
+      { key: "driving_license" as const, label: "Driving License",  icon: "🪪" },
+      { key: "insurance"       as const, label: "Vehicle Insurance", icon: "🛡️" },
+      { key: "tax_certificate" as const, label: "Tax Certificate",   icon: "📋" },
+    ];
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {docs.map(({ key, label, icon }) => {
+          const doc = driverDocs[key];
+          const verified = doc.is_verified;
+          const submitted = doc.submitted;
+          return (
+            <div key={key} style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: submitted ? 12 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F1F5F9", border: "1.5px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+                    {icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{label}</div>
+                    {!submitted && (
+                      <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>Not submitted</div>
+                    )}
+                  </div>
+                </div>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20,
+                  background: verified ? "#DCFCE7" : submitted ? "#FEF9C3" : "#F1F5F9",
+                  color:      verified ? "#15803D" : submitted ? "#92400E" : "#94A3B8",
+                  border:     `1px solid ${verified ? "#BBF7D0" : submitted ? "#FDE68A" : "#E2E8F0"}`,
+                  flexShrink: 0,
+                }}>
+                  {verified ? <><CheckCircle2 size={11} /> Verified</> : submitted ? <><Clock size={11} /> Pending</> : "—"}
+                </span>
+              </div>
+
+              {submitted && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {doc.doc_number && (
+                    <div style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 12px" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3 }}>Number</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.doc_number}</div>
+                    </div>
+                  )}
+                  {doc.expiry_date && (
+                    <div style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 12px" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3 }}>Expires</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                        {new Date(doc.expiry_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                      </div>
+                    </div>
+                  )}
+                  {doc.file_url && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: ACCENT, textDecoration: "none" }}
+                      >
+                        <ExternalLink size={12} /> View Document
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   /* ── Live content (map + timeline) ── */
   const LiveContent = () => (
     <>
@@ -319,10 +434,12 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
         <div style={{ padding: "18px 20px 0", borderBottom: "1.5px solid #F1F5F9", flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>
-                {booking?.id}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Booking Details</div>
+              {booking?.bookingRef && (
+                <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.5, marginBottom: 4 }}>
+                  {booking.bookingRef}
+                </div>
+              )}
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Trip Details</div>
             </div>
             <DrawerClose asChild>
               <button style={{ width: 32, height: 32, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", flexShrink: 0, transition: "background 0.15s, border-color 0.15s" }}
@@ -354,37 +471,35 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             )}
           </div>
 
-          {/* Tab bar — only for Ongoing */}
-          {isOngoing && (
-            <div style={{ display: "flex", marginTop: 14 }}>
-              {(["details", "live"] as const).map((tab) => {
-                const active = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      padding: "8px 18px",
-                      fontSize: 13,
-                      fontWeight: active ? 700 : 500,
-                      color: active ? ACCENT : "#64748B",
-                      background: "none",
-                      border: "none",
-                      outline: "none",
-                      borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
-                      marginBottom: -1.5,
-                      cursor: "pointer",
-                      textTransform: "capitalize",
-                      transition: "color 0.15s",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {tab === "live" ? "Live" : "Details"}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Tab bar — always visible */}
+          <div style={{ display: "flex", marginTop: 14 }}>
+            {(["details", "documents", ...(isOngoing ? ["live"] : [])] as const).map((tab) => {
+              const active = activeTab === tab;
+              const label = tab === "live" ? "Live" : tab === "documents" ? "Documents" : "Details";
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as typeof activeTab)}
+                  style={{
+                    padding: "8px 18px",
+                    fontSize: 13,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? ACCENT : "#64748B",
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
+                    marginBottom: -1.5,
+                    cursor: "pointer",
+                    transition: "color 0.15s",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Scrollable body ── */}

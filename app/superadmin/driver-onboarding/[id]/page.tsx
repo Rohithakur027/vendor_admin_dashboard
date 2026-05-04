@@ -504,89 +504,6 @@ function DocTable({
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-function DriverReviewSkeleton() {
-  return (
-    <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Back button */}
-      <div>
-        <Skeleton className="h-9 w-20 rounded-[10px]" />
-      </div>
-
-      {/* Breadcrumb bar */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 20px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Skeleton className="h-3.5 w-32" />
-          <span style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 300 }}>/</span>
-          <Skeleton className="h-3.5 w-28" />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Skeleton className="h-8 w-32 rounded-lg" />
-          <Skeleton className="h-8 w-36 rounded-lg" />
-        </div>
-      </div>
-
-      {/* Profile card */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
-        <Skeleton className="h-14 w-14 rounded-full shrink-0" />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </div>
-          <div style={{ display: "flex", gap: 16 }}>
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="h-3.5 w-32" />
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-          {[76, 76, 76].map((w, i) => (
-            <div key={i} style={{ padding: "12px 22px", borderRadius: 12, border: "1px solid #e2e8f0", textAlign: "center" as const, minWidth: w, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-              <Skeleton className="h-7 w-8" />
-              <Skeleton className="h-3 w-14" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Skeleton className="h-10 w-28 rounded-[9px]" />
-        <Skeleton className="h-10 w-36 rounded-[9px]" />
-        <Skeleton className="h-10 w-36 rounded-[9px]" />
-      </div>
-
-      {/* Basic details content */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        {[
-          { title: "PERSONAL INFORMATION", rows: 2 },
-          { title: "ADDRESS DETAILS",      rows: 2 },
-          { title: "LICENSE & EMPLOYMENT", rows: 2 },
-        ].map((section, si, arr) => (
-          <div key={section.title} style={{ borderBottom: si < arr.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-            {/* Section header */}
-            <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-              <Skeleton className="h-3 w-40" />
-            </div>
-            {/* Field rows — 3 columns, 2 rows */}
-            {Array.from({ length: section.rows }).map((_, ri) => (
-              <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: ri < section.rows - 1 ? "1px solid #f1f5f9" : "none" }}>
-                {[0, 1, 2].map((ci) => (
-                  <div key={ci} style={{ padding: "16px 20px", borderRight: ci < 2 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
-                    <Skeleton className="h-2.5 w-20" />
-                    <Skeleton className="h-3.5 w-32" />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DriverReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -712,9 +629,7 @@ export default function DriverReviewPage() {
     }
   }
 
-  if (loading) return <DriverReviewSkeleton />;
-
-  if (!record) {
+  if (!loading && !record) {
     return (
       <div style={{ fontFamily: FONT, padding: 40, color: "#64748b", fontSize: 14 }}>
         Driver not found.{" "}
@@ -739,9 +654,9 @@ export default function DriverReviewPage() {
   const docKind: "driver" | "vehicle" = activeTab === "driver" ? "driver" : "vehicle";
   const activeDocs = activeTab === "driver" ? driverDocs : vehicleDocs;
 
-  const statusStyle = STATUS_STYLES[record.status] ?? STATUS_STYLES["Pending"];
-  const basicSections = buildSections(record);
-  const canAct = record.status !== "Approved" && record.status !== "Rejected";
+  const statusStyle = record ? (STATUS_STYLES[record.status] ?? STATUS_STYLES["Pending"]) : STATUS_STYLES["Pending"];
+  const basicSections = record ? buildSections(record) : [];
+  const canAct = record ? (record.status !== "Approved" && record.status !== "Rejected") : false;
 
   return (
     <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -775,9 +690,18 @@ export default function DriverReviewPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13.5, color: "#64748b" }}>Driver Onboarding</span>
           <span style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 300 }}>/</span>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{record.full_name}</span>
+          {loading || !record ? (
+            <Skeleton className="h-3.5 w-28" />
+          ) : (
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{record.full_name}</span>
+          )}
         </div>
-        {canAct ? (
+        {loading || !record ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <Skeleton className="h-8 w-32 rounded-lg" />
+            <Skeleton className="h-8 w-36 rounded-lg" />
+          </div>
+        ) : canAct ? (
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => setRejectModal(true)}
@@ -800,38 +724,65 @@ export default function DriverReviewPage() {
 
       {/* Driver profile card */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dbeafe", color: BLUE, fontWeight: 800, fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {initials(record.full_name)}
-        </div>
+        {loading || !record ? (
+          <Skeleton className="h-14 w-14 rounded-full shrink-0" />
+        ) : (
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dbeafe", color: BLUE, fontWeight: 800, fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {initials(record.full_name)}
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{record.full_name}</span>
-            <span style={{
-              fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-              background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`,
-              display: "inline-flex", alignItems: "center", gap: 5,
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusStyle.dot }} />
-              {record.status}
-            </span>
+            {loading || !record ? (
+              <>
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{record.full_name}</span>
+                <span style={{
+                  fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+                  background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusStyle.dot }} />
+                  {record.status}
+                </span>
+              </>
+            )}
           </div>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.phone}</span>
-            {record.email && <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.email}</span>}
-            <span style={{ fontSize: 12.5, color: "#64748b" }}>Registered {fmtDate(record.created_at)}</span>
+            {loading || !record ? (
+              <>
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-3.5 w-32" />
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.phone}</span>
+                {record.email && <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.email}</span>}
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>Registered {fmtDate(record.created_at)}</span>
+              </>
+            )}
           </div>
-          {record.rejection_note && (
+          {record?.rejection_note && (
             <p style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>Rejection note: {record.rejection_note}</p>
           )}
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           {[
-            { label: "Total Docs", value: record.doc_counts.total,     blue: false },
-            { label: "Submitted",  value: submittedCt,                  blue: false },
-            { label: "Approved",   value: approvedCt,                   blue: true  },
+            { label: "Total Docs", value: record?.doc_counts.total ?? 0, blue: false },
+            { label: "Submitted",  value: submittedCt,                   blue: false },
+            { label: "Approved",   value: approvedCt,                    blue: true  },
           ].map(s => (
             <div key={s.label} style={{ padding: "12px 22px", borderRadius: 12, border: "1px solid #e2e8f0", background: s.blue ? "#eff6ff" : "#fff", textAlign: "center" as const, minWidth: 76 }}>
-              <p style={{ fontSize: 24, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              {loading || !record ? (
+                <Skeleton className="h-7 w-8 mx-auto mb-1" />
+              ) : (
+                <p style={{ fontSize: 24, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              )}
               <p style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 5 }}>{s.label}</p>
             </div>
           ))}
@@ -881,7 +832,31 @@ export default function DriverReviewPage() {
       </div>
 
       {/* Tab: Basic Details */}
-      {activeTab === "basic" && (
+      {activeTab === "basic" && (loading || !record ? (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          {[
+            { title: "PERSONAL INFORMATION", rows: 2 },
+            { title: "ADDRESS DETAILS",      rows: 2 },
+            { title: "LICENSE & EMPLOYMENT", rows: 2 },
+          ].map((section, si, arr) => (
+            <div key={section.title} style={{ borderBottom: si < arr.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+              <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+                <Skeleton className="h-3 w-40" />
+              </div>
+              {Array.from({ length: section.rows }).map((_, ri) => (
+                <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: ri < section.rows - 1 ? "1px solid #f1f5f9" : "none" }}>
+                  {[0, 1, 2].map((ci) => (
+                    <div key={ci} style={{ padding: "16px 20px", borderRight: ci < 2 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <Skeleton className="h-2.5 w-20" />
+                      <Skeleton className="h-3.5 w-32" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
           {basicSections.map((section, si) => {
             const isEditing = editingSection === section.title;
@@ -952,10 +927,25 @@ export default function DriverReviewPage() {
             );
           })}
         </div>
-      )}
+      ))}
 
       {/* Tab: Driver / Vehicle Documents */}
-      {(activeTab === "driver" || activeTab === "vehicle") && (
+      {(activeTab === "driver" || activeTab === "vehicle") && (loading ? (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 130px 130px 140px 140px", gap: 16, padding: "16px 24px", borderBottom: i < 3 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-7 w-24 rounded" />
+              <Skeleton className="h-7 w-24 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <DocTable
           docs={activeDocs}
           onApprove={docId => applyApprove(docId, docKind)}
@@ -963,7 +953,7 @@ export default function DriverReviewPage() {
           onView={doc => setViewDoc({ doc, kind: docKind })}
           onUpload={(docId) => applyUpload(docId, docKind)}
         />
-      )}
+      ))}
 
       {/* View document modal */}
       {viewDoc && (
@@ -990,7 +980,7 @@ export default function DriverReviewPage() {
           <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 440, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
             <p style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", marginBottom: 10 }}>Approve Onboarding?</p>
             <p style={{ fontSize: 13.5, color: "#64748b", marginBottom: 22, lineHeight: 1.6 }}>
-              This will create a driver account for <strong>{record.full_name}</strong> with their phone number as the default password. All approved documents will be transferred.
+              This will create a driver account for <strong>{record?.full_name}</strong> with their phone number as the default password. All approved documents will be transferred.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button

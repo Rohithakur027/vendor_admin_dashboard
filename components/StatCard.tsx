@@ -1,4 +1,5 @@
 import { LucideIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatCardProps {
   title: string;
@@ -12,9 +13,10 @@ interface StatCardProps {
     usedLabel: string;
     totalLabel: string;
   };
+  loading?: boolean;
 }
 
-export function StatCard({ title, value, icon: Icon, description, progress }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, description, progress, loading }: StatCardProps) {
   const pct = progress ? Math.min((progress.used / progress.total) * 100, 100) : 0;
 
   if (progress) {
@@ -38,12 +40,16 @@ export function StatCard({ title, value, icon: Icon, description, progress }: St
         <div style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>
           {title}
         </div>
-        <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1.1, marginBottom: 12, letterSpacing: -1 }}>
-          {value}
-        </div>
+        {loading ? (
+          <Skeleton className="h-9 w-28 mb-3 bg-white/25" />
+        ) : (
+          <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1.1, marginBottom: 12, letterSpacing: -1 }}>
+            {value}
+          </div>
+        )}
         <div>
           <div style={{ width: "100%", height: 5, borderRadius: 10, background: "rgba(255,255,255,0.2)", overflow: "hidden", marginBottom: 7 }}>
-            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 10, background: "rgba(255,255,255,0.85)", transition: "width 0.6s" }} />
+            <div style={{ width: `${loading ? 0 : pct}%`, height: "100%", borderRadius: 10, background: "rgba(255,255,255,0.85)", transition: "width 0.6s" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
             <span>{progress.usedLabel}</span>
@@ -78,13 +84,21 @@ export function StatCard({ title, value, icon: Icon, description, progress }: St
           </div>
         )}
       </div>
-      <div style={{ fontSize: 48, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginTop: 8, letterSpacing: -2 }}>
-        {value}
-      </div>
-      {description && (
-        <div style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 8, fontWeight: 500 }}>
-          {description}
+      {loading ? (
+        <Skeleton className="h-12 w-24 mt-2" />
+      ) : (
+        <div style={{ fontSize: 48, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginTop: 8, letterSpacing: -2 }}>
+          {value}
         </div>
+      )}
+      {description && (
+        loading ? (
+          <Skeleton className="h-3 w-32 mt-2" />
+        ) : (
+          <div style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 8, fontWeight: 500 }}>
+            {description}
+          </div>
+        )
       )}
     </div>
   );

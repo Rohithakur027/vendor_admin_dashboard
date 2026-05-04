@@ -1,7 +1,7 @@
 "use client";
 
 import { useVendor } from "@/context/VendorContext";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -38,56 +38,15 @@ function DonutChart({ instant, scheduled, total }: { instant: number; scheduled:
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-
-function AccountsSkeleton() {
-  return (
-    <div className="flex gap-5">
-      <div className="flex-1 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-7">
-          <Skeleton className="h-3 w-40 mb-5" />
-          <Skeleton className="h-16 w-56 mb-7" />
-          <div className="border-t border-slate-100 pt-5 flex gap-10">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-2.5 w-24" />
-                <Skeleton className="h-5 w-28" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-              <Skeleton className="h-2.5 w-28" />
-              <Skeleton className="h-9 w-32" />
-              <Skeleton className="h-3 w-36" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="w-[300px] space-y-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AccountsPage() {
   const { supervisors, bookings, isLoading } = useVendor();
 
-  if (isLoading) return <AccountsSkeleton />;
-
   // ── Totals ──
-  const totalWalletLimit = supervisors.reduce((s, sup) => s + sup.walletLimit, 0);
-  const totalConsumed    = supervisors.reduce((s, sup) => s + sup.walletUsed, 0);
-  const walletBalance    = totalWalletLimit - totalConsumed;
-  const activeSups       = supervisors.filter((s) => s.status === "Active");
-  const topSpender       = [...supervisors].sort((a, b) => b.walletUsed - a.walletUsed)[0];
+  const totalConsumed = supervisors.reduce((s, sup) => s + sup.walletUsed, 0);
+  const activeSups    = supervisors.filter((s) => s.status === "Active");
+  const topSpender    = [...supervisors].sort((a, b) => b.walletUsed - a.walletUsed)[0];
 
   // ── Fixed display stats ──
   const avgPerDay = 10428;
@@ -145,26 +104,42 @@ export default function AccountsPage() {
                 </span>
               </div>
               <div style={{ marginBottom: 20 }}>
-                <span style={{ fontSize: 36, fontWeight: 800, color: "#0F172A", lineHeight: 1, letterSpacing: -0.5 }}>
-                  ₹{totalConsumed.toLocaleString("en-IN")}
-                </span>
+                {isLoading ? (
+                  <Skeleton className="h-9 w-56" />
+                ) : (
+                  <span style={{ fontSize: 36, fontWeight: 800, color: "#0F172A", lineHeight: 1, letterSpacing: -0.5 }}>
+                    ₹{totalConsumed.toLocaleString("en-IN")}
+                  </span>
+                )}
               </div>
               <div style={{ borderTop: "1.5px solid #F1F5F9", paddingTop: 20, display: "flex", gap: 36 }}>
                 <div>
                   <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>VS Yesterday</p>
-                  <p style={{ fontSize: 16, fontWeight: 700, color: isUp ? "#16A34A" : "#DC2626" }}>
-                    {isUp ? "↑" : "↓"} {Math.abs(pctChange).toFixed(1)}%
-                  </p>
+                  {isLoading ? (
+                    <Skeleton className="h-5 w-20 mb-1" />
+                  ) : (
+                    <p style={{ fontSize: 16, fontWeight: 700, color: isUp ? "#16A34A" : "#DC2626" }}>
+                      {isUp ? "↑" : "↓"} {Math.abs(pctChange).toFixed(1)}%
+                    </p>
+                  )}
                   <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>was {fmt(prevAmt)}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Avg / Day</p>
-                  <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(avgPerDay)}</p>
+                  {isLoading ? (
+                    <Skeleton className="h-5 w-24 mb-1" />
+                  ) : (
+                    <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(avgPerDay)}</p>
+                  )}
                   <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>trailing 30 days</p>
                 </div>
                 <div>
                   <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Peak Day</p>
-                  <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(peakDay)}</p>
+                  {isLoading ? (
+                    <Skeleton className="h-5 w-24 mb-1" />
+                  ) : (
+                    <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(peakDay)}</p>
+                  )}
                   <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>highest in period</p>
                 </div>
               </div>
@@ -174,30 +149,52 @@ export default function AccountsPage() {
           {/* 4 stat tiles */}
           <div style={{ ...CARD, display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
             <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
-              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Wallet Balance</p>
-              <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(walletBalance)}</p>
+              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Total Spent (Lifetime)</p>
+              {isLoading ? (
+                <Skeleton className="h-7 w-32 mb-2" />
+              ) : (
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(totalConsumed)}</p>
+              )}
               <p style={{ fontSize: 12, color: "#94A3B8" }}>
-                Available · <span style={{ color: "#16A34A", fontWeight: 700 }}>no cap</span>
+                Across all supervisors · <span style={{ color: "#16A34A", fontWeight: 700 }}>vendor wallet</span>
               </p>
             </div>
             <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
               <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Today&apos;s Spend</p>
-              <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(totalConsumed)}</p>
-              <p style={{ fontSize: 12, color: "#94A3B8" }}>Across {activeSups.length} active supervisors</p>
+              {isLoading ? (
+                <Skeleton className="h-7 w-32 mb-2" />
+              ) : (
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(totalConsumed)}</p>
+              )}
+              <p style={{ fontSize: 12, color: "#94A3B8" }}>
+                Across {isLoading ? <SkeletonInline className="h-3 w-6" /> : activeSups.length} active supervisors
+              </p>
             </div>
             <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
               <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Avg / Active Supervisor</p>
-              <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>
-                {activeSups.length > 0 ? fmt(Math.round(totalConsumed / activeSups.length)) : "₹0"}
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-7 w-32 mb-2" />
+              ) : (
+                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>
+                  {activeSups.length > 0 ? fmt(Math.round(totalConsumed / activeSups.length)) : "₹0"}
+                </p>
+              )}
               <p style={{ fontSize: 12, color: "#94A3B8" }}>Today&apos;s spend ÷ active</p>
             </div>
             <div style={{ padding: "18px 22px" }}>
               <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Top Spender Today</p>
-              <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8 }}>{topSpender?.name ?? "—"}</p>
-              <p style={{ fontSize: 12, color: "#94A3B8" }}>
-                {topSpender ? `${fmt(topSpender.walletUsed)} · ${topSpender.zone}` : "No data"}
-              </p>
+              {isLoading ? (
+                <Skeleton className="h-6 w-32 mb-2" />
+              ) : (
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8 }}>{topSpender?.name ?? "—"}</p>
+              )}
+              {isLoading ? (
+                <Skeleton className="h-3 w-28" />
+              ) : (
+                <p style={{ fontSize: 12, color: "#94A3B8" }}>
+                  {topSpender ? `${fmt(topSpender.walletUsed)} · ${topSpender.zone}` : "No data"}
+                </p>
+              )}
             </div>
           </div>
 
@@ -216,7 +213,32 @@ export default function AccountsPage() {
                 ))}
               </div>
               <div>
-                {sortedBySpend.map(({ sup, share }, idx) => (
+                {isLoading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "28px 1fr 90px 76px",
+                        gap: "0 10px",
+                        padding: "12px 20px",
+                        borderBottom: i < 4 ? "1px solid #F8FAFC" : "none",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Skeleton className="h-3 w-3" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-2.5 w-16" />
+                      </div>
+                      <Skeleton className="h-3.5 w-16" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-10" />
+                        <Skeleton className="h-1 w-full" />
+                      </div>
+                    </div>
+                  ))
+                  : sortedBySpend.map(({ sup, share }, idx) => (
                   <div
                     key={sup.id}
                     style={{
@@ -248,16 +270,41 @@ export default function AccountsPage() {
             {/* Bookings table */}
             <div style={CARD}>
               <div style={{ padding: "16px 20px 12px", borderBottom: "1.5px solid #F1F5F9" }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Bookings</p>
+                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Trips</p>
                 <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>Per supervisor · today</p>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 72px 76px", gap: "0 10px", padding: "9px 20px", borderBottom: "1px solid #F8FAFC" }}>
-                {["#", "SUPERVISOR", "BOOKINGS", "SHARE"].map((h) => (
+                {["#", "SUPERVISOR", "TRIPS", "SHARE"].map((h) => (
                   <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.6 }}>{h}</span>
                 ))}
               </div>
               <div>
-                {sortedByBookings.map(({ sup, bookingCount, bookingShare }, idx) => (
+                {isLoading
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "28px 1fr 72px 76px",
+                        gap: "0 10px",
+                        padding: "12px 20px",
+                        borderBottom: i < 4 ? "1px solid #F8FAFC" : "none",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Skeleton className="h-3 w-3" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-2.5 w-16" />
+                      </div>
+                      <Skeleton className="h-3.5 w-8" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3 w-10" />
+                        <Skeleton className="h-1 w-full" />
+                      </div>
+                    </div>
+                  ))
+                  : sortedByBookings.map(({ sup, bookingCount, bookingShare }, idx) => (
                   <div
                     key={sup.id}
                     style={{
@@ -295,13 +342,21 @@ export default function AccountsPage() {
 
           {/* Spend by Booking Type */}
           <div style={{ ...CARD, padding: "20px" }}>
-            <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginBottom: 2 }}>Spend by Booking Type</p>
+            <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginBottom: 2 }}>Spend by Trip Type</p>
             <p style={{ fontSize: 11.5, color: "#94A3B8", marginBottom: 20 }}>Today across all supervisors</p>
 
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <DonutChart instant={instantFare} scheduled={scheduledFare} total={totalFare} />
+              {isLoading ? (
+                <Skeleton className="h-[130px] w-[130px] rounded-full" />
+              ) : (
+                <DonutChart instant={instantFare} scheduled={scheduledFare} total={totalFare} />
+              )}
               <div>
-                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{fmt(instantFare + scheduledFare)}</p>
+                {isLoading ? (
+                  <Skeleton className="h-6 w-24 mb-1" />
+                ) : (
+                  <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{fmt(instantFare + scheduledFare)}</p>
+                )}
                 <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 4 }}>Total today</p>
               </div>
             </div>
@@ -317,13 +372,17 @@ export default function AccountsPage() {
                       <span style={{ width: 10, height: 10, borderRadius: 2, background: color, display: "inline-block", flexShrink: 0 }} />
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{label}</span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{fmt(amount)}</span>
-                      <span style={{ fontSize: 11.5, color: "#94A3B8", fontWeight: 600 }}>{pct}%</span>
-                    </div>
+                    {isLoading ? (
+                      <Skeleton className="h-3 w-20" />
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{fmt(amount)}</span>
+                        <span style={{ fontSize: 11.5, color: "#94A3B8", fontWeight: 600 }}>{pct}%</span>
+                      </div>
+                    )}
                   </div>
                   <div style={{ height: 5, borderRadius: 10, background: "#F1F5F9", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 10, transition: "width 0.5s ease" }} />
+                    <div style={{ height: "100%", width: `${isLoading ? 0 : pct}%`, background: color, borderRadius: 10, transition: "width 0.5s ease" }} />
                   </div>
                 </div>
               ))}

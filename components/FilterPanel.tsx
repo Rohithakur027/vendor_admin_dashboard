@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { TbFilter } from "react-icons/tb";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,8 @@ interface FilterPanelProps {
   onClose: () => void;
   activeCount?: number;
   onClearAll?: () => void;
+  onApply?: () => void;
+  onCancel?: () => void;
   children: React.ReactNode;
 }
 
@@ -18,6 +21,8 @@ export function FilterPanel({
   onClose,
   activeCount = 0,
   onClearAll,
+  onApply,
+  onCancel,
   children,
 }: FilterPanelProps) {
   const anchorRef = useRef<HTMLSpanElement>(null);
@@ -44,31 +49,15 @@ export function FilterPanel({
     }
   }, [open, computePos]);
 
-  return (
-    <>
-      {/* Invisible anchor pinned to bottom-right of the parent relative container */}
-      <span
-        ref={anchorRef}
-        aria-hidden
-        style={{
-          position: "absolute",
-          right: 0,
-          top: "100%",
-          display: "block",
-          width: 0,
-          height: 0,
-          pointerEvents: "none",
-        }}
-      />
-
-      {open && panelPos && (
+  const portalContent = open && panelPos
+    ? createPortal(
         <>
           {/* Click-away backdrop */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 9998 }}
             onClick={onClose}
           />
-          {/* Panel — fixed so it is never clipped by overflow containers */}
+          {/* Panel — rendered into document.body to escape any stacking context */}
           <div
             className="w-72 bg-white rounded-2xl shadow-xl border p-5 space-y-4"
             style={{
@@ -98,7 +87,7 @@ export function FilterPanel({
                   </button>
                 )}
                 <button
-                  onClick={onClose}
+                  onClick={onCancel ?? onClose}
                   className="h-7 w-7 flex items-center justify-center rounded-full border hover:bg-gray-50 transition-colors"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -106,9 +95,45 @@ export function FilterPanel({
               </div>
             </div>
             {children}
+            {onApply && (
+              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+                <button
+                  onClick={onCancel ?? onClose}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold border bg-white text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onApply}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
           </div>
-        </>
-      )}
+        </>,
+        document.body
+      )
+    : null;
+
+  return (
+    <>
+      {/* Invisible anchor pinned to bottom-right of the parent relative container */}
+      <span
+        ref={anchorRef}
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: 0,
+          top: "100%",
+          display: "block",
+          width: 0,
+          height: 0,
+          pointerEvents: "none",
+        }}
+      />
+      {portalContent}
     </>
   );
 }

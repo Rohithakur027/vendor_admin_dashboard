@@ -3,20 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutGrid, Building2, Users, Menu, X, Shield, ClipboardCheck,
+  LayoutGrid, Building2, Users, Shield, ClipboardCheck, BarChart2, MapPin,
   ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 type NavItem = { label: string; href: string; icon: React.ElementType };
 
 const navItems: NavItem[] = [
-  { label: "Overview",          href: "/superadmin",                   icon: LayoutGrid },
+  { label: "Dashboard",         href: "/superadmin",                   icon: LayoutGrid },
   { label: "Vendors",           href: "/superadmin/vendors",           icon: Building2 },
+  { label: "Live Map",          href: "/superadmin/live-map",          icon: MapPin },
   { label: "Drivers",           href: "/superadmin/drivers",           icon: Users },
   { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck },
+  { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2 },
 ];
 
 function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -33,12 +34,34 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-export function SuperAdminSidebar() {
+export function SuperAdminSidebar({
+  mobileOpen,
+  onMobileOpenChange,
+}: {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}) {
   const pathname = usePathname();
-  const [open,      setOpen]      = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [tabletExpanded, setTabletExpanded] = useState(false);
+  const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const SidebarContent = ({ isCollapsed = false }: { isCollapsed?: boolean }) => (
+  function handleTabletEnter() {
+    if (tabletTimer.current) clearTimeout(tabletTimer.current);
+    setTabletExpanded(true);
+  }
+
+  function handleTabletLeave() {
+    tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
+  }
+
+  const SidebarContent = ({
+    isCollapsed = false,
+    onLinkClick,
+  }: {
+    isCollapsed?: boolean;
+    onLinkClick?: () => void;
+  }) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={cn("border-b flex items-center", isCollapsed ? "px-3 py-5 justify-center" : "px-6 py-5")}>
@@ -66,7 +89,7 @@ export function SuperAdminSidebar() {
           const link = (
             <Link
               href={href}
-              onClick={() => setOpen(false)}
+              onClick={onLinkClick}
               className={cn(
                 "flex items-center gap-3 rounded-lg text-sm transition-colors",
                 isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
@@ -87,15 +110,34 @@ export function SuperAdminSidebar() {
           );
         })}
       </nav>
+
+      {/* User profile — bottom */}
+      <div className={cn("border-t shrink-0", isCollapsed ? "px-3 py-4 flex justify-center" : "px-4 py-4")}>
+        {isCollapsed ? (
+          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            SK
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              SK
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-800 leading-none truncate">SK Travels</p>
+              <p className="text-xs text-slate-400 mt-0.5">Super Admin</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* ── Desktop sidebar (xl+): full width, user-collapsible ── */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300 relative",
+          "hidden xl:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300 relative z-[60]",
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
@@ -115,20 +157,42 @@ export function SuperAdminSidebar() {
         </button>
       </aside>
 
-      {/* Mobile hamburger */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <Button variant="outline" size="icon" onClick={() => setOpen(!open)}>
-          {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
-      </div>
+      {/* ── Tablet sidebar (md–xl): icon-only strip, hover expands as overlay ── */}
+      <aside
+        className="hidden md:flex xl:hidden w-[60px] shrink-0 sticky top-0 h-screen relative z-[60]"
+        onMouseEnter={handleTabletEnter}
+        onMouseLeave={handleTabletLeave}
+      >
+        {/* Always-visible 60px icon strip */}
+        <div className="w-[60px] h-full flex flex-col bg-white border-r overflow-hidden">
+          <SidebarContent isCollapsed={true} />
+        </div>
 
-      {/* Mobile overlay */}
-      {open && (
-        <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="w-56 bg-white border-r h-full shadow-xl">
-            <SidebarContent />
+        {/* Expanded overlay on hover */}
+        {tabletExpanded && (
+          <div
+            className="absolute left-0 top-0 h-full w-56 bg-white border-r shadow-xl z-30 flex flex-col"
+            onMouseEnter={handleTabletEnter}
+            onMouseLeave={handleTabletLeave}
+          >
+            <SidebarContent
+              isCollapsed={false}
+              onLinkClick={() => setTabletExpanded(false)}
+            />
           </div>
-          <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
+        )}
+      </aside>
+
+      {/* ── Mobile drawer (< md): full-width slide-in from left ── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="w-56 bg-white border-r h-full shadow-xl flex flex-col">
+            <SidebarContent onLinkClick={() => onMobileOpenChange(false)} />
+          </div>
+          <div
+            className="flex-1 bg-black/40"
+            onClick={() => onMobileOpenChange(false)}
+          />
         </div>
       )}
     </>

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, phone, zone, password, walletLimit, companies, status } = body;
+    const { name, email, phone, zone, password, companies, status } = body;
 
     // ── Validation ─────────────────────────────────────────────────────────────
     const errors: Record<string, string> = {};
@@ -30,7 +30,6 @@ export async function POST(req: NextRequest) {
       phone:         phone.trim(),
       zone:          zone?.trim() ?? "",
       status:        status ?? "Active",
-      walletLimit:   Number(walletLimit) || 10000,
       walletUsed:    0,
       companies:     Array.isArray(companies) ? companies : [],
       appAccess:     true,
