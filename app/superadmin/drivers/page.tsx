@@ -96,7 +96,7 @@ export default function SuperAdminDriversPage() {
             </div>
             <div>
               {loading ? (
-                <div className="sk-pulse" style={{ height: 22, width: 32, borderRadius: 6, background: "#F1F5F9", marginBottom: 6 }} />
+                <Skeleton className="h-[22px] w-12 mb-1.5" />
               ) : (
                 <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{value}</p>
               )}

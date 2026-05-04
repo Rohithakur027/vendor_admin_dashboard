@@ -6,7 +6,7 @@ import { vendorsApi, type VendorDetailApiItem, type WalletTransaction } from "@/
 import {
   ArrowLeft, Building2, MapPin, Phone, Mail, Users,
   Calendar, TrendingUp, Wallet, ShieldOff, ShieldCheck,
-  CheckCircle2, Loader2, AlertCircle,
+  CheckCircle2, Loader2, AlertCircle, Route,
 } from "lucide-react";
 
 const BLUE = "#2563eb";
@@ -100,35 +100,8 @@ export default function VendorProfilePage() {
     }
   }
 
-  // ── Loading ───────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
-        {/* Breadcrumb skeleton */}
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 20px", height: 52, display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => router.push("/superadmin/vendors")} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#64748b", fontFamily: FONT, fontSize: 13, fontWeight: 600, padding: 0 }}>
-            <ArrowLeft style={{ width: 15, height: 15 }} /> Vendors
-          </button>
-          <span style={{ color: "#cbd5e1" }}>/</span>
-          <div style={{ width: 120, height: 14, background: "#f1f5f9", borderRadius: 6 }} />
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px 28px", display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 60, height: 60, borderRadius: 16, background: "#f1f5f9" }} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ width: 200, height: 18, background: "#f1f5f9", borderRadius: 6 }} />
-            <div style={{ width: 300, height: 13, background: "#f8fafc", borderRadius: 6 }} />
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 40, color: "#94a3b8" }}>
-          <Loader2 style={{ width: 20, height: 20, animation: "spin 1s linear infinite" }} />
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        </div>
-      </div>
-    );
-  }
-
   // ── Fetch error ───────────────────────────────────────────────────────────
-  if (fetchError || !vendor) {
+  if (!loading && (fetchError || !vendor)) {
     return (
       <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 20px", height: 52, display: "flex", alignItems: "center", gap: 10 }}>
@@ -144,7 +117,10 @@ export default function VendorProfilePage() {
     );
   }
 
-  const isBlocked = vendor.status === "Inactive";
+  const isBlocked = vendor?.status === "Inactive";
+  const skeletonBox = (w: number | string, h: number) => (
+    <span style={{ display: "inline-block", width: w, height: h, background: "#f1f5f9", borderRadius: 6, animation: "skel-pulse 1.5s ease-in-out infinite", verticalAlign: "middle" }} />
+  );
 
   return (
     <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -171,62 +147,87 @@ export default function VendorProfilePage() {
           <ArrowLeft style={{ width: 15, height: 15 }} /> Vendors
         </button>
         <span style={{ color: "#cbd5e1" }}>/</span>
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{vendor.name}</span>
+        {loading || !vendor ? skeletonBox(120, 14) : (
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{vendor.name}</span>
+        )}
       </div>
 
       {/* Profile header card */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "24px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
-        <div style={{
-          minWidth: 60, height: 60, borderRadius: 16, flexShrink: 0, padding: "0 14px",
-          background: isBlocked ? "#f1f5f9" : "#eff6ff",
-          color: isBlocked ? "#94a3b8" : BLUE,
-          fontWeight: 800, fontSize: 13,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          textAlign: "center", maxWidth: 160, wordBreak: "break-word",
-        }}>
-          {vendor.name}
-        </div>
+        {loading || !vendor ? (
+          <div style={{ width: 60, height: 60, borderRadius: 16, background: "#f1f5f9", flexShrink: 0, animation: "skel-pulse 1.5s ease-in-out infinite" }} />
+        ) : (
+          <div style={{
+            minWidth: 60, height: 60, borderRadius: 16, flexShrink: 0, padding: "0 14px",
+            background: isBlocked ? "#f1f5f9" : "#eff6ff",
+            color: isBlocked ? "#94a3b8" : BLUE,
+            fontWeight: 800, fontSize: 13,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            textAlign: "center", maxWidth: 160, wordBreak: "break-word",
+          }}>
+            {vendor.name}
+          </div>
+        )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const, marginBottom: 6 }}>
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{vendor.name}</span>
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-              background: isBlocked ? "#f1f5f9" : "#f0fdf4",
-              color:      isBlocked ? "#64748b"  : "#15803d",
-              border: `1px solid ${isBlocked ? "#e2e8f0" : "#bbf7d0"}`,
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: isBlocked ? "#94a3b8" : "#22c55e" }} />
-              {vendor.status}
-            </span>
+            {loading || !vendor ? (
+              <>
+                {skeletonBox(200, 22)}
+                {skeletonBox(70, 20)}
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#0f172a" }}>{vendor.name}</span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+                  background: isBlocked ? "#f1f5f9" : "#f0fdf4",
+                  color:      isBlocked ? "#64748b"  : "#15803d",
+                  border: `1px solid ${isBlocked ? "#e2e8f0" : "#bbf7d0"}`,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: isBlocked ? "#94a3b8" : "#22c55e" }} />
+                  {vendor.status}
+                </span>
+              </>
+            )}
           </div>
           <div style={{ display: "flex", gap: 18, flexWrap: "wrap" as const }}>
-            {vendor.city && (
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
-                <MapPin style={{ width: 13, height: 13 }} /> {vendor.city}
-              </span>
+            {loading || !vendor ? (
+              <>
+                {skeletonBox(120, 13)}
+                {skeletonBox(180, 13)}
+                {skeletonBox(140, 13)}
+              </>
+            ) : (
+              <>
+                {vendor.city && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
+                    <MapPin style={{ width: 13, height: 13 }} /> {vendor.city}
+                  </span>
+                )}
+                {vendor.email && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
+                    <Mail style={{ width: 13, height: 13 }} /> {vendor.email}
+                  </span>
+                )}
+                {vendor.phone && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
+                    <Phone style={{ width: 13, height: 13 }} /> {vendor.phone}
+                  </span>
+                )}
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
+                  <Calendar style={{ width: 13, height: 13 }} /> Joined {fmtDate(vendor.joinedAt)}
+                </span>
+              </>
             )}
-            {vendor.email && (
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
-                <Mail style={{ width: 13, height: 13 }} /> {vendor.email}
-              </span>
-            )}
-            {vendor.phone && (
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
-                <Phone style={{ width: 13, height: 13 }} /> {vendor.phone}
-              </span>
-            )}
-            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#64748b" }}>
-              <Calendar style={{ width: 13, height: 13 }} /> Joined {fmtDate(vendor.joinedAt)}
-            </span>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           <button
             onClick={toggleBlock}
-            disabled={toggling}
+            disabled={toggling || loading || !vendor}
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "9px 16px", borderRadius: 10, cursor: toggling ? "not-allowed" : "pointer",
@@ -234,7 +235,7 @@ export default function VendorProfilePage() {
               border: isBlocked ? "1.5px solid #bbf7d0" : "1.5px solid #fecaca",
               background: isBlocked ? "#f0fdf4" : "#fef2f2",
               color: isBlocked ? "#15803d" : "#b91c1c",
-              opacity: toggling ? 0.6 : 1,
+              opacity: (toggling || loading) ? 0.6 : 1,
             }}
           >
             {toggling
@@ -247,10 +248,12 @@ export default function VendorProfilePage() {
           </button>
           <button
             onClick={() => setRechargeOpen(true)}
+            disabled={loading || !vendor}
             style={{
               display: "flex", alignItems: "center", gap: 7,
-              padding: "9px 16px", borderRadius: 10, border: "none", cursor: "pointer",
+              padding: "9px 16px", borderRadius: 10, border: "none", cursor: loading ? "not-allowed" : "pointer",
               background: BLUE, color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FONT,
+              opacity: loading ? 0.6 : 1,
             }}
           >
             <Wallet style={{ width: 15, height: 15 }} /> Recharge Wallet
@@ -261,10 +264,10 @@ export default function VendorProfilePage() {
       {/* Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
         {[
-          { label: "Total Supervisors",  value: vendor.totalSupervisors ?? 0, icon: Users,      blue: false },
-          { label: "Bookings Today",    value: vendor.totalBookingsToday,   icon: TrendingUp, blue: false },
-          { label: "All-Time Bookings", value: vendor.totalBookingsAllTime, icon: Building2,  blue: false },
-          { label: "Wallet Balance",    value: fmtCurrency(vendor.wallet_balance ?? 0), icon: Wallet, blue: true },
+          { label: "Total Supervisors",  value: vendor?.totalSupervisors ?? 0, icon: Users,      blue: false },
+          { label: "Trips Today",    value: vendor?.totalBookingsToday ?? 0,   icon: Route,      blue: false },
+          { label: "All-Time Trips", value: vendor?.totalBookingsAllTime ?? 0, icon: Route,      blue: false },
+          { label: "Wallet Balance",    value: fmtCurrency(vendor?.wallet_balance ?? 0), icon: Wallet, blue: true },
         ].map((s) => (
           <div key={s.label} style={{
             background: s.blue ? "#eff6ff" : "#fff",
@@ -280,7 +283,9 @@ export default function VendorProfilePage() {
               <s.icon style={{ width: 18, height: 18, color: s.blue ? BLUE : "#64748b" }} />
             </div>
             <div>
-              <p style={{ fontSize: s.blue ? 16 : 22, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              {loading || !vendor ? skeletonBox(80, 22) : (
+                <p style={{ fontSize: s.blue ? 16 : 22, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              )}
               <p style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 4 }}>{s.label}</p>
             </div>
           </div>
@@ -290,19 +295,19 @@ export default function VendorProfilePage() {
       {/* Details grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-        {/* Company Details */}
+        {/* Vendor Details */}
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>Company Details</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>Vendor Details</span>
           </div>
           <div style={{ padding: "6px 0" }}>
             {[
-              { label: "Company Name",   value: vendor.name },
-              { label: "Contact Person", value: vendor.contactPerson },
-              { label: "Business Email", value: vendor.email },
-              { label: "Phone",          value: vendor.phone },
-              { label: "City",           value: vendor.city },
-              { label: "Member Since",   value: fmtDate(vendor.joinedAt) },
+              { label: "Vendor Name",    value: vendor?.name },
+              { label: "Contact Person", value: vendor?.contactPerson },
+              { label: "Business Email", value: vendor?.email },
+              { label: "Phone",          value: vendor?.phone },
+              { label: "City",           value: vendor?.city },
+              { label: "Member Since",   value: vendor ? fmtDate(vendor.joinedAt) : "" },
             ].map((row, i) => (
               <div key={row.label} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -310,7 +315,9 @@ export default function VendorProfilePage() {
                 borderBottom: i < 5 ? "1px solid #f8fafc" : "none",
               }}>
                 <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{row.label}</span>
-                <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 700, maxWidth: "60%", textAlign: "right" as const, wordBreak: "break-word" as const }}>{row.value || "—"}</span>
+                {loading || !vendor ? skeletonBox(120, 14) : (
+                  <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 700, maxWidth: "60%", textAlign: "right" as const, wordBreak: "break-word" as const }}>{row.value || "—"}</span>
+                )}
               </div>
             ))}
           </div>
@@ -321,7 +328,23 @@ export default function VendorProfilePage() {
           <div style={{ padding: "12px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>Recent Transactions</span>
           </div>
-          {transactions.length === 0 ? (
+          {loading ? (
+            <div>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderBottom: i < 3 ? "1px solid #f8fafc" : "none" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "#f1f5f9", flexShrink: 0, animation: "skel-pulse 1.5s ease-in-out infinite" }} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {skeletonBox("70%", 12)}
+                    {skeletonBox("40%", 10)}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                    {skeletonBox(60, 13)}
+                    {skeletonBox(40, 10)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : transactions.length === 0 ? (
             <div style={{ padding: "32px 20px", textAlign: "center" as const, color: "#cbd5e1", fontSize: 13 }}>
               No transactions yet.
             </div>
@@ -394,7 +417,7 @@ export default function VendorProfilePage() {
               </div>
               <div>
                 <p style={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>Recharge Wallet</p>
-                <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 1 }}>Current balance: {fmtCurrency(vendor.wallet_balance ?? 0)}</p>
+                <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 1 }}>Current balance: {fmtCurrency(vendor?.wallet_balance ?? 0)}</p>
               </div>
             </div>
 
@@ -475,7 +498,10 @@ export default function VendorProfilePage() {
         </div>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes skel-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
     </div>
   );
 }

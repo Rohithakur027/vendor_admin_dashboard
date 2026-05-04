@@ -3,67 +3,11 @@
 import { useState, Fragment } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { StatusBadge } from "@/components/StatusBadge";
-import {
-  FilterPanel,
-  FilterSection,
-  FilterPill,
-  FilterTrigger,
-} from "@/components/FilterPanel";
 import { Car, ArrowRight } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
-
-function BookingTableSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-52" />
-        </div>
-        <Skeleton className="h-8 w-36 rounded-full" />
-      </div>
-      <div className="flex gap-3">
-        <Skeleton className="h-[42px] flex-1 rounded-xl" />
-        <Skeleton className="h-[42px] w-24 rounded-xl" />
-      </div>
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          <div className="grid grid-cols-[100px_2fr_1.5fr_1.5fr_120px_100px] gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-3 w-16" />
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-col divide-y divide-slate-100">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-[100px_2fr_1.5fr_1.5fr_120px_100px] items-center gap-4 px-6 py-4">
-              <div className="space-y-2">
-                <Skeleton className="h-3.5 w-16" />
-                <Skeleton className="h-4 w-14 rounded" />
-              </div>
-              <div className="space-y-1.5 pr-4">
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-2 w-16" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-              <Skeleton className="h-3.5 w-28" />
-              <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <div className="space-y-1">
-                <Skeleton className="h-3.5 w-14" />
-                <Skeleton className="h-3 w-12" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function formatDateStrings(iso: string) {
   try {
@@ -89,28 +33,35 @@ function MockSeparator() {
 export default function ActiveBookingsPage() {
   const { bookings, supervisors, drivers, isLoading, apiCounts } = useVendor();
 
-  if (isLoading) return <BookingTableSkeleton />;
-
   const [search, setSearch]             = useState("");
-  const [supervisorFilter, setSupervisorFilter] = useState("all");
-  const [filterOpen, setFilterOpen]   = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const ongoingBookings = bookings.filter((b) => b.status === "Ongoing");
 
   const filtered = ongoingBookings.filter((b) => {
     const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      b.id.toLowerCase().includes(q) ||
-      b.pickupLocation.toLowerCase().includes(q) ||
-      b.dropLocation.toLowerCase().includes(q);
-    const matchSupervisor =
-      supervisorFilter === "all" || b.supervisorId === supervisorFilter;
-    return matchSearch && matchSupervisor;
-  });
+    if (!q) return true;
+    const driver = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
+    const driverName = driver?.name || "";
+    const driverPhone = (b.driverPhone ?? driver?.phone ?? "").toLowerCase();
+    const vehicleModel = driver?.vehicle ?? "";
+    const vehicleReg   = driver?.vehicleReg ?? "";
+    const companyName = b.bookingSource || "";
+    const supervisorName = supervisors.find(s => s.id === b.supervisorId)?.name || "";
 
-  const activeFilterCount = supervisorFilter !== "all" ? 1 : 0;
+    return (
+      b.id.toLowerCase().includes(q) ||
+      (b.bookingRef?.toLowerCase().includes(q) ?? false) ||
+      b.pickupLocation.toLowerCase().includes(q) ||
+      b.dropLocation.toLowerCase().includes(q) ||
+      driverName.toLowerCase().includes(q) ||
+      driverPhone.includes(q) ||
+      vehicleModel.toLowerCase().includes(q) ||
+      vehicleReg.toLowerCase().replace(/\s+/g, "").includes(q.replace(/\s+/g, "")) ||
+      companyName.toLowerCase().includes(q) ||
+      supervisorName.toLowerCase().includes(q)
+    );
+  });
 
   const apiInFiltered = filtered.filter((b) => {
     const idx = bookings.findIndex((x) => x.id === b.id);
@@ -123,14 +74,18 @@ export default function ActiveBookingsPage() {
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-slate-800">Active Bookings</h2>
+          <h2 className="text-[22px] font-bold tracking-tight text-slate-800">Active Trips</h2>
           <p className="text-[13px] text-slate-400 font-medium mt-0.5">
-            {filtered.length} of {ongoingBookings.length} rides currently in progress
+            {isLoading ? (
+              <SkeletonInline className="h-3 w-40" />
+            ) : (
+              <>{filtered.length} of {ongoingBookings.length} rides currently in progress</>
+            )}
           </p>
         </div>
-        
+
         {/* Count Pills */}
-        {ongoingBookings.length > 0 && (
+        {!isLoading && ongoingBookings.length > 0 && (
           <div className="flex items-center gap-2 text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1.5 rounded-full font-semibold w-fit shadow-none tracking-wide">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
             {ongoingBookings.length} live right now
@@ -138,38 +93,13 @@ export default function ActiveBookingsPage() {
         )}
       </div>
 
-      {/* SEARCH AND FILTER BUTTONS */}
+      {/* SEARCH */}
       <div className="flex flex-wrap gap-3 items-center">
         <SearchBar
           value={search}
           onChange={setSearch}
-          placeholder="Search by ID, pickup or drop location..."
+          placeholder="Search by ID, route, name, vehicle, company..."
         />
-        <div className="relative shrink-0">
-          <FilterTrigger onClick={() => setFilterOpen((v) => !v)} activeCount={activeFilterCount} />
-          <FilterPanel
-            open={filterOpen}
-            onClose={() => setFilterOpen(false)}
-            activeCount={activeFilterCount}
-            onClearAll={() => setSupervisorFilter("all")}
-          >
-            <FilterSection label="Filter by Supervisor">
-              <FilterPill
-                label="All Supervisors"
-                active={supervisorFilter === "all"}
-                onClick={() => setSupervisorFilter("all")}
-              />
-              {supervisors.map((s) => (
-                <FilterPill
-                  key={s.id}
-                  label={s.name}
-                  active={supervisorFilter === s.id}
-                  onClick={() => setSupervisorFilter(s.id)}
-                />
-              ))}
-            </FilterSection>
-          </FilterPanel>
-        </div>
       </div>
 
       {/* UNIFIED TABLE CONTAINER */}
@@ -177,11 +107,11 @@ export default function ActiveBookingsPage() {
         <div className="w-full overflow-x-auto">
           <div className="min-w-[900px]">
             {/* TH */}
-            <div className="grid grid-cols-[100px_2fr_120px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ID & TYPE</div>
+            <div className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">TRIP ID & TYPE</div>
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">ROUTE</div>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">COMPANY</div>
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">SUPERVISOR</div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VEHICLE</div>
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">DRIVER</div>
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">STATUS</div>
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">CREATED AT</div>
@@ -189,7 +119,38 @@ export default function ActiveBookingsPage() {
 
             {/* TBODY */}
             <div className="flex flex-col divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5">
+                    <div className="space-y-2">
+                      <Skeleton className="h-3.5 w-16" />
+                      <Skeleton className="h-4 w-12 rounded" />
+                    </div>
+                    <div className="space-y-1.5 pr-4">
+                      <Skeleton className="h-3.5 w-3/4" />
+                      <Skeleton className="h-2 w-16" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-3.5 w-14" />
+                      <Skeleton className="h-3 w-12" />
+                    </div>
+                  </div>
+                ))
+              ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
                   <Car className="h-10 w-10 text-slate-200" />
                   <p className="text-sm font-medium">No rides currently in progress.</p>
@@ -198,19 +159,21 @@ export default function ActiveBookingsPage() {
                 filtered.map((booking, idx) => {
                   const { day, time } = formatDateStrings(booking.createdAt);
                   const supervisorName = supervisors.find(s => s.id === booking.supervisorId)?.name || 'Unknown';
-                  const driverName = booking.driverId ? (drivers.find(d => d.id === booking.driverId)?.name || 'Unknown') : null;
-                  const vehicle = booking.driverId ? (drivers.find(d => d.id === booking.driverId)?.vehicle ?? null) : null;
+                  const driver = booking.driverId ? drivers.find(d => d.id === booking.driverId) : null;
+                  const driverName = driver ? (driver.name || 'Unknown') : null;
+                  const vehicle = driver?.vehicle ?? null;
+                  const vehicleReg = driver?.vehicleReg ?? null;
 
                   return (
                     <Fragment key={booking.id}>
                       {idx === splitAt && <MockSeparator />}
                     <div
-                      className="grid grid-cols-[100px_2fr_120px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer group"
+                      className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer group"
                       onClick={() => setSelectedBooking(booking)}
                     >
                       {/* ID & TYPE */}
                       <div className="flex flex-col items-start gap-1">
-                        <span className="font-extrabold text-[#111827] text-[13px]">{booking.id}</span>
+                        <span className="font-extrabold text-[#111827] text-[13px]">{booking.bookingRef ?? "—"}</span>
                         <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
                           {booking.type}
                         </span>
@@ -233,31 +196,34 @@ export default function ActiveBookingsPage() {
                         </span>
                       </div>
 
-                      {/* COMPANY */}
-                      <div>
-                        {booking.bookingSource ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-semibold truncate max-w-[110px]">
+                      {/* SUPERVISOR */}
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-[13px] font-medium text-slate-600 truncate">{supervisorName}</span>
+                        {booking.bookingSource && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-semibold truncate max-w-[110px]">
                             {booking.bookingSource}
                           </span>
-                        ) : (
-                          <span className="text-[12px] text-slate-300 italic">—</span>
                         )}
                       </div>
 
-                      {/* SUPERVISOR */}
-                      <div className="flex items-center">
-                        <span className="text-[13px] font-medium text-slate-600 truncate">{supervisorName}</span>
-                      </div>
-
-                      {/* DRIVER */}
+                      {/* VEHICLE */}
                       <div className="flex flex-col gap-px">
                         {driverName ? (
                           <>
-                            <span className="text-[13px] font-medium text-slate-600 truncate">{driverName}</span>
-                            {vehicle && (
-                              <span className="text-[11px] text-slate-400 truncate">{vehicle}</span>
+                            <span className="text-[13px] font-medium text-slate-600 truncate">{vehicleReg || vehicle || "Unknown"}</span>
+                            {vehicleReg && vehicle && (
+                              <span className="text-[11px] font-semibold text-slate-500 truncate">{vehicle}</span>
                             )}
                           </>
+                        ) : (
+                          <span className="text-[13px] text-slate-300 font-medium italic">—</span>
+                        )}
+                      </div>
+
+                      {/* DRIVER */}
+                      <div className="flex flex-col gap-px min-w-0">
+                        {driverName ? (
+                          <span className="text-[13px] font-medium text-slate-600 truncate">{driverName}</span>
                         ) : (
                           <span className="text-[13px] text-slate-300 font-medium italic">Awaiting</span>
                         )}

@@ -3,28 +3,30 @@
 import {
   createContext, useContext, useState, useEffect, ReactNode, useCallback,
 } from "react";
-import { supervisorsApi, bookingsApi } from "@/lib/api";
-import type { BookingApiItem } from "@/lib/api";
+import { supervisorsApi, tripsApi, vendorsApi } from "@/lib/api";
+import type { TripApiItem, VendorWalletSnapshot } from "@/lib/api";
 import type { Supervisor, SupervisorFormData } from "@/modules/supervisors/types";
 import type { Driver } from "@/modules/drivers/types";
 import type { Booking } from "@/modules/bookings/types";
 import { mockSupervisors, mockBookings, mockDrivers } from "@/lib/mock-data";
+import { useAuth } from "./AuthContext";
 
 interface VendorContextValue {
   supervisors: Supervisor[];
   drivers: Driver[];
   bookings: Booking[];
+  vendorWallet: VendorWalletSnapshot | null;
   isLoading: boolean;
   apiCounts: { supervisors: number; bookings: number; drivers: number };
   addSupervisor: (data: SupervisorFormData) => Promise<void>;
-  updateSupervisor: (id: string, data: Partial<Supervisor>) => void;
-  deleteSupervisor: (id: string) => void;
-  toggleAppAccess: (id: string) => void;
+  updateSupervisor: (id: string, data: Partial<Supervisor>) => Promise<void>;
+  deleteSupervisor: (id: string) => Promise<void>;
+  toggleAppAccess: (id: string) => Promise<void>;
 }
 
 const VendorContext = createContext<VendorContextValue | null>(null);
 
-function toBooking(item: BookingApiItem): Booking {
+function toBooking(item: TripApiItem): Booking {
   return {
     id:              item.id,
     type:            item.type as "Instant" | "Scheduled",
@@ -40,13 +42,13 @@ function toBooking(item: BookingApiItem): Booking {
     fare:            item.fare       ?? undefined,
     passengers:      item.passengers ?? undefined,
     bookingSource:   item.bookingSource,
-    bookingRef:      item.bookingRef,
+    bookingRef:      item.tripRef,
     driverPhone:     item.driverPhone,
   };
 }
 
-function deriveDrivers(apiItems: BookingApiItem[]): Driver[] {
-  const tripsByDriver = new Map<string, BookingApiItem[]>();
+function deriveDrivers(apiItems: TripApiItem[]): Driver[] {
+  const tripsByDriver = new Map<string, TripApiItem[]>();
 
   for (const item of apiItems) {
     if (!item.driverId) continue;
@@ -68,6 +70,11 @@ function deriveDrivers(apiItems: BookingApiItem[]): Driver[] {
       id:                    driverId,
       name:                  latest.driverName   ?? "Unknown",
       phone:                 latest.driverPhone  ?? "",
+      vehicle:               latest.vehicleModel ?? undefined,
+      vehicleReg:            latest.vehicleReg        ?? undefined,
+      vehicleType:           latest.vehicleType       ?? undefined,
+      vehicleColor:          latest.vehicleColor      ?? undefined,
+      vehicleMakeYear:       latest.vehicleMakeYear   ?? undefined,
       status:                (ongoingTrip ? "On Trip" : "Available") as Driver["status"],
       assignedSupervisorId:  current.supervisorId   ?? null,
       assignedSupervisorName: current.supervisorName ?? null,
@@ -75,6 +82,7 @@ function deriveDrivers(apiItems: BookingApiItem[]): Driver[] {
       lastActive:            latest.createdAt,
       recentTrips:           sorted.slice(0, 5).map((t) => ({
         bookingId:      t.id,
+        tripRef:        t.tripRef ?? null,
         from:           t.pickupLocation,
         to:             t.dropLocation,
         date:           t.createdAt,
@@ -85,14 +93,16 @@ function deriveDrivers(apiItems: BookingApiItem[]): Driver[] {
 }
 
 export function VendorProvider({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [apiSups, setApiSups] = useState<Supervisor[]>([]);
   const [apiBks,  setApiBks]  = useState<Booking[]>([]);
   const [apiDrvs, setApiDrvs] = useState<Driver[]>([]);
+  const [vendorWallet, setVendorWallet] = useState<VendorWalletSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Combine API data (first) with mock data (after) so mock rows appear below real rows
-  const supervisors = [...apiSups, ...mockSupervisors];
-  const bookings    = [...apiBks, ...mockBookings];
+  const supervisors = [...apiSups];
+  const bookings    = [...apiBks];
   const drivers     = [...apiDrvs, ...mockDrivers];
   const apiCounts   = {
     supervisors: apiSups.length,
@@ -102,14 +112,16 @@ export function VendorProvider({ children }: { children: ReactNode }) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [supsRes, bksRes] = await Promise.all([
+      const [supsRes, bksRes, walletRes] = await Promise.all([
         supervisorsApi.list(),
-        bookingsApi.list({ limit: 100 }),
+        tripsApi.list({ limit: 100 }),
+        vendorsApi.myWallet().catch(() => null),
       ]);
       setApiSups(supsRes.data as unknown as Supervisor[]);
       const apiItems = bksRes.data;
       setApiBks(apiItems.map(toBooking));
       setApiDrvs(deriveDrivers(apiItems));
+      setVendorWallet(walletRes?.data ?? null);
     } catch {
       // auth or network error — AuthContext handles redirect
     } finally {
@@ -118,19 +130,27 @@ export function VendorProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+    // Vendor APIs are scoped to a single vendor via JWT vendor_id. Superadmins
+    // (and unauthenticated visitors) have no vendor scope and would just hit
+    // 400/403s. Skip the fetch entirely for them.
+    if (!isAuthenticated || user?.role !== "vendor") {
+      setIsLoading(false);
+      return;
+    }
     fetchAll();
-  }, [fetchAll]);
+  }, [authLoading, isAuthenticated, user?.role, fetchAll]);
 
   const addSupervisor = useCallback(async (data: SupervisorFormData): Promise<void> => {
     const res = await supervisorsApi.create({
-      name:        data.name,
-      email:       data.email,
-      phone:       data.phone,
-      zone:        data.zone,
-      password:    data.password,
-      status:      data.status,
-      walletLimit: data.walletLimit,
-      companies:   data.companies,
+      name:            data.name,
+      email:           data.email,
+      phone:           data.phone,
+      zone:            data.zone,
+      password:        data.password,
+      status:          data.status,
+      companies:       data.companies,
+      sendCredentials: data.sendCredentials,
     });
     setApiSups((prev) => [res.data as unknown as Supervisor, ...prev]);
   }, []);
@@ -141,19 +161,21 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     );
     try {
       const res = await supervisorsApi.update(id, {
-        name:        data.name,
-        phone:       data.phone,
-        zone:        data.zone,
-        status:      data.status,
-        walletLimit: data.walletLimit,
+        name:      data.name,
+        email:     data.email,
+        phone:     data.phone,
+        zone:      data.zone,
+        status:    data.status,
+        companies: data.companies,
       });
       setApiSups((prev) =>
         prev.map((s) =>
           s.id === id ? { ...s, ...(res.data as unknown as Supervisor) } : s
         )
       );
-    } catch {
+    } catch (err) {
       fetchAll();
+      throw err;
     }
   }, [fetchAll]);
 
@@ -161,8 +183,9 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     setApiSups((prev) => prev.filter((s) => s.id !== id));
     try {
       await supervisorsApi.delete(id);
-    } catch {
+    } catch (err) {
       fetchAll();
+      throw err;
     }
   }, [fetchAll]);
 
@@ -177,8 +200,9 @@ export function VendorProvider({ children }: { children: ReactNode }) {
           s.id === id ? { ...s, ...(res.data as unknown as Supervisor) } : s
         )
       );
-    } catch {
+    } catch (err) {
       fetchAll();
+      throw err;
     }
   }, [fetchAll]);
 
@@ -188,6 +212,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
         supervisors,
         drivers,
         bookings,
+        vendorWallet,
         isLoading,
         apiCounts,
         addSupervisor,

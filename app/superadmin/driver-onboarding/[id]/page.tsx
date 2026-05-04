@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { driverOnboardingApi, type OnboardingDetail, type OnboardingDoc } from "@/lib/api";
 import { STATUS_STYLES } from "@/components/StatusBadge";
@@ -22,6 +22,8 @@ interface Doc {
   rejectionReason: string;
   hasExpiry:       boolean;
   expiryDate:      string | null;
+  fileUrl:         string | null;
+  fileUrlBack:     string | null;
 }
 
 function mapDoc(d: OnboardingDoc): Doc {
@@ -34,7 +36,27 @@ function mapDoc(d: OnboardingDoc): Doc {
     rejectionReason: d.rejection_note ?? "",
     hasExpiry:       d.has_expiry,
     expiryDate:      d.expiry_date,
+    fileUrl:         d.file_url ?? null,
+    fileUrlBack:     d.file_url_back ?? null,
   };
+}
+
+function fileKind(url: string | null): "image" | "pdf" | "other" {
+  if (!url) return "other";
+  const u = url.toLowerCase().split("?")[0];
+  if (/\.(jpe?g|png|webp|gif|bmp|svg|heic|heif)$/.test(u)) return "image";
+  if (/\.pdf$/.test(u)) return "pdf";
+  return "other";
+}
+
+function fileNameFromUrl(url: string | null): string {
+  if (!url) return "";
+  try {
+    const path = new URL(url, "http://x").pathname;
+    return decodeURIComponent(path.split("/").pop() ?? "");
+  } catch {
+    return url.split("/").pop() ?? "";
+  }
 }
 
 function fmtDate(iso: string | null) {
@@ -58,14 +80,22 @@ function buildSections(r: OnboardingDetail) {
       ],
     },
     {
-      title: "ADDRESS DETAILS",
+      title: "CURRENT ADDRESS",
       fields: [
-        { label: "CURRENT ADDRESS",   value: fmt(r.current_address),   raw: r.current_address ?? "",   key: "current_address" },
-        { label: "CITY",              value: fmt(r.city),              raw: r.city ?? "",              key: "city" },
-        { label: "STATE",             value: fmt(r.state),             raw: r.state ?? "",             key: "state" },
-        { label: "PINCODE",           value: fmt(r.pincode),           raw: r.pincode ?? "",           key: "pincode" },
-        { label: "PERMANENT ADDRESS", value: fmt(r.permanent_address), raw: r.permanent_address ?? "", key: "permanent_address" },
-        { label: "NATIONALITY",       value: fmt(r.nationality),       raw: r.nationality ?? "",       key: "nationality" },
+        { label: "ADDRESS",  value: fmt(r.current_address), raw: r.current_address ?? "", key: "current_address" },
+        { label: "CITY",     value: fmt(r.city),            raw: r.city ?? "",            key: "city" },
+        { label: "STATE",    value: fmt(r.state),           raw: r.state ?? "",           key: "state" },
+        { label: "PINCODE",  value: fmt(r.pincode),         raw: r.pincode ?? "",         key: "pincode" },
+      ],
+    },
+    {
+      title: "PERMANENT ADDRESS",
+      fields: [
+        { label: "ADDRESS",     value: fmt(r.permanent_address), raw: r.permanent_address ?? "", key: "permanent_address" },
+        { label: "CITY",        value: fmt(r.permanent_city),    raw: r.permanent_city ?? "",    key: "permanent_city" },
+        { label: "STATE",       value: fmt(r.permanent_state),   raw: r.permanent_state ?? "",   key: "permanent_state" },
+        { label: "PINCODE",     value: fmt(r.permanent_pincode), raw: r.permanent_pincode ?? "", key: "permanent_pincode" },
+        { label: "NATIONALITY", value: fmt(r.nationality),       raw: r.nationality ?? "",       key: "nationality" },
       ],
     },
     {
@@ -92,10 +122,11 @@ function buildSections(r: OnboardingDetail) {
     sections.push({
       title: "VEHICLE INFORMATION",
       fields: [
-        { label: "PLATE NUMBER", value: fmt(r.vehicle.plate_number), raw: r.vehicle.plate_number ?? "", key: "vehicle.plate_number" },
-        { label: "MODEL",        value: fmt(r.vehicle.model),        raw: r.vehicle.model ?? "",        key: "vehicle.model" },
-        { label: "COLOR",        value: fmt(r.vehicle.color),        raw: r.vehicle.color ?? "",        key: "vehicle.color" },
-        { label: "TYPE",         value: fmt(r.vehicle.type),         raw: r.vehicle.type ?? "",         key: "vehicle.type" },
+        { label: "PLATE NUMBER",     value: fmt(r.vehicle.plate_number),                          raw: r.vehicle.plate_number ?? "",                          key: "vehicle.plate_number" },
+        { label: "MODEL",            value: fmt(r.vehicle.model),                                 raw: r.vehicle.model ?? "",                                 key: "vehicle.model" },
+        { label: "COLOR",            value: fmt(r.vehicle.color),                                 raw: r.vehicle.color ?? "",                                 key: "vehicle.color" },
+        { label: "MAKE",             value: fmt(r.vehicle.make),                                  raw: r.vehicle.make ?? "",                                  key: "vehicle.make" },
+        { label: "YEAR",             value: r.vehicle.year != null ? String(r.vehicle.year) : "—", raw: r.vehicle.year != null ? String(r.vehicle.year) : "",  key: "vehicle.year" },
       ],
     });
   }
@@ -139,38 +170,74 @@ function ViewModal({
   const decided    = doc.status === "Approved" || doc.status === "Rejected";
   const showActions = !decided || changeMode;
 
+  const renderPreview = (url: string | null, label: string) => {
+    if (!url) {
+      return (
+        <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24 }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="3" width="16" height="18" rx="2" stroke="#94a3b8" strokeWidth="1.5"/>
+              <path d="M8 8h8M8 12h8M8 16h5" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <p style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>{label} not uploaded</p>
+        </div>
+      );
+    }
+    const k = fileKind(url);
+    if (k === "image") {
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={url} alt={label} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />;
+    }
+    if (k === "pdf") {
+      return <iframe src={url} title={label} style={{ width: "100%", height: "100%", border: "none", background: "#fff" }} />;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
+        <p style={{ fontSize: 12, color: "#0f172a", fontWeight: 700 }}>{fileNameFromUrl(url) || "File"}</p>
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{ padding: "6px 14px", borderRadius: 7, background: BLUE, color: "#fff", fontSize: 11.5, fontWeight: 700, textDecoration: "none", fontFamily: FONT }}>Open file</a>
+      </div>
+    );
+  };
+
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
       onClick={onClose}
     >
       <div
-        style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 520, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
+        style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 880, width: "100%", maxHeight: "92vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
-          <div>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, flexShrink: 0 }}>
+          <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{doc.name}</p>
-            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Submitted by driver</p>
+            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{doc.desc}</p>
           </div>
           <button
             onClick={onClose}
-            style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", fontSize: 14, color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+            style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", fontSize: 14, color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center" }}
           >✕</button>
         </div>
 
-        <div style={{
-          minHeight: 280, background: "#eff6ff", border: `2px dashed ${BLUE}`,
-          borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 20,
-        }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dbeafe", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="3" width="16" height="18" rx="2" stroke={BLUE} strokeWidth="1.5"/>
-              <path d="M8 8h8M8 12h8M8 16h5" stroke={BLUE} strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <p style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{doc.name}</p>
-          <p style={{ fontSize: 12, color: "#94a3b8" }}>{doc.desc}</p>
+        <div style={{ display: "flex", gap: 16, marginBottom: 18 }}>
+          {(["front", "back"] as const).map(side => {
+            const url   = side === "front" ? doc.fileUrl : doc.fileUrlBack;
+            const label = side === "front" ? "Front"     : "Back";
+            return (
+              <div key={side} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <p style={{ fontSize: 11.5, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</p>
+                  {url && (
+                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11.5, color: BLUE, fontWeight: 700, textDecoration: "none" }}>Open ↗</a>
+                  )}
+                </div>
+                <div style={{ height: 360, background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {renderPreview(url, label)}
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {decided && !changeMode ? (
@@ -329,23 +396,139 @@ function DatePickerCell({ value, onChange, hasExpiry }: { value: string; onChang
   );
 }
 
+// ── Upload modal — front + back ───────────────────────────────────────────────
+function UploadModal({
+  doc, onClose, onUploaded,
+}: {
+  doc:        Doc;
+  onClose:    () => void;
+  onUploaded: (side: "front" | "back", file: File) => Promise<void>;
+}) {
+  const frontInputRef = useRef<HTMLInputElement>(null);
+  const backInputRef  = useRef<HTMLInputElement>(null);
+  const [busy,   setBusy]   = useState<"front" | "back" | null>(null);
+  const [errMsg, setErrMsg] = useState("");
+  const [previews, setPreviews] = useState<{ front?: string; back?: string }>({});
+
+  async function handle(side: "front" | "back", file: File | undefined) {
+    if (!file) return;
+    setErrMsg("");
+    const previewUrl = URL.createObjectURL(file);
+    setPreviews(p => ({ ...p, [side]: previewUrl }));
+    setBusy(side);
+    try {
+      await onUploaded(side, file);
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const Side = ({ side, label, currentUrl }: { side: "front" | "back"; label: string; currentUrl: string | null }) => {
+    const localPreview = previews[side];
+    const url          = localPreview ?? currentUrl;
+    const ref          = side === "front" ? frontInputRef : backInputRef;
+    const isImage      = url ? fileKind(url) === "image" : false;
+    const isPdf        = url ? fileKind(url) === "pdf"   : false;
+    return (
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</p>
+        <div style={{
+          position: "relative", height: 180, borderRadius: 10,
+          border: `1.5px ${url ? "solid" : "dashed"} ${url ? "#e2e8f0" : "#cbd5e1"}`,
+          background: url ? "#fff" : "#f8fafc",
+          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          {url && isImage && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt={label} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+          )}
+          {url && isPdf && (
+            <iframe src={url} title={label} style={{ width: "100%", height: "100%", border: "none" }} />
+          )}
+          {url && !isImage && !isPdf && (
+            <p style={{ fontSize: 12, color: "#64748b" }}>📎 File uploaded</p>
+          )}
+          {!url && (
+            <p style={{ fontSize: 12.5, color: "#94a3b8" }}>No file selected</p>
+          )}
+        </div>
+        <input
+          ref={ref}
+          type="file"
+          style={{ display: "none" }}
+          onChange={e => { handle(side, e.target.files?.[0]); e.target.value = ""; }}
+        />
+        <button
+          onClick={() => ref.current?.click()}
+          disabled={busy === side}
+          style={{
+            padding: "8px 12px", borderRadius: 8,
+            border: "1.5px solid #bfdbfe", background: busy === side ? "#dbeafe" : "#eff6ff",
+            color: BLUE, fontSize: 12.5, fontWeight: 700,
+            cursor: busy === side ? "wait" : "pointer", fontFamily: FONT,
+          }}
+        >
+          {busy === side ? "Uploading…" : (url ? `Replace ${label}` : `Upload ${label}`)}
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 720, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18 }}>
+          <div>
+            <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Upload {doc.name}</p>
+            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Upload the front and back sides of the document.</p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ width: 32, height: 32, borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", fontSize: 14, color: "#64748b" }}
+          >✕</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 16 }}>
+          <Side side="front" label="Front" currentUrl={doc.fileUrl} />
+          <Side side="back"  label="Back"  currentUrl={doc.fileUrlBack} />
+        </div>
+
+        {errMsg && (
+          <p style={{ marginTop: 12, fontSize: 12.5, color: "#B91C1C", fontWeight: 600 }}>{errMsg}</p>
+        )}
+
+        <div style={{ marginTop: 18, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "9px 20px", borderRadius: 8, border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: FONT }}
+          >Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Document table ────────────────────────────────────────────────────────────
 function DocTable({
-  docs, onApprove, onReject, onView, onUpload,
+  docs, onApprove, onReject, onView, onOpenUpload,
 }: {
-  docs:      Doc[];
-  onApprove: (id: string) => void;
-  onReject:  (id: string, reason: string) => void;
-  onView:    (doc: Doc) => void;
-  onUpload:  (id: string, file: File) => void;
+  docs:         Doc[];
+  onApprove:    (id: string) => void;
+  onReject:     (id: string, reason: string) => void;
+  onView:       (doc: Doc) => void;
+  onOpenUpload: (doc: Doc) => void;
 }) {
-  const [rejectingId,   setRejectingId]   = useState<string | null>(null);
-  const [reason,        setReason]        = useState("");
-  const [expiryEdits,   setExpiryEdits]   = useState<Record<string, string>>({});
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, string>>({});
-
-  const fileInputRef  = useRef<HTMLInputElement>(null);
-  const pendingDocId  = useRef<string>("");
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [reason,      setReason]      = useState("");
+  const [expiryEdits, setExpiryEdits] = useState<Record<string, string>>({});
 
   const GRID = "2fr 1.2fr 1.3fr 1.7fr 1.3fr";
   const GAP  = 16;
@@ -356,33 +539,8 @@ function DocTable({
     setReason("");
   }
 
-  const triggerUpload = useCallback((docId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    pendingDocId.current = docId;
-    fileInputRef.current?.click();
-  }, []);
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file && pendingDocId.current) {
-      const docId = pendingDocId.current;
-      setUploadedFiles(prev => ({ ...prev, [docId]: file.name }));
-      onUpload(docId, file);
-    }
-    e.target.value = "";
-  }
-
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-      {/* Hidden file input shared across all rows */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.pdf"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
-
       <div style={{ display: "grid", gridTemplateColumns: GRID, columnGap: GAP, padding: "11px 24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
         {["DOCUMENT", "STATUS", "EXPIRY DATE", "ACTION", "UPLOAD FILE"].map(h => (
           <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
@@ -390,8 +548,9 @@ function DocTable({
       </div>
 
       {docs.map((doc, idx) => {
-        const currentExpiry  = expiryEdits[doc.id] ?? doc.expiryDate ?? "";
-        const uploadedName   = uploadedFiles[doc.id];
+        const currentExpiry = expiryEdits[doc.id] ?? doc.expiryDate ?? "";
+        const sideCount     = (doc.fileUrl ? 1 : 0) + (doc.fileUrlBack ? 1 : 0);
+        const sideLabel     = sideCount === 2 ? "Front + Back" : sideCount === 1 ? (doc.fileUrl ? "Front uploaded" : "Back uploaded") : "";
         return (
           <div key={doc.id}>
             <div
@@ -409,10 +568,8 @@ function DocTable({
               {/* Document name */}
               <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                 <span style={{ fontSize: 13.5, fontWeight: 700, color: doc.submitted ? "#0f172a" : "#94a3b8" }}>{doc.name}</span>
-                {uploadedName && (
-                  <span style={{ fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
-                    📎 {uploadedName}
-                  </span>
+                {sideLabel && (
+                  <span style={{ fontSize: 11, color: "#64748b" }}>📎 {sideLabel}</span>
                 )}
               </div>
 
@@ -450,22 +607,12 @@ function DocTable({
 
               {/* Upload File column */}
               <div onClick={e => e.stopPropagation()}>
-                {uploadedName ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    <span style={{ fontSize: 11, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const, maxWidth: 140 }}>
-                      📎 {uploadedName}
-                    </span>
-                    <button
-                      onClick={e => triggerUpload(doc.id, e)}
-                      style={{ padding: "3px 8px", borderRadius: 6, border: "1.5px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: FONT, width: "fit-content" }}
-                    >Change</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={e => triggerUpload(doc.id, e)}
-                    style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #bfdbfe", background: "#eff6ff", color: BLUE, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}
-                  >Upload yourself</button>
-                )}
+                <button
+                  onClick={e => { e.stopPropagation(); onOpenUpload(doc); }}
+                  style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #bfdbfe", background: "#eff6ff", color: BLUE, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT }}
+                >
+                  {sideCount > 0 ? "Manage files" : "Upload yourself"}
+                </button>
               </div>
             </div>
 
@@ -504,89 +651,6 @@ function DocTable({
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-function DriverReviewSkeleton() {
-  return (
-    <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Back button */}
-      <div>
-        <Skeleton className="h-9 w-20 rounded-[10px]" />
-      </div>
-
-      {/* Breadcrumb bar */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "0 20px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Skeleton className="h-3.5 w-32" />
-          <span style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 300 }}>/</span>
-          <Skeleton className="h-3.5 w-28" />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Skeleton className="h-8 w-32 rounded-lg" />
-          <Skeleton className="h-8 w-36 rounded-lg" />
-        </div>
-      </div>
-
-      {/* Profile card */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
-        <Skeleton className="h-14 w-14 rounded-full shrink-0" />
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </div>
-          <div style={{ display: "flex", gap: 16 }}>
-            <Skeleton className="h-3.5 w-28" />
-            <Skeleton className="h-3.5 w-36" />
-            <Skeleton className="h-3.5 w-32" />
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-          {[76, 76, 76].map((w, i) => (
-            <div key={i} style={{ padding: "12px 22px", borderRadius: 12, border: "1px solid #e2e8f0", textAlign: "center" as const, minWidth: w, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-              <Skeleton className="h-7 w-8" />
-              <Skeleton className="h-3 w-14" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Skeleton className="h-10 w-28 rounded-[9px]" />
-        <Skeleton className="h-10 w-36 rounded-[9px]" />
-        <Skeleton className="h-10 w-36 rounded-[9px]" />
-      </div>
-
-      {/* Basic details content */}
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        {[
-          { title: "PERSONAL INFORMATION", rows: 2 },
-          { title: "ADDRESS DETAILS",      rows: 2 },
-          { title: "LICENSE & EMPLOYMENT", rows: 2 },
-        ].map((section, si, arr) => (
-          <div key={section.title} style={{ borderBottom: si < arr.length - 1 ? "1px solid #f1f5f9" : "none" }}>
-            {/* Section header */}
-            <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
-              <Skeleton className="h-3 w-40" />
-            </div>
-            {/* Field rows — 3 columns, 2 rows */}
-            {Array.from({ length: section.rows }).map((_, ri) => (
-              <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: ri < section.rows - 1 ? "1px solid #f1f5f9" : "none" }}>
-                {[0, 1, 2].map((ci) => (
-                  <div key={ci} style={{ padding: "16px 20px", borderRight: ci < 2 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
-                    <Skeleton className="h-2.5 w-20" />
-                    <Skeleton className="h-3.5 w-32" />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DriverReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -598,6 +662,7 @@ export default function DriverReviewPage() {
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState<"basic" | "driver" | "vehicle">("basic");
   const [viewDoc,     setViewDoc]     = useState<{ doc: Doc; kind: "driver" | "vehicle" } | null>(null);
+  const [uploadDoc,   setUploadDoc]   = useState<{ doc: Doc; kind: "driver" | "vehicle" } | null>(null);
 
   // basic-details inline editing
   const [editingSection, setEditingSection] = useState<string | null>(null);
@@ -616,8 +681,12 @@ export default function DriverReviewPage() {
       const next = { ...prev } as typeof prev & { vehicle: typeof prev.vehicle };
       for (const [key, val] of Object.entries(sectionDraft)) {
         if (key.startsWith("vehicle.")) {
-          const vKey = key.split(".")[1] as "plate_number" | "model" | "color" | "type";
-          if (next.vehicle) next.vehicle = { ...next.vehicle, [vKey]: val || null };
+          const vKey = key.split(".")[1] as "plate_number" | "model" | "color" | "type" | "make" | "year";
+          if (next.vehicle) {
+            const v = val || null;
+            const cast = vKey === "year" ? (v ? Number(v) : null) : v;
+            next.vehicle = { ...next.vehicle, [vKey]: cast };
+          }
         } else {
           (next as unknown as Record<string, unknown>)[key] = val || null;
         }
@@ -653,13 +722,32 @@ export default function DriverReviewPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  function applyUpload(docId: string, kind: "driver" | "vehicle") {
-    const setter = kind === "driver" ? setDriverDocs : setVehicleDocs;
-    setter(prev => prev.map(d =>
-      d.id === docId && !d.submitted
-        ? { ...d, submitted: true, status: "Pending" as DocStatus }
-        : d
+  async function uploadDocFile(docId: string, kind: "driver" | "vehicle", side: "front" | "back", file: File) {
+    const updated = await driverOnboardingApi.uploadDocumentFile(id!, docId, side, file);
+    const setter  = kind === "driver" ? setDriverDocs : setVehicleDocs;
+    setter(prev => prev.map(d => d.id === docId
+      ? {
+          ...d,
+          submitted:   updated.submitted,
+          status:      updated.status as DocStatus,
+          fileUrl:     updated.file_url ?? null,
+          fileUrlBack: updated.file_url_back ?? null,
+        }
+      : d
     ));
+    setUploadDoc(prev => prev && prev.doc.id === docId
+      ? {
+          ...prev,
+          doc: {
+            ...prev.doc,
+            submitted:   updated.submitted,
+            status:      updated.status as DocStatus,
+            fileUrl:     updated.file_url ?? null,
+            fileUrlBack: updated.file_url_back ?? null,
+          },
+        }
+      : prev
+    );
   }
 
   function applyApprove(docId: string, kind: "driver" | "vehicle") {
@@ -712,9 +800,7 @@ export default function DriverReviewPage() {
     }
   }
 
-  if (loading) return <DriverReviewSkeleton />;
-
-  if (!record) {
+  if (!loading && !record) {
     return (
       <div style={{ fontFamily: FONT, padding: 40, color: "#64748b", fontSize: 14 }}>
         Driver not found.{" "}
@@ -739,9 +825,9 @@ export default function DriverReviewPage() {
   const docKind: "driver" | "vehicle" = activeTab === "driver" ? "driver" : "vehicle";
   const activeDocs = activeTab === "driver" ? driverDocs : vehicleDocs;
 
-  const statusStyle = STATUS_STYLES[record.status] ?? STATUS_STYLES["Pending"];
-  const basicSections = buildSections(record);
-  const canAct = record.status !== "Approved" && record.status !== "Rejected";
+  const statusStyle = record ? (STATUS_STYLES[record.status] ?? STATUS_STYLES["Pending"]) : STATUS_STYLES["Pending"];
+  const basicSections = record ? buildSections(record) : [];
+  const canAct = record ? (record.status !== "Approved" && record.status !== "Rejected") : false;
 
   return (
     <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
@@ -775,9 +861,18 @@ export default function DriverReviewPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13.5, color: "#64748b" }}>Driver Onboarding</span>
           <span style={{ color: "#cbd5e1", fontSize: 14, fontWeight: 300 }}>/</span>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{record.full_name}</span>
+          {loading || !record ? (
+            <Skeleton className="h-3.5 w-28" />
+          ) : (
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>{record.full_name}</span>
+          )}
         </div>
-        {canAct ? (
+        {loading || !record ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <Skeleton className="h-8 w-32 rounded-lg" />
+            <Skeleton className="h-8 w-36 rounded-lg" />
+          </div>
+        ) : canAct ? (
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => setRejectModal(true)}
@@ -800,38 +895,65 @@ export default function DriverReviewPage() {
 
       {/* Driver profile card */}
       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "20px 28px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" as const }}>
-        <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dbeafe", color: BLUE, fontWeight: 800, fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {initials(record.full_name)}
-        </div>
+        {loading || !record ? (
+          <Skeleton className="h-14 w-14 rounded-full shrink-0" />
+        ) : (
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dbeafe", color: BLUE, fontWeight: 800, fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {initials(record.full_name)}
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{record.full_name}</span>
-            <span style={{
-              fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-              background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`,
-              display: "inline-flex", alignItems: "center", gap: 5,
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusStyle.dot }} />
-              {record.status}
-            </span>
+            {loading || !record ? (
+              <>
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>{record.full_name}</span>
+                <span style={{
+                  fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+                  background: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusStyle.dot }} />
+                  {record.status}
+                </span>
+              </>
+            )}
           </div>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.phone}</span>
-            {record.email && <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.email}</span>}
-            <span style={{ fontSize: 12.5, color: "#64748b" }}>Registered {fmtDate(record.created_at)}</span>
+            {loading || !record ? (
+              <>
+                <Skeleton className="h-3.5 w-28" />
+                <Skeleton className="h-3.5 w-36" />
+                <Skeleton className="h-3.5 w-32" />
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.phone}</span>
+                {record.email && <span style={{ fontSize: 12.5, color: "#64748b" }}>{record.email}</span>}
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>Registered {fmtDate(record.created_at)}</span>
+              </>
+            )}
           </div>
-          {record.rejection_note && (
+          {record?.rejection_note && (
             <p style={{ fontSize: 12, color: "#B91C1C", marginTop: 6 }}>Rejection note: {record.rejection_note}</p>
           )}
         </div>
         <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
           {[
-            { label: "Total Docs", value: record.doc_counts.total,     blue: false },
-            { label: "Submitted",  value: submittedCt,                  blue: false },
-            { label: "Approved",   value: approvedCt,                   blue: true  },
+            { label: "Total Docs", value: record?.doc_counts.total ?? 0, blue: false },
+            { label: "Submitted",  value: submittedCt,                   blue: false },
+            { label: "Approved",   value: approvedCt,                    blue: true  },
           ].map(s => (
             <div key={s.label} style={{ padding: "12px 22px", borderRadius: 12, border: "1px solid #e2e8f0", background: s.blue ? "#eff6ff" : "#fff", textAlign: "center" as const, minWidth: 76 }}>
-              <p style={{ fontSize: 24, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              {loading || !record ? (
+                <Skeleton className="h-7 w-8 mx-auto mb-1" />
+              ) : (
+                <p style={{ fontSize: 24, fontWeight: 800, color: s.blue ? BLUE : "#0f172a", lineHeight: 1 }}>{s.value}</p>
+              )}
               <p style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 5 }}>{s.label}</p>
             </div>
           ))}
@@ -881,7 +1003,31 @@ export default function DriverReviewPage() {
       </div>
 
       {/* Tab: Basic Details */}
-      {activeTab === "basic" && (
+      {activeTab === "basic" && (loading || !record ? (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          {[
+            { title: "PERSONAL INFORMATION", rows: 2 },
+            { title: "ADDRESS DETAILS",      rows: 2 },
+            { title: "LICENSE & EMPLOYMENT", rows: 2 },
+          ].map((section, si, arr) => (
+            <div key={section.title} style={{ borderBottom: si < arr.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+              <div style={{ padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #f1f5f9" }}>
+                <Skeleton className="h-3 w-40" />
+              </div>
+              {Array.from({ length: section.rows }).map((_, ri) => (
+                <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderBottom: ri < section.rows - 1 ? "1px solid #f1f5f9" : "none" }}>
+                  {[0, 1, 2].map((ci) => (
+                    <div key={ci} style={{ padding: "16px 20px", borderRight: ci < 2 ? "1px solid #f1f5f9" : "none", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <Skeleton className="h-2.5 w-20" />
+                      <Skeleton className="h-3.5 w-32" />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
         <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
           {basicSections.map((section, si) => {
             const isEditing = editingSection === section.title;
@@ -952,18 +1098,33 @@ export default function DriverReviewPage() {
             );
           })}
         </div>
-      )}
+      ))}
 
       {/* Tab: Driver / Vehicle Documents */}
-      {(activeTab === "driver" || activeTab === "vehicle") && (
+      {(activeTab === "driver" || activeTab === "vehicle") && (loading ? (
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 130px 130px 140px 140px", gap: 16, padding: "16px 24px", borderBottom: i < 3 ? "1px solid #f1f5f9" : "none", alignItems: "center" }}>
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-7 w-24 rounded" />
+              <Skeleton className="h-7 w-24 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : (
         <DocTable
           docs={activeDocs}
           onApprove={docId => applyApprove(docId, docKind)}
           onReject={(docId, reason) => applyReject(docId, reason, docKind)}
           onView={doc => setViewDoc({ doc, kind: docKind })}
-          onUpload={(docId) => applyUpload(docId, docKind)}
+          onOpenUpload={doc => setUploadDoc({ doc, kind: docKind })}
         />
-      )}
+      ))}
 
       {/* View document modal */}
       {viewDoc && (
@@ -981,6 +1142,15 @@ export default function DriverReviewPage() {
         />
       )}
 
+      {/* Upload document modal — front + back */}
+      {uploadDoc && (
+        <UploadModal
+          doc={uploadDoc.doc}
+          onClose={() => setUploadDoc(null)}
+          onUploaded={(side, file) => uploadDocFile(uploadDoc.doc.id, uploadDoc.kind, side, file)}
+        />
+      )}
+
       {/* Approve onboarding modal */}
       {approveModal && (
         <div
@@ -990,7 +1160,7 @@ export default function DriverReviewPage() {
           <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 440, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }} onClick={e => e.stopPropagation()}>
             <p style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", marginBottom: 10 }}>Approve Onboarding?</p>
             <p style={{ fontSize: 13.5, color: "#64748b", marginBottom: 22, lineHeight: 1.6 }}>
-              This will create a driver account for <strong>{record.full_name}</strong> with their phone number as the default password. All approved documents will be transferred.
+              This will create a driver account for <strong>{record?.full_name}</strong> with their phone number as the default password. All approved documents will be transferred.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button

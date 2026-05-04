@@ -4,11 +4,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useVendor } from "@/context/VendorContext";
 import { useState, useEffect } from "react";
 import {
-  ArrowLeft, BookOpen, TrendingUp, Circle,
+  ArrowLeft, Route, TrendingUp, Circle,
   IndianRupee, ArrowRight, User, Phone, Car,
   CheckCircle2, Building2,
 } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 
 // ── constants ────────────────────────────────────────────────────────────────
@@ -27,6 +27,17 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function fmtDateTime(iso: string) {
+  try {
+    const d = new Date(iso);
+    const day  = d.toLocaleDateString("en-GB",  { day: "2-digit", month: "short" });
+    const time = d.toLocaleTimeString("en-US",  { hour: "2-digit", minute: "2-digit" }).toLowerCase();
+    return { day, time };
+  } catch {
+    return { day: "—", time: "" };
+  }
+}
+
 function weeklyEarnings(bookings: { createdAt: string; fare?: number }[]) {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -40,33 +51,6 @@ function weeklyEarnings(bookings: { createdAt: string; fare?: number }[]) {
 }
 
 // ── Sub-components ───────────────────────────────────────────────────────────
-function DriverDetailSkeleton() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Skeleton className="h-9 w-20 rounded-lg" />
-        <Skeleton className="h-5 w-40" />
-      </div>
-      <div style={{ display: "flex", gap: 24, borderBottom: "1.5px solid #E8EEF4", paddingBottom: 1 }}>
-        {[0,1,2,3].map(i => <Skeleton key={i} className="h-8 w-24 rounded" />)}
-      </div>
-      <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, padding: 20 }}>
-        <div style={{ display: "flex", gap: 18 }}>
-          <Skeleton className="h-16 w-16 rounded-full shrink-0" />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-72" />
-          </div>
-          <Skeleton className="h-4 w-36 shrink-0" />
-        </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-        {[0,1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}
-      </div>
-    </div>
-  );
-}
-
 function StatCard({ label, value, icon: Icon, iconBg, iconColor }: {
   label: string; value: string | number;
   icon: React.ElementType; iconBg: string; iconColor: string;
@@ -155,10 +139,8 @@ export default function DriverProfilePage() {
   const { drivers, bookings, isLoading } = useVendor();
   const [activeTab, setActiveTab] = useState("overview");
 
-  if (isLoading) return <DriverDetailSkeleton />;
-
   const driver = drivers.find(d => d.id === id);
-  if (!driver) {
+  if (!isLoading && !driver) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p style={{ color: "#64748B" }}>Driver not found.</p>
@@ -168,9 +150,9 @@ export default function DriverProfilePage() {
   }
 
   const font        = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
-  const drvInitials = driver.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
-  const statusCfg   = STATUS_STYLES[driver.status] ?? STATUS_STYLES["Offline"];
-  const isOnline    = driver.status === "Available" || driver.status === "On Trip";
+  const drvInitials = driver ? driver.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "";
+  const statusCfg   = driver ? (STATUS_STYLES[driver.status] ?? STATUS_STYLES["Offline"]) : STATUS_STYLES["Offline"];
+  const isOnline    = driver ? (driver.status === "Available" || driver.status === "On Trip") : false;
 
   // bookings filtered to this driver
   const drvBookings    = bookings.filter(b => b.driverId === id);
@@ -229,7 +211,13 @@ export default function DriverProfilePage() {
         <div style={{ width: 1, height: 28, background: "#E8EEF4" }} />
         <div>
           <p style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>Driver Profile</p>
-          <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>{driver.name} · Full details</p>
+          <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
+            {isLoading || !driver ? (
+              <SkeletonInline className="h-3 w-32" />
+            ) : (
+              <>{driver.name} · Full details</>
+            )}
+          </p>
         </div>
       </div>
 
@@ -266,7 +254,44 @@ export default function DriverProfilePage() {
       </div>
 
       {/* ══ TAB: OVERVIEW ══ */}
-      {activeTab === "overview" && (
+      {activeTab === "overview" && (isLoading || !driver ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ ...CARD_STYLE, padding: "20px 24px", display: "flex", alignItems: "center", gap: 18 }}>
+            <Skeleton className="h-[60px] w-[60px] rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-3 w-32 shrink-0" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={CARD_STYLE} className="p-5 flex items-center justify-between gap-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+                <Skeleton className="h-[38px] w-[38px] rounded-xl shrink-0" />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
+            <Skeleton className="h-[120px] rounded-2xl" />
+            <div className="space-y-3.5">
+              <div style={CARD_STYLE} className="p-4 space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <div style={CARD_STYLE} className="p-4 space-y-2.5">
+                <Skeleton className="h-4 w-32" />
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-3 w-full" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
           {/* ── Profile card — identical layout to Supervisor Profile ── */}
@@ -318,8 +343,8 @@ export default function DriverProfilePage() {
 
           {/* ── 4 stat cards ── */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-            <StatCard label="Total Trips"       value={driver.totalTrips}    icon={BookOpen}     iconBg="#F1F5F9" iconColor="#0F172A" />
-            <StatCard label="Today's Bookings"  value={todayBookings.length} icon={TrendingUp}   iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Total Trips"       value={driver.totalTrips}    icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Today's Trips"  value={todayBookings.length} icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Today's Completed" value={completedToday}       icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Ongoing"           value={ongoingCt}            icon={Circle}       iconBg="#F1F5F9" iconColor="#0F172A" />
           </div>
@@ -436,66 +461,147 @@ export default function DriverProfilePage() {
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "trips" && (
         <div style={CARD_STYLE}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 88px 80px 108px", gap: 8, padding: "12px 20px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", borderRadius: "14px 14px 0 0" }}>
-            {["ROUTE", "SUPERVISOR", "TYPE", "FARE", "STATUS"].map(h => (
+          {/* Header — matches Active Trips table column scheme */}
+          <div style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "12px 20px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", borderRadius: "14px 14px 0 0" }}>
+            {["TRIP ID & TYPE", "ROUTE", "SUPERVISOR", "VEHICLE", "STATUS", "CREATED AT"].map(h => (
               <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
             ))}
           </div>
 
-          {drvBookings.length > 0 ? (
+          {isLoading ? (
             <div>
-              {drvBookings.map((booking, idx) => (
-                <div
-                  key={booking.id}
-                  style={{ display: "grid", gridTemplateColumns: "1fr 120px 88px 80px 108px", gap: 8, padding: "14px 20px", borderBottom: idx < drvBookings.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <div>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.pickupLocation}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 3, margin: "3px 0" }}>
-                      <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
-                      <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
-                    </div>
-                    <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.dropLocation}</p>
-                    <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>{fmtDate(booking.createdAt)}</p>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: i < 4 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}>
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-16" />
+                    <Skeleton className="h-4 w-12 rounded" />
                   </div>
-                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.supervisorName}</span>
-                  <span style={{ background: booking.type === "Instant" ? "#DBEAFE" : "#FEF3C7", color: booking.type === "Instant" ? "#1D4ED8" : "#B45309", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, display: "inline-block" }}>
-                    {booking.type}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>
-                    {booking.fare ? `₹${booking.fare.toLocaleString()}` : <span style={{ color: "#CBD5E1" }}>—</span>}
-                  </span>
-                  <TripStatusBadge status={booking.status} />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-3/4" />
+                    <Skeleton className="h-2 w-16" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <div className="space-y-1">
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-3.5 w-14" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
                 </div>
               ))}
+            </div>
+          ) : !driver ? null : drvBookings.length > 0 ? (
+            <div>
+              {drvBookings.map((booking, idx) => {
+                const { day, time } = fmtDateTime(booking.createdAt);
+                return (
+                  <div
+                    key={booking.id}
+                    style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: idx < drvBookings.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                  >
+                    {/* TRIP ID & TYPE */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontWeight: 800, color: "#0F172A", fontSize: 13 }}>{booking.bookingRef ?? "—"}</span>
+                      <span style={{ background: booking.type === "Instant" ? "#EEF2FF" : "#FEF3C7", color: booking.type === "Instant" ? "#2563EB" : "#B45309", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, display: "inline-block", width: "fit-content" }}>
+                        {booking.type}
+                      </span>
+                    </div>
+
+                    {/* ROUTE */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.pickupLocation}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                        <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
+                        <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
+                      </div>
+                      <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.dropLocation}</p>
+                    </div>
+
+                    {/* SUPERVISOR */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.supervisorName}</span>
+                      {booking.bookingSource && (
+                        <span style={{ background: "#E2E8F0", color: "#475569", border: "1px solid #CBD5E1", fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 5, display: "inline-block", width: "fit-content" }}>
+                          {booking.bookingSource}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* VEHICLE */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
+                      {driver.vehicleReg && driver.vehicle && (
+                        <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{driver.vehicle}</span>
+                      )}
+                    </div>
+
+                    {/* STATUS */}
+                    <TripStatusBadge status={booking.status} />
+
+                    {/* CREATED AT */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{day}</span>
+                      <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 2 }}>{time}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : driver.recentTrips.length > 0 ? (
             <div>
               {driver.recentTrips.map((trip, idx) => (
                 <div
                   key={trip.bookingId}
-                  style={{ display: "grid", gridTemplateColumns: "1fr 120px 88px 80px 108px", gap: 8, padding: "14px 20px", borderBottom: idx < driver.recentTrips.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
+                  style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: idx < driver.recentTrips.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
                 >
-                  <div>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.from}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 3, margin: "3px 0" }}>
+                  {/* TRIP ID & TYPE */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontWeight: 800, color: "#0F172A", fontSize: 13 }}>{trip.bookingId}</span>
+                    <span style={{ background: "#EEF2FF", color: "#2563EB", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, display: "inline-block", width: "fit-content" }}>Instant</span>
+                  </div>
+
+                  {/* ROUTE */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.from}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
                       <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
                       <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
                     </div>
                     <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.to}</p>
-                    <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>{trip.date}</p>
                   </div>
-                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{trip.supervisorName}</span>
-                  <span style={{ background: "#DBEAFE", color: "#1D4ED8", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, display: "inline-block" }}>Instant</span>
-                  <span style={{ color: "#CBD5E1", fontSize: 14, fontWeight: 800 }}>—</span>
+
+                  {/* SUPERVISOR */}
+                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.supervisorName}</span>
+
+                  {/* VEHICLE */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
+                    {driver.vehicleReg && driver.vehicle && (
+                      <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{driver.vehicle}</span>
+                    )}
+                  </div>
+
+                  {/* STATUS */}
                   <TripStatusBadge status="Completed" />
+
+                  {/* CREATED AT */}
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{trip.date}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -506,7 +612,17 @@ export default function DriverProfilePage() {
       )}
 
       {/* ══ TAB: EARNINGS ══ */}
-      {activeTab === "earnings" && (
+      {activeTab === "earnings" && (isLoading || !driver ? (
+        <div className="space-y-4">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-2xl" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+        </div>
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
             <StatCard label="Total Earned"    value={`₹${displayEarned.toLocaleString()}`}         icon={IndianRupee} iconBg="#DBEAFE" iconColor="#2563EB" />
@@ -570,7 +686,7 @@ export default function DriverProfilePage() {
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       {/* ══ TAB: SETTINGS ══ */}
       {activeTab === "settings" && (
@@ -580,19 +696,31 @@ export default function DriverProfilePage() {
             <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Full profile details for this driver</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {[
-              { label: "Full Name",           value: driver.name },
-              { label: "Phone Number",        value: driver.phone },
-              { label: "Vehicle",             value: driver.vehicle ?? "—" },
-              { label: "Vehicle Reg No.",     value: driver.vehicleReg ?? "—" },
-              { label: "Vehicle Type",        value: driver.vehicleType ?? "—" },
-              { label: "Vehicle Color",       value: driver.vehicleColor ?? "—" },
-              { label: "Status",              value: driver.status },
-              { label: "Assigned Supervisor", value: driver.assignedSupervisorName ?? "None" },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p style={{ fontSize: 11.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 5 }}>{label}</p>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{value}</p>
+            {(isLoading || !driver
+              ? Array.from({ length: 8 }).map((_, i) => ({ label: "", value: "", _skeleton: true, _key: i }))
+              : [
+                { label: "Full Name",           value: driver.name },
+                { label: "Phone Number",        value: driver.phone },
+                { label: "Vehicle",             value: driver.vehicle ?? "—" },
+                { label: "Vehicle Reg No.",     value: driver.vehicleReg ?? "—" },
+                { label: "Vehicle Type",        value: driver.vehicleType ?? "—" },
+                { label: "Vehicle Color",       value: driver.vehicleColor ?? "—" },
+                { label: "Status",              value: driver.status },
+                { label: "Assigned Supervisor", value: driver.assignedSupervisorName ?? "None" },
+              ]
+            ).map((entry: any, i: number) => (
+              <div key={entry._key ?? entry.label}>
+                {entry._skeleton ? (
+                  <>
+                    <Skeleton className="h-3 w-24 mb-2" />
+                    <Skeleton className="h-4 w-32" />
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 11.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 5 }}>{entry.label}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{entry.value}</p>
+                  </>
+                )}
               </div>
             ))}
           </div>

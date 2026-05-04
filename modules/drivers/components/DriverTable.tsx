@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { useRouter } from "next/navigation";
 import type { Driver } from "../types";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -25,9 +26,10 @@ const MockSeparator = () => (
 interface DriverTableProps {
   drivers: Driver[];
   splitAt?: number;
+  loading?: boolean;
 }
 
-export function DriverTable({ drivers, splitAt }: DriverTableProps) {
+export function DriverTable({ drivers, splitAt, loading }: DriverTableProps) {
   const router = useRouter();
 
   return (
@@ -47,7 +49,21 @@ export function DriverTable({ drivers, splitAt }: DriverTableProps) {
 
           {/* Rows */}
           <div className="flex flex-col divide-y divide-slate-100">
-            {drivers.length === 0 ? (
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-[minmax(0,2fr)_130px_130px_minmax(0,1.6fr)_100px_120px] items-center gap-6 px-6 py-3.5">
+                  <div className="space-y-1.5 min-w-0">
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3.5 w-8" />
+                  <Skeleton className="h-3.5 w-16" />
+                </div>
+              ))
+            ) : drivers.length === 0 ? (
               <div className="text-center py-16 text-slate-500">
                 <p className="text-sm font-medium">No drivers found.</p>
               </div>

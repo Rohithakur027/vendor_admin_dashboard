@@ -28,7 +28,7 @@ type SubmitState = "idle" | "loading" | "success" | "error";
 // ── helpers ──────────────────────────────────────────────────────────────────
 const empty: SupervisorFormData = {
   name: "", email: "", phone: "", zone: "",
-  password: "", status: "Active", walletLimit: 10000, companies: [],
+  password: "", status: "Active", companies: [],
 };
 
 function generatePassword() {
@@ -56,7 +56,7 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
   // reset on open/editData change
   useEffect(() => {
     if (editData) {
-      setForm({ name: editData.name, email: editData.email, phone: editData.phone, zone: editData.zone, password: "", status: editData.status, walletLimit: editData.walletLimit, companies: editData.companies || [] });
+      setForm({ name: editData.name, email: editData.email, phone: editData.phone, zone: editData.zone, password: "", status: editData.status, companies: editData.companies || [] });
       setCredEmail(editData.email);
     } else {
       setForm(empty);
@@ -125,7 +125,7 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
     setApiErrorFields({});
 
     try {
-      await onSubmit({ ...form });
+      await onSubmit({ ...form, email: credEmail || form.email, sendCredentials: sent });
 
       // ── success ──
       setSubmitState("success");
@@ -143,7 +143,6 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
 
   function handleGenerate() { field("password", generatePassword()); setShowPassword(true); setSent(false); }
   function handleCopy()     { if (!form.password) return; navigator.clipboard.writeText(form.password); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-  function handleSend()     { if (!credEmail || !form.password) return; setSent(true); setTimeout(() => setSent(false), 3000); }
   function addCompany()     { const t = companyInput.trim(); if (t && !form.companies.includes(t)) field("companies", [...form.companies, t]); setCompanyInput(""); }
   function removeCompany(c: string) { field("companies", form.companies.filter(x => x !== c)); }
 
@@ -308,20 +307,18 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
                 </Field>
 
                 {/* Send credentials row */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[13px] text-slate-500 font-medium">Send credentials to email</span>
+                <div className="flex items-center gap-2.5 pt-1">
                   <button
                     type="button"
-                    onClick={handleSend}
-                    disabled={!credEmail || !form.password}
-                    className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center transition-all border disabled:opacity-40 disabled:pointer-events-none ${
-                      sent ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600"
+                    onClick={() => setSent(v => !v)}
+                    className={`h-[18px] w-[18px] shrink-0 rounded-[4px] flex items-center justify-center transition-all border ${
+                      sent ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-400"
                     }`}
                   >
-                    <Check className="h-4 w-4" />
+                    {sent && <Check className="h-3.5 w-3.5" strokeWidth={3.5} />}
                   </button>
+                  <span className="text-[13px] text-slate-500 font-medium">Send credentials to email</span>
                 </div>
-                {sent && <p className="text-[11px] text-emerald-600 font-semibold -mt-2">Credentials sent successfully!</p>}
               </div>
             )}
           </div>

@@ -19,55 +19,22 @@ import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/SearchBar";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 
 type StatusFilter = "All" | "Active" | "Inactive";
+
+function fmtJoined(d: string) {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 function fmtPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
   if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
   return phone;
-}
-
-function VendorsSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-4 w-36" />
-        </div>
-        <Skeleton className="h-10 w-40 rounded-xl" />
-      </div>
-      <div className="flex gap-3">
-        <Skeleton className="h-[42px] flex-1 rounded-xl" />
-        <Skeleton className="h-[42px] w-24 rounded-xl" />
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          {[160, 120, 100, 110, 70, 60].map((w, i) => (
-            <Skeleton key={i} className="h-3" style={{ width: w }} />
-          ))}
-        </div>
-        <div className="flex flex-col divide-y divide-slate-100">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5">
-              <div className="space-y-1.5">
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/3" />
-              </div>
-              <Skeleton className="h-3.5 w-2/3" />
-              <Skeleton className="h-3.5 w-28" />
-              <Skeleton className="h-3.5 w-1/2" />
-              <Skeleton className="h-6 w-16 rounded-full" />
-              <Skeleton className="h-3.5 w-14" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Field helper ──────────────────────────────────────────────────────────────
@@ -91,7 +58,6 @@ export default function SuperAdminVendorsPage() {
   const [drawerOpen,   setDrawerOpen]  = useState(false);
   const [step,         setStep]        = useState<1 | 2>(1);
   const [filterOpen,   setFilterOpen]  = useState(false);
-  const [cityFilter,   setCityFilter]  = useState("All");
 
   // Step 1 fields
   const [form, setForm] = useState({ name: "", contactPerson: "", email: "", phone: "", city: "" });
@@ -123,14 +89,12 @@ export default function SuperAdminVendorsPage() {
       .finally(() => setLoadingList(false));
   }, []);
 
-  const uniqueCities = [...new Set(vendors.map(v => v.city).filter(Boolean))].sort();
-  const activeVendorFilterCount = (statusFilter !== "All" ? 1 : 0) + (cityFilter !== "All" ? 1 : 0);
+  const activeVendorFilterCount = statusFilter !== "All" ? 1 : 0;
 
   const filtered = vendors.filter((v) => {
     const q = search.toLowerCase();
     const matchSearch = !q || v.name.toLowerCase().includes(q) || v.contactPerson.toLowerCase().includes(q) || v.city.toLowerCase().includes(q);
-    const matchCity   = cityFilter === "All" || v.city === cityFilter;
-    return matchSearch && (statusFilter === "All" || v.status === statusFilter) && matchCity;
+    return matchSearch && (statusFilter === "All" || v.status === statusFilter);
   });
 
   function field(key: keyof typeof form, val: string) {
@@ -186,6 +150,7 @@ export default function SuperAdminVendorsPage() {
       password,
       secondaryPOCs: pocs.filter((p) => p.name || p.email || p.phone),
       ...(walletEnabled && walletAmount ? { walletAmount: parseFloat(walletAmount) } : {}),
+      sendCredentials: sendEmail,
     };
 
     try {
@@ -215,8 +180,6 @@ export default function SuperAdminVendorsPage() {
     setSubmitSuccess(false);
   }
 
-  if (loadingList) return <VendorsSkeleton />;
-
   return (
     <div className="space-y-4">
 
@@ -224,9 +187,16 @@ export default function SuperAdminVendorsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-slate-800">Vendors</h2>
-          <p className="text-sm text-slate-500">{vendors.length} total vendors</p>
+          <p className="text-sm text-slate-500">
+            {loadingList ? (
+              <SkeletonInline className="h-3 w-8" />
+            ) : (
+              vendors.length
+            )} total vendors
+          </p>
         </div>
         <Button
+          disabled={loadingList}
           className="bg-blue-600 hover:bg-blue-700 gap-2 rounded-xl px-5 h-10 text-[13px] font-semibold"
           onClick={() => setDrawerOpen(true)}
         >
@@ -252,21 +222,13 @@ export default function SuperAdminVendorsPage() {
             open={filterOpen}
             onClose={() => setFilterOpen(false)}
             activeCount={activeVendorFilterCount}
-            onClearAll={() => { setStatusFilter("All"); setCityFilter("All"); }}
+            onClearAll={() => { setStatusFilter("All"); }}
           >
             <FilterSection label="Status">
               {(["All", "Active", "Inactive"] as StatusFilter[]).map(s => (
                 <FilterPill key={s} label={s} active={statusFilter === s} onClick={() => setStatusFilter(s)} />
               ))}
             </FilterSection>
-            {uniqueCities.length > 0 && (
-              <FilterSection label="City">
-                <FilterPill label="All Cities" active={cityFilter === "All"} onClick={() => setCityFilter("All")} />
-                {uniqueCities.map(c => (
-                  <FilterPill key={c} label={c} active={cityFilter === c} onClick={() => setCityFilter(c)} />
-                ))}
-              </FilterSection>
-            )}
           </FilterPanel>
         </div>
       </div>
@@ -283,13 +245,27 @@ export default function SuperAdminVendorsPage() {
           <div className="min-w-[900px]">
             {/* Header */}
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-              {["VENDOR", "EMAIL", "PHONE", "CONTACT PERSON", "STATUS", "JOINED"].map((h) => (
+              {["VENDOR", "EMAIL", "PHONE", "CONTACT PERSON", "STATUS", "JOINED ON"].map((h) => (
                 <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
               ))}
             </div>
             {/* Body */}
             <div className="flex flex-col divide-y divide-slate-100">
-              {filtered.length === 0 ? (
+              {loadingList ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_100px_100px] items-center gap-6 px-6 py-3.5">
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-3/4" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-3.5 w-2/3" />
+                    <Skeleton className="h-3.5 w-28" />
+                    <Skeleton className="h-3.5 w-1/2" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-3.5 w-20" />
+                  </div>
+                ))
+              ) : filtered.length === 0 ? (
                 <div className="text-center py-14 text-slate-500">
                   <p className="text-sm font-medium">No vendors found.</p>
                 </div>
@@ -326,9 +302,9 @@ export default function SuperAdminVendorsPage() {
                       <StatusBadge status={v.status} size="sm" />
                     </div>
 
-                    {/* Joined */}
+                    {/* Joined On */}
                     <div>
-                      <span className="text-[13px] text-slate-600 font-medium">{v.joinedAt}</span>
+                      <span className="text-[13px] text-slate-600 font-medium">{fmtJoined(v.joinedAt)}</span>
                     </div>
                   </div>
                 ))
@@ -466,10 +442,10 @@ export default function SuperAdminVendorsPage() {
                   {/* Send credentials row */}
                   <div className="flex items-center gap-2.5 pt-1">
                     <button type="button" onClick={() => setSendEmail((v) => !v)}
-                      className={`h-4 w-4 shrink-0 rounded-[3px] flex items-center justify-center transition-all border ${
-                        sendEmail ? "bg-slate-900 border-slate-900 text-white" : "bg-white border-slate-400"
+                      className={`h-[18px] w-[18px] shrink-0 rounded-[4px] flex items-center justify-center transition-all border ${
+                        sendEmail ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-400"
                       }`}>
-                      {sendEmail && <Check className="h-2.5 w-2.5" />}
+                      {sendEmail && <Check className="h-3.5 w-3.5" strokeWidth={3.5} />}
                     </button>
                     <span className="text-[13px] text-slate-500 font-medium">Send credentials to email</span>
                   </div>

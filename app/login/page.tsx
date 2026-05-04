@@ -74,7 +74,7 @@ export default function LoginPage() {
             One platform<br />for your entire<br />fleet.
           </h1>
           <p style={{ color: "rgba(255,255,255,0.72)", fontSize: 14.5, marginTop: 14, lineHeight: 1.6, maxWidth: 280 }}>
-            Manage drivers, vendors, bookings and vehicles — all from a single dashboard.
+            Manage drivers, vendors, trips and vehicles — all from a single dashboard.
           </p>
         </div>
 

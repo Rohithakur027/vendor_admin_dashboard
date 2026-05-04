@@ -14,60 +14,6 @@ const FONT   = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
 type StatusFilter = "All" | "Pending" | "In Review" | "Rejected" | "Approved";
 
-function DriverOnboardingSkeleton() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
-      {/* Page header */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <Skeleton className="h-6 w-52" />
-        <Skeleton className="h-4 w-80" />
-      </div>
-
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} style={{ background: "#fff", borderRadius: 14, border: "1.5px solid #E8EEF4", padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-            <Skeleton className="h-[38px] w-[38px] shrink-0 rounded-[10px]" />
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <Skeleton className="h-6 w-10" />
-              <Skeleton className="h-3 w-32" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Toolbar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Skeleton className="h-[38px] rounded-[10px]" style={{ flex: 1, maxWidth: 380 }} />
-        <Skeleton className="h-[38px] w-24 rounded-[10px]" />
-      </div>
-
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          {[160, 100, 80, 80, 60].map((w, i) => (
-            <Skeleton key={i} className="h-3" style={{ width: w }} />
-          ))}
-        </div>
-        <div className="flex flex-col divide-y divide-slate-100">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5">
-              <div className="space-y-1.5">
-                <Skeleton className="h-3.5 w-40" />
-                <Skeleton className="h-3 w-28" />
-              </div>
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-3.5 w-24" />
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <Skeleton className="h-8 w-[70px] rounded-[9px]" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -116,8 +62,6 @@ export default function DriverOnboardingPage() {
 
   const activeFilterCount = statusFilter !== "All" ? 1 : 0;
 
-  if (loading) return <DriverOnboardingSkeleton />;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
 
@@ -163,7 +107,11 @@ export default function DriverOnboardingPage() {
               <s.icon className="h-5 w-5" style={{ color: "#64748B" }} />
             </div>
             <div>
-              <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{s.value}</p>
+              {loading ? (
+                <Skeleton className="h-[22px] w-10 mb-1.5" />
+              ) : (
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{s.value}</p>
+              )}
               <p style={{ fontSize: 11.5, color: "#64748B", marginTop: 3 }}>{s.label}</p>
             </div>
           </div>
@@ -211,7 +159,20 @@ export default function DriverOnboardingPage() {
 
             {/* Body */}
             <div className="flex flex-col divide-y divide-slate-100">
-              {items.length === 0 ? (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,2.5fr)_160px_140px_150px_120px] items-center gap-6 px-6 py-3.5">
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-40" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-3.5 w-24" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <Skeleton className="h-8 w-[70px] rounded-[9px]" />
+                  </div>
+                ))
+              ) : items.length === 0 ? (
                 <div className="py-16 text-center">
                   <p className="text-sm font-medium text-slate-500">
                     {search || statusFilter !== "All" ? "No drivers match your search." : "No driver onboarding records found."}

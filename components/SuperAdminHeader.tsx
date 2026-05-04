@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Menu } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const pageTitles: Record<string, string> = {
@@ -17,14 +17,25 @@ const pageTitles: Record<string, string> = {
   "/superadmin/drivers": "Drivers",
 };
 
-export function SuperAdminHeader() {
+export function SuperAdminHeader({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const title = pageTitles[pathname] ?? "Super Admin";
 
   return (
-    <header className="h-14 border-b bg-white flex items-center justify-between px-6 shrink-0">
-      <h1 className="text-base font-semibold">{title}</h1>
+    <header className="h-14 border-b bg-white flex items-center justify-between px-4 md:px-6 shrink-0">
+      <div className="flex items-center gap-2">
+        {/* Hamburger — mobile only, minimum 44×44 tap target */}
+        <button
+          className="md:hidden flex items-center justify-center w-11 h-11 -ml-1.5 rounded-lg text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+          onClick={onMobileMenuClick}
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <h1 className="text-base font-semibold">{title}</h1>
+      </div>
+
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
           <span className="text-sm font-medium">Super Admin</span>

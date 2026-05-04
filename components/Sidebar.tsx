@@ -5,17 +5,15 @@ import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
   User,
-  BookText,
-  Menu,
-  X,
+  Route,
   Truck,
-  Wallet,
+  FileText,
+  BarChart2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 type SubItem = { label: string; href: string };
@@ -28,28 +26,27 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
-  { label: "Supervisors", href: "/dashboard/supervisors", icon: User },
+  { label: "Dashboard",   href: "/dashboard",               icon: LayoutGrid },
+  { label: "Supervisors", href: "/dashboard/supervisors",    icon: User },
   {
-    label: "Bookings",
+    label: "Trips",
     href: "/dashboard/bookings",
-    icon: BookText,
+    icon: Route,
     subItems: [
-      { label: "Active Bookings", href: "/dashboard/bookings/active" },
-      { label: "Past Bookings", href: "/dashboard/bookings/past" },
-      { label: "Scheduled Bookings", href: "/dashboard/bookings/scheduled" },
+      { label: "Active Trips",    href: "/dashboard/bookings/active" },
+      { label: "Past Trips",      href: "/dashboard/bookings/past" },
+      { label: "Scheduled Trips", href: "/dashboard/bookings/scheduled" },
     ],
   },
-  { label: "Accounts", href: "/dashboard/accounts", icon: Wallet },
+  { label: "Invoicing", href: "/dashboard/accounts/invoicing", icon: FileText },
+  { label: "Reports",   href: "/dashboard/reports",            icon: BarChart2 },
 ];
 
 function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="relative group/nav">
       {children}
-      {/* Custom tooltip — replaces browser-native title attr */}
       <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 delay-75">
-        {/* Left arrow */}
         <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-slate-800" />
         <div className="bg-slate-800 text-white text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap shadow-lg tracking-wide">
           {label}
@@ -59,15 +56,45 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen,
+  onMobileOpenChange,
+}: {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [bookingsExpanded, setBookingsExpanded] = useState(
-    pathname.startsWith("/dashboard/bookings")
-  );
+  const [tabletExpanded, setTabletExpanded] = useState(false);
+  const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    navItems.forEach(item => {
+      if (item.subItems) init[item.href] = pathname.startsWith(item.href);
+    });
+    return init;
+  });
 
-  const SidebarContent = ({ isCollapsed = false }: { isCollapsed?: boolean }) => (
+  function toggleExpanded(href: string) {
+    setExpanded(prev => ({ ...prev, [href]: !prev[href] }));
+  }
+
+  function handleTabletEnter() {
+    if (tabletTimer.current) clearTimeout(tabletTimer.current);
+    setTabletExpanded(true);
+  }
+
+  function handleTabletLeave() {
+    tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
+  }
+
+  const SidebarContent = ({
+    isCollapsed = false,
+    onLinkClick,
+  }: {
+    isCollapsed?: boolean;
+    onLinkClick?: () => void;
+  }) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={cn("border-b flex items-center", isCollapsed ? "px-3 py-5 justify-center" : "px-6 py-5")}>
@@ -94,9 +121,10 @@ export function Sidebar() {
           const active = subItems ? pathname.startsWith(href) : pathname === href;
 
           if (subItems) {
+            const isExpanded = !!expanded[href];
             const btn = (
               <button
-                onClick={() => !isCollapsed && setBookingsExpanded((v) => !v)}
+                onClick={() => !isCollapsed && toggleExpanded(href)}
                 className={cn(
                   "w-full flex items-center gap-3 rounded-lg text-sm transition-colors",
                   isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
@@ -112,7 +140,7 @@ export function Sidebar() {
                     <ChevronDown
                       className={cn(
                         "h-3.5 w-3.5 ml-auto transition-transform duration-200",
-                        bookingsExpanded && "rotate-180"
+                        isExpanded && "rotate-180"
                       )}
                     />
                   </>
@@ -123,7 +151,7 @@ export function Sidebar() {
             return (
               <div key={href}>
                 {isCollapsed ? <NavTooltip label={label}>{btn}</NavTooltip> : btn}
-                {!isCollapsed && bookingsExpanded && (
+                {!isCollapsed && isExpanded && (
                   <div className="mt-1 flex flex-col space-y-0.5">
                     {subItems.map((sub) => {
                       const isSubActive = pathname === sub.href;
@@ -131,7 +159,7 @@ export function Sidebar() {
                         <Link
                           key={sub.href}
                           href={sub.href}
-                          onClick={() => setOpen(false)}
+                          onClick={onLinkClick}
                           className={cn(
                             "flex items-center px-4 py-2 transition-colors text-[13px] ml-9 mr-4",
                             isSubActive
@@ -155,7 +183,7 @@ export function Sidebar() {
                 <NavTooltip label={label}>
                   <Link
                     href={href}
-                    onClick={() => setOpen(false)}
+                    onClick={onLinkClick}
                     className={cn(
                       "flex items-center gap-3 rounded-lg text-sm transition-colors",
                       "px-0 py-2.5 justify-center",
@@ -170,7 +198,7 @@ export function Sidebar() {
               ) : (
                 <Link
                   href={href}
-                  onClick={() => setOpen(false)}
+                  onClick={onLinkClick}
                   className={cn(
                     "flex items-center gap-3 rounded-lg text-sm transition-colors",
                     "px-3 py-2.5",
@@ -211,10 +239,10 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* ── Desktop sidebar (xl+): full width, user-collapsible ── */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300",
+          "hidden xl:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300 relative z-[60]",
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
@@ -234,20 +262,42 @@ export function Sidebar() {
         </button>
       </aside>
 
-      {/* Mobile hamburger */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <Button variant="outline" size="icon" onClick={() => setOpen(!open)}>
-          {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-        </Button>
-      </div>
+      {/* ── Tablet sidebar (md–xl): icon-only strip, hover expands as overlay ── */}
+      <aside
+        className="hidden md:flex xl:hidden w-[60px] shrink-0 sticky top-0 h-screen relative z-[60]"
+        onMouseEnter={handleTabletEnter}
+        onMouseLeave={handleTabletLeave}
+      >
+        {/* Always-visible 60px icon strip */}
+        <div className="w-[60px] h-full flex flex-col bg-white border-r overflow-hidden">
+          <SidebarContent isCollapsed={true} />
+        </div>
 
-      {/* Mobile overlay */}
-      {open && (
-        <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="w-56 bg-white border-r h-full shadow-xl">
-            <SidebarContent />
+        {/* Expanded overlay on hover */}
+        {tabletExpanded && (
+          <div
+            className="absolute left-0 top-0 h-full w-56 bg-white border-r shadow-xl z-30 flex flex-col"
+            onMouseEnter={handleTabletEnter}
+            onMouseLeave={handleTabletLeave}
+          >
+            <SidebarContent
+              isCollapsed={false}
+              onLinkClick={() => setTabletExpanded(false)}
+            />
           </div>
-          <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
+        )}
+      </aside>
+
+      {/* ── Mobile drawer (< md): full-width slide-in from left ── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="w-56 bg-white border-r h-full shadow-xl flex flex-col">
+            <SidebarContent onLinkClick={() => onMobileOpenChange(false)} />
+          </div>
+          <div
+            className="flex-1 bg-black/40"
+            onClick={() => onMobileOpenChange(false)}
+          />
         </div>
       )}
     </>

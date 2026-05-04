@@ -6,11 +6,13 @@ import {
   Drawer,
   DrawerContent,
   DrawerClose,
+  DrawerTitle,
 } from "@/components/ui/drawer";
-import { Clock, CheckCircle2, XCircle, Loader2, Phone } from "lucide-react";
+import { Clock, CheckCircle2, XCircle, Loader2, Phone, FileText, ExternalLink, Maximize2, X as XIcon } from "lucide-react";
 import type { Booking, BookingStatus } from "../types";
 import { useVendor } from "@/context/VendorContext";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+import { superadminApi, type DriverDocuments } from "@/lib/api";
 
 const LiveTrackingMap = dynamic(
   () => import("@/components/LiveTrackingMap"),
@@ -26,10 +28,31 @@ interface BookingDetailModalProps {
 
 export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps) {
   const { drivers, supervisors } = useVendor();
-  const [activeTab, setActiveTab] = useState<"details" | "live">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "documents" | "live">("details");
+  const [driverDocs, setDriverDocs]     = useState<DriverDocuments | null>(null);
+  const [docsLoading, setDocsLoading]   = useState(false);
+  const [docsError, setDocsError]       = useState<string | null>(null);
+  const [expandedDoc, setExpandedDoc]   = useState<{ label: string; url: string | null } | null>(null);
 
   // reset to details tab whenever a new booking is opened
-  useEffect(() => { setActiveTab("details"); }, [booking?.id]);
+  useEffect(() => {
+    setActiveTab("details");
+    setDriverDocs(null);
+    setDocsError(null);
+    setExpandedDoc(null);
+  }, [booking?.id]);
+
+  // fetch documents when tab becomes active
+  useEffect(() => {
+    if (activeTab !== "documents" || !booking?.driverId) return;
+    if (driverDocs || docsLoading) return;
+    setDocsLoading(true);
+    setDocsError(null);
+    superadminApi.drivers.documents(booking.driverId)
+      .then((res) => setDriverDocs(res.data))
+      .catch((err) => setDocsError(err.message ?? "Failed to load documents"))
+      .finally(() => setDocsLoading(false));
+  }, [activeTab, booking?.driverId]);
 
   const driver     = booking?.driverId     ? drivers.find((d) => d.id === booking.driverId)         : null;
   const supervisor = booking?.supervisorId ? supervisors.find((s) => s.id === booking.supervisorId) : null;
@@ -42,7 +65,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     const status = booking.status;
 
     const base = [
-      { label: "Booking Created", done: events.length >= 1, active: false },
+      { label: "Trip Created", done: events.length >= 1, active: false },
       { label: "Driver Assigned", done: events.length >= 2, active: false },
       { label: "Trip Started",    done: events.length >= 3, active: false },
       { label: "In Progress",     done: status === "Ongoing" || status === "Completed", active: status === "Ongoing" },
@@ -202,11 +225,12 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {[
-              { label: "Model", value: driver.vehicle?.split(" ").slice(0, 2).join(" ") ?? "—" },
-              { label: "Color", value: driver.vehicleColor ?? "—" },
-              { label: "Type",  value: driver.vehicleType  ?? "—" },
+              { label: "Model",     value: driver.vehicle?.split(" ").slice(0, 2).join(" ") ?? "—" },
+              { label: "Type",      value: driver.vehicleType      ?? "—" },
+              { label: "Color",     value: driver.vehicleColor     ?? "—" },
+              { label: "Make Year", value: driver.vehicleMakeYear ? String(driver.vehicleMakeYear) : "—" },
             ].map((d) => (
               <div key={d.label} style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 11px" }}>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>{d.label}</div>
@@ -253,6 +277,74 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
       )}
     </>
   );
+
+  /* ── Documents content — always render the 3 sections; data wired later ── */
+  const DocumentsContent = () => {
+    const docs = [
+      { key: "driving_license" as const, label: "Driving License"   },
+      { key: "insurance"       as const, label: "Vehicle Insurance" },
+      { key: "tax_certificate" as const, label: "Vehicle Tax"       },
+    ];
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {docsError && (
+          <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 10, padding: "10px 12px", color: "#DC2626", fontSize: 12 }}>
+            {docsError}
+          </div>
+        )}
+        {docs.map(({ key, label }) => {
+          const doc       = driverDocs ? driverDocs[key] : null;
+          const verified  = doc?.is_verified ?? false;
+          const submitted = doc?.submitted   ?? false;
+          const fileUrl   = doc?.file_url    ?? null;
+          return (
+            <div key={key} style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{label}</div>
+                  <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
+                    {docsLoading ? "Loading…" : submitted ? (verified ? "Verified" : "Pending review") : "Not submitted"}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setExpandedDoc({ label, url: fileUrl })}
+                  title="Expand"
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", cursor: "pointer", color: "#475569", flexShrink: 0 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F1F5F9"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
+                >
+                  <Maximize2 size={14} />
+                </button>
+              </div>
+
+              <div style={{
+                background: "#fff", border: "1.5px dashed #E5E7EB", borderRadius: 10,
+                padding: "18px 14px", display: "flex", alignItems: "center", justifyContent: "center",
+                minHeight: 78,
+              }}>
+                {docsLoading ? (
+                  <Loader2 size={16} className="animate-spin" style={{ color: "#94A3B8" }} />
+                ) : fileUrl ? (
+                  <a
+                    href={fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: ACCENT, textDecoration: "none" }}
+                  >
+                    <ExternalLink size={13} /> View document
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 12, color: "#94A3B8" }}>No file uploaded yet</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   /* ── Live content (map + timeline) ── */
   const LiveContent = () => (
@@ -304,6 +396,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
   );
 
   return (
+    <>
     <Drawer open={!!booking} onOpenChange={(o) => !o && onClose()} direction="right">
       <DrawerContent
         className="flex flex-col h-full"
@@ -315,14 +408,17 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         }}
       >
+        <DrawerTitle className="sr-only">Booking Details</DrawerTitle>
         {/* ── Header ── */}
         <div style={{ padding: "18px 20px 0", borderBottom: "1.5px solid #F1F5F9", flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>
-                {booking?.id}
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Booking Details</div>
+              {booking?.bookingRef && (
+                <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.5, marginBottom: 4 }}>
+                  {booking.bookingRef}
+                </div>
+              )}
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Trip Details</div>
             </div>
             <DrawerClose asChild>
               <button style={{ width: 32, height: 32, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", flexShrink: 0, transition: "background 0.15s, border-color 0.15s" }}
@@ -354,37 +450,35 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             )}
           </div>
 
-          {/* Tab bar — only for Ongoing */}
-          {isOngoing && (
-            <div style={{ display: "flex", marginTop: 14 }}>
-              {(["details", "live"] as const).map((tab) => {
-                const active = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      padding: "8px 18px",
-                      fontSize: 13,
-                      fontWeight: active ? 700 : 500,
-                      color: active ? ACCENT : "#64748B",
-                      background: "none",
-                      border: "none",
-                      outline: "none",
-                      borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
-                      marginBottom: -1.5,
-                      cursor: "pointer",
-                      textTransform: "capitalize",
-                      transition: "color 0.15s",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {tab === "live" ? "Live" : "Details"}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* Tab bar — always visible */}
+          <div style={{ display: "flex", marginTop: 14 }}>
+            {(["details", "documents", ...(isOngoing ? ["live"] : [])] as const).map((tab) => {
+              const active = activeTab === tab;
+              const label = tab === "live" ? "Live" : tab === "documents" ? "Documents" : "Details";
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as typeof activeTab)}
+                  style={{
+                    padding: "8px 18px",
+                    fontSize: 13,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? ACCENT : "#64748B",
+                    background: "none",
+                    border: "none",
+                    outline: "none",
+                    borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
+                    marginBottom: -1.5,
+                    cursor: "pointer",
+                    transition: "color 0.15s",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Scrollable body ── */}
@@ -399,13 +493,70 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             .booking-sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
           `}</style>
 
-          {isOngoing ? (
-            activeTab === "details" ? <DetailsContent /> : <LiveContent />
-          ) : (
-            <DetailsContent />
-          )}
+          {activeTab === "details"   && <DetailsContent />}
+          {activeTab === "documents" && <DocumentsContent />}
+          {activeTab === "live"      && isOngoing && <LiveContent />}
         </div>
       </DrawerContent>
     </Drawer>
+
+    {/* Fullscreen document expand modal — sibling to drawer, sits above with higher z-index */}
+    {expandedDoc && (
+      <div
+        onClick={() => setExpandedDoc(null)}
+        style={{
+          position: "fixed", inset: 0, background: "rgba(15,23,42,0.65)",
+          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: "#fff", borderRadius: 16, width: "100%", maxWidth: 960, maxHeight: "92vh",
+            display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", borderBottom: "1.5px solid #F1F5F9" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6 }}>Document</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", marginTop: 2 }}>{expandedDoc.label}</div>
+            </div>
+            <button
+              onClick={() => setExpandedDoc(null)}
+              style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <XIcon size={16} />
+            </button>
+          </div>
+          <div style={{ flex: 1, minHeight: 360, padding: 18, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
+            {expandedDoc.url
+              ? (() => {
+                  const u = expandedDoc.url.toLowerCase().split("?")[0];
+                  if (/\.(jpe?g|png|webp|gif|bmp|svg)$/.test(u)) {
+                    // eslint-disable-next-line @next/next/no-img-element
+                    return <img src={expandedDoc.url} alt={expandedDoc.label} style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />;
+                  }
+                  if (/\.pdf$/.test(u)) {
+                    return <iframe src={expandedDoc.url} title={expandedDoc.label} style={{ width: "100%", height: "70vh", border: "none", background: "#fff" }} />;
+                  }
+                  return (
+                    <a href={expandedDoc.url!} target="_blank" rel="noopener noreferrer" style={{ padding: "10px 18px", borderRadius: 9, background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                      Open file
+                    </a>
+                  );
+                })()
+              : (
+                <div style={{ textAlign: "center" as const, color: "#94A3B8" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>No file uploaded yet</div>
+                  <div style={{ fontSize: 11.5, marginTop: 4 }}>Document will appear here once provided.</div>
+                </div>
+              )
+            }
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

@@ -90,6 +90,7 @@ export const mockVendors: Vendor[] = [
 export const mockSupervisors: Supervisor[] = [
   {
     id: "sup-001",
+    ref: "",
     name: "Kiran Gowda",
     email: "kiran.gowda@sktravels.com",
     phone: "+91 98765 43210",
@@ -99,7 +100,6 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 4,
     isOnline: true,
     createdAt: "2024-01-15",
-    walletLimit: 15000,
     walletUsed: 11200,
     companies: ["Infosys"],
     dailyHistory: [
@@ -122,6 +122,7 @@ export const mockSupervisors: Supervisor[] = [
   },
   {
     id: "sup-002",
+    ref: "",
     name: "Lakshmi Rao",
     email: "lakshmi.rao@sktravels.com",
     phone: "+91 87654 32109",
@@ -131,7 +132,6 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 5,
     isOnline: true,
     createdAt: "2024-02-20",
-    walletLimit: 10000,
     walletUsed: 4500,
     companies: ["Flipkart"],
     dailyHistory: [
@@ -154,6 +154,7 @@ export const mockSupervisors: Supervisor[] = [
   },
   {
     id: "sup-003",
+    ref: "",
     name: "Naveen Reddy",
     email: "naveen.reddy@sktravels.com",
     phone: "+91 76543 21098",
@@ -163,13 +164,13 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 0,
     isOnline: false,
     createdAt: "2024-03-10",
-    walletLimit: 8000,
     walletUsed: 0,
     companies: ["TCS", "HCL Technologies"],
     dailyHistory: [],
   },
   {
     id: "sup-004",
+    ref: "",
     name: "Deepa Shetty",
     email: "deepa.shetty@sktravels.com",
     phone: "+91 65432 10987",
@@ -179,7 +180,6 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 12,
     isOnline: true,
     createdAt: "2024-01-28",
-    walletLimit: 20000,
     walletUsed: 18750,
     companies: ["Swiggy", "Razorpay", "Zerodha"],
     dailyHistory: [
@@ -202,6 +202,7 @@ export const mockSupervisors: Supervisor[] = [
   },
   {
     id: "sup-005",
+    ref: "",
     name: "Suresh Hegde",
     email: "suresh.hegde@sktravels.com",
     phone: "+91 54321 09876",
@@ -211,7 +212,6 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 0,
     isOnline: false,
     createdAt: "2024-04-05",
-    walletLimit: 12000,
     walletUsed: 3200,
     companies: ["Tech Mahindra"],
     dailyHistory: [
@@ -234,6 +234,7 @@ export const mockSupervisors: Supervisor[] = [
   },
   {
     id: "sup-006",
+    ref: "",
     name: "Meena Prasad",
     email: "meena.prasad@sktravels.com",
     phone: "+91 43210 98765",
@@ -243,7 +244,6 @@ export const mockSupervisors: Supervisor[] = [
     bookingsToday: 3,
     isOnline: false,
     createdAt: "2024-02-14",
-    walletLimit: 10000,
     walletUsed: 6800,
     companies: ["Biocon", "Mphasis"],
     dailyHistory: [
@@ -280,9 +280,9 @@ export const mockDrivers: Driver[] = [
     totalTrips: 342,
     lastActive: "2024-04-22T10:30:00",
     recentTrips: [
-      { bookingId: "bkg-001", from: "MG Road", to: "Kempegowda Airport", date: "2024-04-22", supervisorName: "Kiran Gowda" },
-      { bookingId: "bkg-007", from: "Jayanagar 4th Block", to: "Whitefield", date: "2024-04-21", supervisorName: "Kiran Gowda" },
-      { bookingId: "bkg-013", from: "Rajajinagar", to: "HSR Layout", date: "2024-04-20", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-001", from: "MG Road", to: "Kempegowda Airport", date: "2024-04-22", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-007", from: "Jayanagar 4th Block", to: "Whitefield", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-013", from: "Rajajinagar", to: "HSR Layout", date: "2024-04-20", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -299,8 +299,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 218,
     lastActive: "2024-04-22T09:45:00",
     recentTrips: [
-      { bookingId: "bkg-003", from: "Koramangala 5th Block", to: "Brigade Road", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
-      { bookingId: "bkg-009", from: "JP Nagar", to: "Bannerghatta Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-003", from: "Koramangala 5th Block", to: "Brigade Road", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-009", from: "JP Nagar", to: "Bannerghatta Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
     ],
   },
   {
@@ -317,7 +317,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 189,
     lastActive: "2024-04-22T08:20:00",
     recentTrips: [
-      { bookingId: "bkg-005", from: "Indiranagar 100ft Road", to: "Yelahanka", date: "2024-04-22", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-005", from: "Indiranagar 100ft Road", to: "Yelahanka", date: "2024-04-22", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -334,7 +334,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 97,
     lastActive: "2024-04-21T18:00:00",
     recentTrips: [
-      { bookingId: "bkg-015", from: "Malleshwaram", to: "Basavanagudi", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-015", from: "Malleshwaram", to: "Basavanagudi", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
   {
@@ -351,8 +351,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 456,
     lastActive: "2024-04-22T11:00:00",
     recentTrips: [
-      { bookingId: "bkg-002", from: "BTM Layout", to: "Manyata Tech Park", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
-      { bookingId: "bkg-010", from: "Electronic City Phase 1", to: "Sarjapur Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-002", from: "BTM Layout", to: "Manyata Tech Park", date: "2024-04-22", supervisorName: "Lakshmi Rao" },
+      { tripRef: null, bookingId: "trp-010", from: "Electronic City Phase 1", to: "Sarjapur Road", date: "2024-04-21", supervisorName: "Lakshmi Rao" },
     ],
   },
   {
@@ -369,7 +369,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 312,
     lastActive: "2024-04-22T07:30:00",
     recentTrips: [
-      { bookingId: "bkg-017", from: "Hebbal Flyover", to: "Yelahanka New Town", date: "2024-04-22", supervisorName: "Meena Prasad" },
+      { tripRef: null, bookingId: "trp-017", from: "Hebbal Flyover", to: "Yelahanka New Town", date: "2024-04-22", supervisorName: "Meena Prasad" },
     ],
   },
   {
@@ -401,8 +401,8 @@ export const mockDrivers: Driver[] = [
     totalTrips: 528,
     lastActive: "2024-04-22T10:50:00",
     recentTrips: [
-      { bookingId: "bkg-004", from: "Domlur", to: "Jayanagar 9th Block", date: "2024-04-22", supervisorName: "Deepa Shetty" },
-      { bookingId: "bkg-011", from: "HAL Airport Road", to: "MG Road", date: "2024-04-21", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-004", from: "Domlur", to: "Jayanagar 9th Block", date: "2024-04-22", supervisorName: "Deepa Shetty" },
+      { tripRef: null, bookingId: "trp-011", from: "HAL Airport Road", to: "MG Road", date: "2024-04-21", supervisorName: "Deepa Shetty" },
     ],
   },
   {
@@ -419,7 +419,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 145,
     lastActive: "2024-04-22T06:00:00",
     recentTrips: [
-      { bookingId: "bkg-016", from: "Majestic Bus Stand", to: "Yeshwanthpur", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-016", from: "Majestic Bus Stand", to: "Yeshwanthpur", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
   {
@@ -436,7 +436,7 @@ export const mockDrivers: Driver[] = [
     totalTrips: 267,
     lastActive: "2024-04-22T09:15:00",
     recentTrips: [
-      { bookingId: "bkg-018", from: "Nagawara", to: "Thanisandra Main Road", date: "2024-04-22", supervisorName: "Meena Prasad" },
+      { tripRef: null, bookingId: "trp-018", from: "Nagawara", to: "Thanisandra Main Road", date: "2024-04-22", supervisorName: "Meena Prasad" },
     ],
   },
   {
@@ -468,15 +468,15 @@ export const mockDrivers: Driver[] = [
     totalTrips: 412,
     lastActive: "2024-04-22T11:10:00",
     recentTrips: [
-      { bookingId: "bkg-006", from: "Sadashivanagar", to: "Vijayanagar", date: "2024-04-22", supervisorName: "Kiran Gowda" },
-      { bookingId: "bkg-012", from: "RT Nagar", to: "Banashankari", date: "2024-04-21", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-006", from: "Sadashivanagar", to: "Vijayanagar", date: "2024-04-22", supervisorName: "Kiran Gowda" },
+      { tripRef: null, bookingId: "trp-012", from: "RT Nagar", to: "Banashankari", date: "2024-04-21", supervisorName: "Kiran Gowda" },
     ],
   },
 ];
 
 export const mockBookings: Booking[] = [
   {
-    id: "bkg-001",
+    id: "trp-001",
     type: "Instant",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -500,7 +500,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-002",
+    id: "trp-002",
     type: "Instant",
     supervisorId: "sup-002",
     supervisorName: "Lakshmi Rao",
@@ -522,7 +522,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-003",
+    id: "trp-003",
     type: "Instant",
     supervisorId: "sup-002",
     supervisorName: "Lakshmi Rao",
@@ -546,7 +546,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-004",
+    id: "trp-004",
     type: "Instant",
     supervisorId: "sup-004",
     supervisorName: "Deepa Shetty",
@@ -568,7 +568,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-005",
+    id: "trp-005",
     type: "Instant",
     supervisorId: "sup-004",
     supervisorName: "Deepa Shetty",
@@ -591,7 +591,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-006",
+    id: "trp-006",
     type: "Instant",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -612,7 +612,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-007",
+    id: "trp-007",
     type: "Instant",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -634,7 +634,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-008",
+    id: "trp-008",
     type: "Instant",
     supervisorId: "sup-002",
     supervisorName: "Lakshmi Rao",
@@ -655,7 +655,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-009",
+    id: "trp-009",
     type: "Scheduled",
     supervisorId: "sup-002",
     supervisorName: "Lakshmi Rao",
@@ -677,7 +677,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-010",
+    id: "trp-010",
     type: "Scheduled",
     supervisorId: "sup-002",
     supervisorName: "Lakshmi Rao",
@@ -698,7 +698,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-011",
+    id: "trp-011",
     type: "Scheduled",
     supervisorId: "sup-004",
     supervisorName: "Deepa Shetty",
@@ -719,7 +719,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-012",
+    id: "trp-012",
     type: "Scheduled",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -741,7 +741,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-013",
+    id: "trp-013",
     type: "Scheduled",
     supervisorId: "sup-004",
     supervisorName: "Deepa Shetty",
@@ -759,7 +759,7 @@ export const mockBookings: Booking[] = [
     interestedDrivers: [],
   },
   {
-    id: "bkg-014",
+    id: "trp-014",
     type: "Scheduled",
     supervisorId: "sup-006",
     supervisorName: "Meena Prasad",
@@ -780,7 +780,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-015",
+    id: "trp-015",
     type: "Instant",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -802,7 +802,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-016",
+    id: "trp-016",
     type: "Instant",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",
@@ -824,7 +824,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-017",
+    id: "trp-017",
     type: "Instant",
     supervisorId: "sup-006",
     supervisorName: "Meena Prasad",
@@ -845,7 +845,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-018",
+    id: "trp-018",
     type: "Scheduled",
     supervisorId: "sup-006",
     supervisorName: "Meena Prasad",
@@ -865,7 +865,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-019",
+    id: "trp-019",
     type: "Instant",
     supervisorId: "sup-004",
     supervisorName: "Deepa Shetty",
@@ -885,7 +885,7 @@ export const mockBookings: Booking[] = [
     ],
   },
   {
-    id: "bkg-020",
+    id: "trp-020",
     type: "Scheduled",
     supervisorId: "sup-001",
     supervisorName: "Kiran Gowda",

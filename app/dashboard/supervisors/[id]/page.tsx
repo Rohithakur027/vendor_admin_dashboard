@@ -3,69 +3,25 @@
 import { useParams, useRouter } from "next/navigation";
 import { useVendor } from "@/context/VendorContext";
 import { useState, useEffect, useRef } from "react";
+import { supervisorsApi } from "@/lib/api";
+import { PanelSupervisorReport } from "@/modules/reports/PanelSupervisorReport";
 import {
-  ArrowLeft, Plus, Wallet, BookOpen, TrendingUp,
+  ArrowLeft, Plus, X, Wallet, Route, TrendingUp,
   Building2, User, IndianRupee, ArrowRight, Receipt,
   Check, AlertTriangle, Trash2, Circle, Mail, Phone, MapPin,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Eye, EyeOff, KeyRound,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import { STATUS_STYLES } from "@/components/StatusBadge";
-
-function SupervisorDetailSkeleton() {
-  return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-9 w-9 rounded-lg" />
-        <Skeleton className="h-5 w-40" />
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center gap-6">
-        <Skeleton className="h-16 w-16 rounded-full shrink-0" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-36" />
-          <div className="flex gap-3 mt-2">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Skeleton className="h-9 w-24 rounded-lg" />
-          <Skeleton className="h-9 w-24 rounded-lg" />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-2">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-8 w-20" />
-            <Skeleton className="h-3 w-36" />
-          </div>
-        ))}
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <Skeleton className="h-4 w-32" />
-        </div>
-        <div className="divide-y divide-slate-100">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center justify-between px-6 py-4 gap-4">
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-              <Skeleton className="h-6 w-20 rounded-full" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
+import type { Booking } from "@/modules/bookings/types";
+import { SearchBar } from "@/components/SearchBar";
+import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
 
 // ── constants ───────────────────────────────────────────────────────────────
 const ACCENT = "#2563EB";
@@ -193,32 +149,73 @@ function BarChart({ days }: { days: { label: string; date: string; total: number
 export default function SupervisorDetailPage() {
   const { id }   = useParams<{ id: string }>();
   const router   = useRouter();
-  const { supervisors, bookings, drivers, updateSupervisor, deleteSupervisor, isLoading } = useVendor();
+  const { supervisors, bookings, drivers, updateSupervisor, deleteSupervisor, toggleAppAccess, isLoading } = useVendor();
 
   const [activeTab,    setActiveTab]    = useState("overview");
-  const [rechargeOpen, setRechargeOpen] = useState(false);
-  const [rechargeAmt,  setRechargeAmt]  = useState("");
-  const [rechargeErr,  setRechargeErr]  = useState("");
   const [deleteOpen,   setDeleteOpen]   = useState(false);
-  const [txnForm,      setTxnForm]      = useState({ amount: "", note: "" });
-  const [txnRecorded,  setTxnRecorded]  = useState(false);
-  const [transactions, setTransactions] = useState<{ id: string; amount: number; note: string; recordedAt: string }[]>([]);
   const [settingsSection, setSettingsSection] = useState<"profile" | "security">("profile");
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", walletLimit: "0", status: "Active", shift: "Morning" });
-  const [editSaved, setEditSaved] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as string[] });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError,  setEditError]  = useState<string | null>(null);
+  const [toast,      setToast]      = useState<string>("");
   const [addCompanyInput, setAddCompanyInput] = useState("");
   const [showAddCompany, setShowAddCompany] = useState(false);
 
+  // ── Account & Security state ──
+  const [appAccessSaving, setAppAccessSaving] = useState(false);
+  const [appAccessError,  setAppAccessError]  = useState<string | null>(null);
+
+  const [pwForm,    setPwForm]    = useState({ password: "", confirm: "" });
+  const [pwShow,    setPwShow]    = useState(false);
+  const [pwSaving,  setPwSaving]  = useState(false);
+  const [pwSaved,   setPwSaved]   = useState(false);
+  const [pwError,   setPwError]   = useState<string | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteSaving,  setDeleteSaving]  = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+  const [selectedBooking,  setSelectedBooking]  = useState<Booking | null>(null);
+  const [tripSearch,       setTripSearch]       = useState("");
+  const [tripStatus,       setTripStatus]       = useState("All Status");
+  const [tripType,         setTripType]         = useState("All Types");
+  const [draftTripStatus,  setDraftTripStatus]  = useState("All Status");
+  const [draftTripType,    setDraftTripType]    = useState("All Types");
+  const [tripFilterOpen,   setTripFilterOpen]   = useState(false);
+
+  function openTripFilter() {
+    setDraftTripStatus(tripStatus);
+    setDraftTripType(tripType);
+    setTripFilterOpen(true);
+  }
+  function applyTripFilter() {
+    setTripStatus(draftTripStatus);
+    setTripType(draftTripType);
+    setTripFilterOpen(false);
+  }
+  function cancelTripFilter() {
+    setTripFilterOpen(false);
+  }
+
+  function addCompany() {
+    const t = addCompanyInput.trim();
+    if (t && !editForm.companies.includes(t)) {
+      setEditForm(f => ({ ...f, companies: [...f.companies, t] }));
+    }
+    setAddCompanyInput("");
+  }
+  
+  function removeCompany(c: string) {
+    setEditForm(f => ({ ...f, companies: f.companies.filter(x => x !== c) }));
+  }
+
   useEffect(() => {
     const sup = supervisors.find(s => s.id === id);
-    if (sup) setEditForm({ name: sup.name, email: sup.email, phone: sup.phone, zone: sup.zone, walletLimit: String(sup.walletLimit), status: sup.status, shift: "Morning" });
+    if (sup) setEditForm({ name: sup.name, email: sup.email, phone: sup.phone, zone: sup.zone, status: sup.status, shift: "Morning", companies: sup.companies ?? [] });
   }, [id, supervisors]);
-
-  if (isLoading) return <SupervisorDetailSkeleton />;
 
   const supervisor = supervisors.find(s => s.id === id);
 
-  if (!supervisor) {
+  if (!isLoading && !supervisor) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p style={{ color: "#64748B" }}>Supervisor not found.</p>
@@ -227,9 +224,6 @@ export default function SupervisorDetailPage() {
     );
   }
 
-  // wallet
-  const walletPct       = supervisor.walletLimit > 0 ? Math.min((supervisor.walletUsed / supervisor.walletLimit) * 100, 100) : 0;
-  const walletRemaining = supervisor.walletLimit - supervisor.walletUsed;
 
   // bookings
   const supBookings  = bookings.filter(b => b.supervisorId === id);
@@ -237,7 +231,7 @@ export default function SupervisorDetailPage() {
   const completedCt  = supBookings.filter(b => b.status === "Completed" && b.createdAt?.startsWith(today)).length;
   const ongoingCt    = supBookings.filter(b => b.status === "Ongoing").length;
   const cancelledCt  = supBookings.filter(b => b.status === "Cancelled").length;
-  const sup_initials = supervisor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+  const sup_initials = supervisor ? supervisor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "";
 
   // spend
   const spendMap: Record<string, number> = {};
@@ -262,38 +256,30 @@ export default function SupervisorDetailPage() {
   // weekly chart
   const weekDays = weeklySpend(supBookings);
 
-  // total paid
-  const totalPaid = transactions.reduce((s, t) => s + t.amount, 0);
-  const outstanding = Math.max(0, totalSpend - totalPaid);
-
   const TABS = [
-    { value: "overview",     label: "Overview" },
-    { value: "bookings",     label: "Recent Trips" },
-    { value: "spend",        label: "Spend Breakdown" },
-    { value: "transactions", label: "Transactions" },
-    { value: "settings",     label: "Settings" },
+    { value: "overview", label: "Overview" },
+    { value: "bookings", label: "Recent Trips" },
+    { value: "spend",    label: "Summary" },
+    { value: "settings", label: "Settings" },
   ];
-
-  // ── record transaction ──
-  function handleRecord(e: React.FormEvent) {
-    e.preventDefault();
-    const amt = parseFloat(txnForm.amount);
-    if (!amt || amt <= 0) return;
-    setTransactions(prev => [{
-      id: `TXN-${Date.now()}`,
-      amount: amt,
-      note: txnForm.note,
-      recordedAt: new Date().toISOString(),
-    }, ...prev]);
-    setTxnForm({ amount: "", note: "" });
-    setTxnRecorded(true);
-    setTimeout(() => setTxnRecorded(false), 2000);
-  }
 
   const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
   return (
     <div style={{ fontFamily: font, color: "#0F172A" }}>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, right: 20, zIndex: 300,
+          background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 12,
+          padding: "12px 18px", display: "flex", alignItems: "center", gap: 10,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.1)", maxWidth: 340,
+        }}>
+          <CheckCircle2 style={{ width: 16, height: 16, color: "#16a34a", flexShrink: 0 }} />
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: "#15803d" }}>{toast}</span>
+        </div>
+      )}
 
       {/* ── Page Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -307,7 +293,13 @@ export default function SupervisorDetailPage() {
           <div style={{ width: 1, height: 28, background: "#E8EEF4" }} />
           <div>
             <p style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>Supervisor Profile</p>
-            <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>{supervisor.name} · Full details</p>
+            <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
+              {isLoading || !supervisor ? (
+                <SkeletonInline className="h-3 w-32" />
+              ) : (
+                <>{supervisor.name} · Full details</>
+              )}
+            </p>
           </div>
         </div>
       </div>
@@ -338,7 +330,44 @@ export default function SupervisorDetailPage() {
       </div>
 
       {/* ══ TAB: OVERVIEW ══ */}
-      {activeTab === "overview" && (
+      {activeTab === "overview" && (isLoading || !supervisor ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ ...CARD_STYLE, padding: 20, display: "flex", alignItems: "center", gap: 18 }}>
+            <Skeleton className="h-[60px] w-[60px] rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-3 w-32 shrink-0" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={CARD_STYLE} className="p-5 flex items-center justify-between gap-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-8 w-16" />
+                </div>
+                <Skeleton className="h-[38px] w-[38px] rounded-xl shrink-0" />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
+            <Skeleton className="h-[110px] rounded-2xl" />
+            <div className="space-y-3.5">
+              <div style={CARD_STYLE} className="p-4 space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <div style={CARD_STYLE} className="p-4 space-y-2.5">
+                <Skeleton className="h-4 w-32" />
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-3 w-full" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
           {/* Profile card */}
@@ -380,8 +409,8 @@ export default function SupervisorDetailPage() {
 
           {/* 4 Stat chips */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-            <StatCard label="Total Bookings"    value={supBookings.length}       icon={BookOpen}     iconBg="#F1F5F9" iconColor="#0F172A" />
-            <StatCard label="Today's Bookings"  value={supervisor.bookingsToday} icon={TrendingUp}   iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Total Trips"    value={supBookings.length}       icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Today's Trips"  value={supervisor.bookingsToday} icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Today's Completed" value={completedCt}              icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Ongoing"           value={ongoingCt}                icon={Circle}       iconBg="#F1F5F9" iconColor="#0F172A" />
           </div>
@@ -408,7 +437,7 @@ export default function SupervisorDetailPage() {
                 Today&apos;s Spend
               </div>
               <div style={{ fontSize: 36, fontWeight: 800, color: "#fff", lineHeight: 1, letterSpacing: -1 }}>
-                ₹{supervisor.walletUsed.toLocaleString("en-IN")}
+                ₹{(supervisor.dailyHistory.find((d) => d.date === today)?.amount ?? 0).toLocaleString("en-IN")}
               </div>
             </div>
 
@@ -466,25 +495,19 @@ export default function SupervisorDetailPage() {
                   </button>
                 </div>
                 <div>
-                  {supBookings.slice(0, 4).map(booking => {
-                    const sc = STATUS_STYLES[booking.status] ?? STATUS_STYLES["Pending"];
-                    return (
-                      <div key={booking.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: "1px solid #F8FAFC" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flex: 1, minWidth: 0 }}>
-                          <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: "50%", background: sc.dot, flexShrink: 0 }} />
-                          <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {booking.pickupLocation} → {booking.dropLocation}
-                            </p>
-                            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{fmtDate(booking.createdAt)}</p>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", flexShrink: 0, marginLeft: 16 }}>
-                          {booking.fare ? `₹${booking.fare.toLocaleString()}` : "—"}
-                        </span>
+                  {supBookings.slice(0, 4).map(booking => (
+                    <div key={booking.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: "1px solid #F8FAFC" }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {booking.pickupLocation} → {booking.dropLocation}
+                        </p>
+                        <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{fmtDate(booking.createdAt)}</p>
                       </div>
-                    );
-                  })}
+                      <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", flexShrink: 0, marginLeft: 16 }}>
+                        {booking.fare ? `₹${booking.fare.toLocaleString()}` : "—"}
+                      </span>
+                    </div>
+                  ))}
                   {supBookings.length === 0 && (
                     <p style={{ textAlign: "center", color: "#94A3B8", fontSize: 12.5, padding: "16px 0 20px" }}>No recent trips.</p>
                   )}
@@ -494,248 +517,233 @@ export default function SupervisorDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       {/* ══ TAB: RECENT TRIPS ══ */}
-      {activeTab === "bookings" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* Table */}
-          <div style={CARD_STYLE}>
-            {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px 88px 80px 108px", gap: 8, padding: "12px 20px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", borderRadius: "14px 14px 0 0" }}>
-              {["ROUTE", "DRIVER", "COMPANY", "TYPE", "FARE", "STATUS"].map(h => (
-                <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
-              ))}
-            </div>
+      {activeTab === "bookings" && (() => {
+        const tripFilterCount = (tripStatus !== "All Status" ? 1 : 0) + (tripType !== "All Types" ? 1 : 0);
+        const filteredBookings = supBookings.filter(b => {
+          const q   = tripSearch.toLowerCase();
+          const drv = drivers.find(d => d.id === b.driverId);
+          const driverPhone  = (b.driverPhone ?? drv?.phone ?? "").toLowerCase();
+          const vehicleModel = drv?.vehicle ?? "";
+          const vehicleReg   = drv?.vehicleReg ?? "";
+          const matchQ =
+            !q ||
+            b.id.toLowerCase().includes(q) ||
+            (b.bookingRef?.toLowerCase().includes(q) ?? false) ||
+            (drv?.name ?? "").toLowerCase().includes(q) ||
+            driverPhone.includes(q) ||
+            vehicleModel.toLowerCase().includes(q) ||
+            vehicleReg.toLowerCase().replace(/\s+/g, "").includes(q.replace(/\s+/g, "")) ||
+            b.pickupLocation.toLowerCase().includes(q) ||
+            b.dropLocation.toLowerCase().includes(q);
+          const matchSt = tripStatus === "All Status" || b.status === tripStatus;
+          const matchTy = tripType   === "All Types"  || b.type   === tripType;
+          return matchQ && matchSt && matchTy;
+        });
 
-            {supBookings.length === 0 ? (
-              <p style={{ textAlign: "center", padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>No bookings yet.</p>
-            ) : (
-              <div>
-                {supBookings.map(booking => {
-                  const sc = STATUS_STYLES[booking.status] ?? STATUS_STYLES["Pending"];
-                  const srcC = srcCfg(booking.bookingSource ?? "Individual");
-                  return (
-                    <div
-                      key={booking.id}
-                      style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px 88px 80px 108px", gap: 8, padding: "14px 20px", borderBottom: "1px solid #F8FAFC", alignItems: "center", cursor: "pointer", transition: "all 0.15s" }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.boxShadow = `inset 0 1px 0 ${ACCENT}50, inset 0 -1px 0 ${ACCENT}50, 0 4px 20px ${ACCENT}12`;
-                        (e.currentTarget as HTMLElement).style.background = "#F8FAFC";
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                        (e.currentTarget as HTMLElement).style.background = "transparent";
-                      }}
-                    >
-                      {/* Route */}
-                      <div>
-                        <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.pickupLocation}</p>
-                        <div style={{ display: "flex", alignItems: "center", gap: 3, margin: "3px 0" }}>
-                          <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
-                          <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
-                        </div>
-                        <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.dropLocation}</p>
-                        <p style={{ fontSize: 11, color: "#64748B", fontWeight: 600, marginTop: 3 }}>{fmtDate(booking.createdAt)}</p>
-                      </div>
-                      {/* Driver */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                        {booking.driverName ? (
-                          <>
-                            <span style={{ fontSize: 12.5, color: "#334155", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.driverName.split(" ")[0]}</span>
-                            {(() => {
-                              const vehicle = booking.driverId ? drivers.find(d => d.id === booking.driverId)?.vehicle : null;
-                              return vehicle ? (
-                                <span style={{ fontSize: 11, color: "#64748B", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vehicle}</span>
-                              ) : null;
-                            })()}
-                          </>
-                        ) : (
-                          <span style={{ fontSize: 12, color: "#94A3B8", fontStyle: "italic" }}>Awaiting</span>
-                        )}
-                      </div>
-                      {/* Company */}
-                      <div>
-                        <span style={{ fontSize: 12, color: "#334155", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{booking.bookingSource ?? "Individual"}</span>
-                      </div>
-                      {/* Type */}
-                      <div>
-                        <span style={{ background: booking.type === "Instant" ? "#DBEAFE" : "#FEF3C7", color: booking.type === "Instant" ? "#1D4ED8" : "#B45309", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5 }}>
-                          {booking.type}
-                        </span>
-                      </div>
-                      {/* Fare */}
-                      <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>
-                        {booking.fare ? `₹${booking.fare.toLocaleString()}` : <span style={{ color: "#CBD5E1" }}>—</span>}
-                      </span>
-                      {/* Status */}
-                      <StatusBadge status={booking.status} />
-                    </div>
-                  );
-                })}
+        return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Search + Filter row */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <SearchBar value={tripSearch} onChange={setTripSearch} placeholder="Search by ID, driver, phone, vehicle, route..." />
+            <div className="relative shrink-0">
+              <FilterTrigger onClick={openTripFilter} activeCount={tripFilterCount} />
+              <FilterPanel
+                open={tripFilterOpen}
+                onClose={cancelTripFilter}
+                onCancel={cancelTripFilter}
+                onApply={applyTripFilter}
+                activeCount={tripFilterCount}
+                onClearAll={() => { setDraftTripStatus("All Status"); setDraftTripType("All Types"); }}
+              >
+                <FilterSection label="Status">
+                  {["All Status","Ongoing","Completed","Pending","Cancelled"].map(s => (
+                    <FilterPill key={s} label={s} active={draftTripStatus === s} onClick={() => setDraftTripStatus(s)} />
+                  ))}
+                </FilterSection>
+                <FilterSection label="Trip Type">
+                  {["All Types","Instant","Scheduled"].map(t => (
+                    <FilterPill key={t} label={t} active={draftTripType === t} onClick={() => setDraftTripType(t)} />
+                  ))}
+                </FilterSection>
+              </FilterPanel>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[900px]">
+              {/* Header */}
+              <div className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+                {["TRIP ID & TYPE", "ROUTE", "COMPANY", "VEHICLE", "DRIVER", "STATUS", "CREATED AT"].map(h => (
+                  <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
+                ))}
               </div>
-            )}
+
+              {/* Rows */}
+              <div className="flex flex-col divide-y divide-slate-100">
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5">
+                      <div className="space-y-2">
+                        <Skeleton className="h-3.5 w-16" />
+                        <Skeleton className="h-4 w-12 rounded" />
+                      </div>
+                      <div className="space-y-1.5 pr-4">
+                        <Skeleton className="h-3.5 w-3/4" />
+                        <Skeleton className="h-2 w-16" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </div>
+                      <Skeleton className="h-4 w-20 rounded" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3.5 w-24" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Skeleton className="h-3.5 w-24" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <div className="space-y-1">
+                        <Skeleton className="h-3.5 w-14" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                    </div>
+                  ))
+                ) : filteredBookings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
+                    <p className="text-sm font-medium">{supBookings.length === 0 ? "No trips yet." : "No trips match your filters."}</p>
+                  </div>
+                ) : (
+                  filteredBookings.map(booking => {
+                    const driver = booking.driverId ? drivers.find(d => d.id === booking.driverId) : null;
+                    const driverName = driver?.name ?? null;
+                    const vehicle = driver?.vehicle ?? null;
+                    const vehicleReg = driver?.vehicleReg ?? null;
+                    const d = new Date(booking.createdAt);
+                    const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+                    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                        onClick={() => setSelectedBooking(booking)}
+                      >
+                        {/* TRIP ID & TYPE */}
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="font-extrabold text-[#111827] text-[13px]">{booking.bookingRef ?? "—"}</span>
+                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
+                            {booking.type}
+                          </span>
+                        </div>
+
+                        {/* ROUTE */}
+                        <div className="flex flex-col min-w-0 pr-4 gap-px">
+                          <span className="font-semibold text-[13px] text-slate-800 leading-tight truncate">
+                            {booking.pickupLocation.split(",")[0]}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <div className="w-14 h-[2px] rounded-full" style={{ background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
+                            <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
+                          </div>
+                          <span className="text-[12px] text-gray-500 truncate">
+                            {booking.dropLocation.split(",")[0]}
+                          </span>
+                        </div>
+
+                        {/* COMPANY */}
+                        <div className="flex flex-col items-start gap-1">
+                          {booking.bookingSource ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-semibold truncate max-w-[130px]">
+                              {booking.bookingSource}
+                            </span>
+                          ) : (
+                            <span className="text-[13px] text-slate-300 font-medium italic">—</span>
+                          )}
+                        </div>
+
+                        {/* VEHICLE */}
+                        <div className="flex flex-col gap-px">
+                          {vehicle ? (
+                            <>
+                              <span className="text-[13px] font-medium text-slate-600 truncate">{vehicle}</span>
+                              {vehicleReg && <span className="text-[11px] font-semibold text-slate-500 truncate">{vehicleReg}</span>}
+                            </>
+                          ) : (
+                            <span className="text-[13px] text-slate-300 font-medium italic">—</span>
+                          )}
+                        </div>
+
+                        {/* DRIVER */}
+                        <div className="flex flex-col gap-px">
+                          {driverName ? (
+                            <span className="text-[13px] font-medium text-slate-600 truncate">{driverName}</span>
+                          ) : (
+                            <span className="text-[13px] text-slate-300 font-medium italic">Awaiting</span>
+                          )}
+                        </div>
+
+                        {/* STATUS */}
+                        <div>
+                          <StatusBadge status={booking.status} />
+                        </div>
+
+                        {/* CREATED AT */}
+                        <div className="flex flex-col text-left">
+                          <span className="text-[13px] font-medium text-slate-700">{day}</span>
+                          <span className="text-[11px] text-slate-400 font-medium mt-0.5">{time}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ══ TAB: SPEND BREAKDOWN ══ */}
-      {activeTab === "spend" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* 3 stat cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-            <StatCard label="Total Spend"      value={`₹${totalSpend.toLocaleString()}`}  icon={IndianRupee} iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Company Spend"    value={`₹${spendEntries.filter(([k]) => k !== "Individual").reduce((s,[,v]) => s+v, 0).toLocaleString()}`} icon={Building2} iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Individual Spend" value={`₹${(finalSpend["Individual"] ?? 0).toLocaleString()}`} icon={User} iconBg="#F1F5F9" iconColor="#64748B" />
-          </div>
-
-          {/* Daily bar chart */}
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 22px 8px" }}>
-              <div>
-                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Daily Spend — Last 7 Days</p>
-                <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>
-                  Week total: <span style={{ fontWeight: 700, color: "#334155" }}>₹{weekDays.reduce((s,d) => s+d.total,0).toLocaleString()}</span>
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#64748B" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: ACCENT, display: "inline-block" }} /> Today
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: "#BFDBFE", display: "inline-block" }} /> Past days
-                </span>
-              </div>
-            </div>
-            <div style={{ padding: "4px 22px 18px" }}>
-              <BarChart days={weekDays} />
-            </div>
-          </div>
-
-          {/* Spend by Source */}
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
-              <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Spend by Source</p>
-              <span style={{ fontSize: 12, color: "#94A3B8" }}>{spendEntries.length} sources</span>
-            </div>
-            <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {spendEntries.map(([source, amount]) => {
-                const pct      = totalSpend > 0 ? (amount / totalSpend) * 100 : 0;
-                const cfg      = srcCfg(source);
-                const tripCount = supBookings.filter(b => (b.bookingSource ?? "Individual") === source && b.fare).length ||
-                                  (source === "Infosys" ? 3 : source === "Wipro" ? 2 : 2);
-                const isAssigned = supervisor.companies.includes(source);
-                return (
-                  <div key={source}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: cfg.bg, color: cfg.color, fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {cfg.initial}
-                        </div>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{source}</span>
-                        <span style={{ background: isAssigned ? "#DBEAFE" : source === "Individual" ? "#CFFAFE" : "#F1F5F9", color: isAssigned ? "#1D4ED8" : source === "Individual" ? "#0891B2" : "#64748B", fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 5 }}>
-                          {isAssigned ? "Assigned" : source === "Individual" ? "Individual" : "Other"}
-                        </span>
-                        <span style={{ fontSize: 11.5, color: "#94A3B8" }}>{tripCount} trip{tripCount !== 1 ? "s" : ""}</span>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>₹{amount.toLocaleString()}</span>
-                        <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 8 }}>{pct.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                    <div style={{ height: 8, borderRadius: 20, background: "#F1F5F9", overflow: "hidden" }}>
-                      <SpendBar pct={pct} color={cfg.color} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      {activeTab === "spend" && (isLoading || !supervisor ? (
+        <div className="space-y-4">
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
-      )}
+      ) : (
+        <PanelSupervisorReport supervisorId={supervisor.id} hideHeader hideSupervisorPicker />
+      ))}
 
       {/* ══ TAB: TRANSACTIONS ══ */}
-      {activeTab === "transactions" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-
-          {/* 3 stat cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-            <StatCard label="Total Billed" value={`₹${totalSpend.toLocaleString()}`} icon={Receipt}   iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Total Paid"   value={`₹${totalPaid.toLocaleString()}`}  icon={Wallet}    iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Outstanding"  value={`₹${outstanding.toLocaleString()}`} icon={TrendingUp} iconBg="#F1F5F9" iconColor="#64748B" />
-          </div>
-
-          {/* Record form */}
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 20px 12px" }}>
-              <div style={{ background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 9, padding: 7 }}>
-                <Receipt className="h-4 w-4" style={{ color: "#64748B" }} />
-              </div>
-              <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Record Transaction Received</p>
+      {/* ══ TAB: SETTINGS ══ */}
+      {activeTab === "settings" && (isLoading || !supervisor ? (
+        <div style={{ display: "flex", gap: 20 }}>
+          <div style={{ width: 210, flexShrink: 0 }}>
+            <div style={{ ...CARD_STYLE, padding: 6 }} className="space-y-1">
+              <Skeleton className="h-9 w-full rounded-lg" />
+              <Skeleton className="h-9 w-full rounded-lg" />
             </div>
-            <form onSubmit={handleRecord} style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "0 20px 20px", alignItems: "flex-end" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, width: 160 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Amount Received (₹)</label>
-                <Input type="number" placeholder="0" min="1" value={txnForm.amount} onChange={e => setTxnForm(f => ({ ...f, amount: e.target.value }))} style={{ fontFamily: font }} />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, flex: 1, minWidth: 200 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Note (optional)</label>
-                <Input placeholder="e.g. Cash received for April dues" value={txnForm.note} onChange={e => setTxnForm(f => ({ ...f, note: e.target.value }))} style={{ fontFamily: font }} />
-              </div>
-              <button
-                type="submit"
-                disabled={!txnForm.amount}
-                style={{ height: 40, padding: "0 20px", borderRadius: 9, border: "none", background: txnRecorded ? "#22C55E" : ACCENT, color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: font, transition: "background 0.2s", opacity: !txnForm.amount ? 0.5 : 1 }}
-              >
-                {txnRecorded ? "✓ Recorded" : "Record"}
-              </button>
-            </form>
           </div>
-
-          {/* Transaction history */}
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
-              <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Transaction History</p>
-              {transactions.length > 0 && (
-                <span style={{ fontSize: 12, color: "#94A3B8" }}>Total received: <strong style={{ color: "#0F172A" }}>₹{totalPaid.toLocaleString()}</strong></span>
-              )}
-            </div>
-            {transactions.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0 48px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Receipt className="h-5 w-5" style={{ color: "#CBD5E1" }} />
-                </div>
-                <p style={{ fontSize: 13.5, color: "#94A3B8", fontWeight: 600 }}>No transactions recorded yet</p>
-                <p style={{ fontSize: 12, color: "#CBD5E1" }}>Use the form above to log a payment received.</p>
-              </div>
-            ) : (
-              <div>
-                {transactions.map(txn => (
-                  <div key={txn.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #F8FAFC" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 9, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <Check className="h-4 w-4" style={{ color: "#64748B" }} />
-                      </div>
-                      <div>
-                        {txn.note && <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{txn.note}</p>}
-                        <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>
-                          {new Date(txn.recordedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                        <p style={{ fontSize: 10, color: "#CBD5E1", fontFamily: "monospace", marginTop: 1 }}>{txn.id}</p>
-                      </div>
-                    </div>
-                    <p style={{ fontSize: 14, fontWeight: 800, color: "#16A34A" }}>+₹{txn.amount.toLocaleString()}</p>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ ...CARD_STYLE, padding: 24 }} className="space-y-4">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-3 w-64" />
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-10 w-full rounded-md" />
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
         </div>
-      )}
-
-      {/* ══ TAB: SETTINGS ══ */}
-      {activeTab === "settings" && (
+      ) : (
         <div style={{ display: "flex", gap: 20 }}>
 
           {/* Left nav */}
@@ -763,7 +771,7 @@ export default function SupervisorDetailPage() {
             {settingsSection === "profile" && (
               <div style={{ ...CARD_STYLE, padding: 24 }}>
                 <div style={{ marginBottom: 20 }}>
-                  <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Profile Settings</p>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Edit Profile</p>
                   <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Update supervisor contact and zone details</p>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -783,30 +791,77 @@ export default function SupervisorDetailPage() {
                       />
                     </div>
                   ))}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+                  {/* Assigned Companies */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Status</label>
-                    <select
-                      value={editForm.status}
-                      onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
-                      style={{ height: 40, border: "1px solid #E2E8F0", borderRadius: 8, padding: "0 12px", fontSize: 14, fontFamily: font, background: "#fff", color: "#0F172A" }}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Assigned Companies</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Input
+                        placeholder="Type company name and press Enter"
+                        value={addCompanyInput}
+                        onChange={e => setAddCompanyInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCompany(); } }}
+                        style={{ fontFamily: font }}
+                      />
+                      <button
+                        type="button"
+                        onClick={addCompany}
+                        style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                      >
+                        <Plus className="h-4 w-4" style={{ color: "#64748B" }} />
+                      </button>
+                    </div>
+                    {editForm.companies && editForm.companies.length > 0 ? (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                        {editForm.companies.map((c: string) => (
+                          <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8 }}>
+                            {c}
+                            <button
+                              type="button"
+                              onClick={() => removeCompany(c)}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.2)", border: "none", cursor: "pointer" }}
+                            >
+                              <X className="h-2 w-2" style={{ color: "#fff" }} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: 12, color: "#94A3B8" }}>No companies assigned yet.</p>
+                    )}
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 20, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 24, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
                   <button
-                    onClick={() => {
-                      updateSupervisor(supervisor.id, { name: editForm.name, email: editForm.email, phone: editForm.phone, zone: editForm.zone, status: editForm.status as "Active" | "Inactive" });
-                      setEditSaved(true);
-                      setTimeout(() => setEditSaved(false), 2500);
+                    disabled={editSaving}
+                    onClick={async () => {
+                      setEditError(null);
+                      setEditSaving(true);
+                      try {
+                        await updateSupervisor(supervisor.id, {
+                          name:      editForm.name,
+                          email:     editForm.email,
+                          phone:     editForm.phone,
+                          zone:      editForm.zone,
+                          status:    editForm.status as "Active" | "Inactive",
+                          companies: editForm.companies,
+                        });
+                        setToast("Profile updated successfully");
+                        setTimeout(() => setToast(""), 2500);
+                      } catch (err) {
+                        setEditError(err instanceof Error ? err.message : "Failed to save changes");
+                      } finally {
+                        setEditSaving(false);
+                      }
                     }}
-                    style={{ padding: "9px 22px", borderRadius: 9, background: editSaved ? "#22C55E" : ACCENT, color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: "pointer", border: "none", fontFamily: font, transition: "background 0.2s" }}
+                    style={{ padding: "9px 22px", borderRadius: 9, background: ACCENT, color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: editSaving ? "wait" : "pointer", opacity: editSaving ? 0.7 : 1, border: "none", fontFamily: font }}
                   >
-                    {editSaved ? "✓ Saved!" : "Save Changes"}
+                    {editSaving ? "Saving…" : "Save Changes"}
                   </button>
-                  {editSaved && <p style={{ fontSize: 12.5, color: "#22C55E", fontWeight: 600 }}>Profile updated successfully.</p>}
+                  {editError && <p style={{ fontSize: 12.5, color: "#DC2626", fontWeight: 600 }}>{editError}</p>}
                 </div>
               </div>
             )}
@@ -827,23 +882,99 @@ export default function SupervisorDetailPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => updateSupervisor(supervisor.id, { appAccess: !supervisor.appAccess })}
-                      style={{ padding: "8px 18px", borderRadius: 9, border: supervisor.appAccess ? "1.5px solid #FECACA" : `1.5px solid ${ACCENT}`, background: supervisor.appAccess ? "#FFF5F5" : `${ACCENT}10`, color: supervisor.appAccess ? "#DC2626" : ACCENT, fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: font, transition: "all 0.2s" }}
+                      disabled={appAccessSaving}
+                      onClick={async () => {
+                        setAppAccessError(null);
+                        setAppAccessSaving(true);
+                        try {
+                          await toggleAppAccess(supervisor.id);
+                        } catch (err) {
+                          setAppAccessError(err instanceof Error ? err.message : "Failed to toggle access");
+                        } finally {
+                          setAppAccessSaving(false);
+                        }
+                      }}
+                      style={{ padding: "8px 18px", borderRadius: 9, border: supervisor.appAccess ? "1.5px solid #FECACA" : `1.5px solid ${ACCENT}`, background: supervisor.appAccess ? "#FFF5F5" : `${ACCENT}10`, color: supervisor.appAccess ? "#DC2626" : ACCENT, fontWeight: 700, fontSize: 13, cursor: appAccessSaving ? "wait" : "pointer", opacity: appAccessSaving ? 0.7 : 1, fontFamily: font, transition: "all 0.2s" }}
                     >
-                      {supervisor.appAccess ? "Disable Access" : "Enable Access"}
+                      {appAccessSaving ? "Saving…" : supervisor.appAccess ? "Disable Access" : "Enable Access"}
                     </button>
                   </div>
+                  {appAccessError && (
+                    <p style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginTop: 10 }}>{appAccessError}</p>
+                  )}
                 </div>
 
-                {/* Password reset */}
+                {/* Update password */}
                 <div style={{ ...CARD_STYLE, padding: 22 }}>
-                  <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>Password Reset</p>
-                  <p style={{ fontSize: 12.5, color: "#94A3B8", marginBottom: 16 }}>Send a password reset link to the supervisor's registered email.</p>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 12, padding: "14px 18px" }}>
-                    <p style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{supervisor.email}</p>
-                    <button style={{ padding: "8px 18px", borderRadius: 9, border: "1.5px solid #E8EEF4", background: "#fff", color: "#334155", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: font }}>
-                      Send Reset Link
+                  <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", marginBottom: 4 }}>
+                    Update Password
+                  </p>
+                  <p style={{ fontSize: 12.5, color: "#94A3B8", marginBottom: 16 }}>Set a new login password for this supervisor. They will be signed out of any active sessions.</p>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>New Password</label>
+                      <div style={{ position: "relative" }}>
+                        <Input
+                          type={pwShow ? "text" : "password"}
+                          placeholder="Min 8 characters"
+                          value={pwForm.password}
+                          onChange={e => { setPwForm(f => ({ ...f, password: e.target.value })); setPwError(null); setPwSaved(false); }}
+                          style={{ fontFamily: font, paddingRight: 36 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwShow(s => !s)}
+                          style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#94A3B8" }}
+                        >
+                          {pwShow ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Confirm Password</label>
+                      <Input
+                        type={pwShow ? "text" : "password"}
+                        placeholder="Confirm the password"
+                        value={pwForm.confirm}
+                        onChange={e => { setPwForm(f => ({ ...f, confirm: e.target.value })); setPwError(null); setPwSaved(false); }}
+                        style={{ fontFamily: font }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <button
+                      disabled={pwSaving || !pwForm.password || !pwForm.confirm}
+                      onClick={async () => {
+                        setPwError(null);
+                        setPwSaved(false);
+                        if (pwForm.password.length < 8) {
+                          setPwError("Password must be at least 8 characters");
+                          return;
+                        }
+                        if (pwForm.password !== pwForm.confirm) {
+                          setPwError("Passwords do not match");
+                          return;
+                        }
+                        setPwSaving(true);
+                        try {
+                          await supervisorsApi.updatePassword(supervisor.id, pwForm.password);
+                          setPwSaved(true);
+                          setPwForm({ password: "", confirm: "" });
+                          setTimeout(() => setPwSaved(false), 3000);
+                        } catch (err) {
+                          setPwError(err instanceof Error ? err.message : "Failed to update password");
+                        } finally {
+                          setPwSaving(false);
+                        }
+                      }}
+                      style={{ padding: "9px 22px", borderRadius: 9, background: pwSaved ? "#22C55E" : ACCENT, color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: (pwSaving || !pwForm.password || !pwForm.confirm) ? "not-allowed" : "pointer", opacity: (pwSaving || !pwForm.password || !pwForm.confirm) ? 0.6 : 1, border: "none", fontFamily: font, transition: "background 0.2s" }}
+                    >
+                      {pwSaving ? "Updating…" : pwSaved ? "✓ Updated" : "Update Password"}
                     </button>
+                    {pwSaved && !pwError && <p style={{ fontSize: 12.5, color: "#22C55E", fontWeight: 600 }}>Password updated successfully.</p>}
+                    {pwError && <p style={{ fontSize: 12.5, color: "#DC2626", fontWeight: 600 }}>{pwError}</p>}
                   </div>
                 </div>
 
@@ -857,7 +988,7 @@ export default function SupervisorDetailPage() {
                       <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>Permanently remove this supervisor and all associated data.</p>
                     </div>
                     <button
-                      onClick={() => setDeleteOpen(true)}
+                      onClick={() => { setDeleteConfirm(""); setDeleteError(null); setDeleteOpen(true); }}
                       style={{ padding: "8px 18px", borderRadius: 9, background: "#DC2626", border: "none", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: font }}
                     >
                       Delete Account
@@ -870,71 +1001,83 @@ export default function SupervisorDetailPage() {
 
           </div>
         </div>
-      )}
+      ))}
 
-      {/* ── Recharge Dialog ── */}
-      <Dialog open={rechargeOpen} onOpenChange={setRechargeOpen}>
-        <DialogContent className="sm:max-w-sm" style={{ fontFamily: font }}>
-          <DialogHeader>
-            <DialogTitle style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: font }}>
-              <Wallet className="h-4 w-4" style={{ color: ACCENT }} /> Recharge Wallet
-            </DialogTitle>
-          </DialogHeader>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: "8px 0" }}>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 10, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B" }}>
-                <span>Current Balance</span>
-                <span style={{ fontWeight: 700, color: "#15803D" }}>₹{walletRemaining.toLocaleString()}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B" }}>
-                <span>Total Limit</span>
-                <span style={{ fontWeight: 600, color: "#334155" }}>₹{supervisor.walletLimit.toLocaleString()}</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#334155", fontFamily: font }}>Add Amount (₹)</label>
-              <Input id="recharge-amount" type="number" min="1" placeholder="e.g. 5000" value={rechargeAmt}
-                onChange={e => { setRechargeAmt(e.target.value); setRechargeErr(""); }}
-                style={{ fontFamily: font }}
-              />
-              {rechargeErr && <p style={{ fontSize: 11.5, color: "#DC2626" }}>{rechargeErr}</p>}
-              {rechargeAmt && Number(rechargeAmt) > 0 && (
-                <p style={{ fontSize: 12, color: "#64748B" }}>New balance: <strong style={{ color: "#15803D" }}>₹{(walletRemaining + Number(rechargeAmt)).toLocaleString()}</strong></p>
-              )}
-            </div>
-          </div>
-          <DialogFooter style={{ gap: 8 }}>
-            <Button variant="outline" onClick={() => setRechargeOpen(false)} style={{ fontFamily: font }}>Cancel</Button>
-            <Button
-              style={{ background: ACCENT, color: "#fff", fontFamily: font }}
-              onClick={() => {
-                const amt = Number(rechargeAmt);
-                if (!amt || amt <= 0) { setRechargeErr("Enter a valid amount"); return; }
-                updateSupervisor(supervisor.id, { walletLimit: supervisor.walletLimit + amt });
-                setRechargeOpen(false);
-              }}
-            >
-              Confirm Recharge
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ── Booking Detail Sidebar ── */}
+      <BookingDetailModal
+        booking={selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+      />
 
       {/* ── Delete Dialog ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent style={{ fontFamily: font }}>
+      <Dialog open={deleteOpen} onOpenChange={(o) => { if (!deleteSaving) setDeleteOpen(o); }}>
+        <DialogContent className="sm:max-w-md" style={{ fontFamily: font }}>
           <DialogHeader>
-            <DialogTitle style={{ color: "#DC2626", display: "flex", alignItems: "center", gap: 7, fontFamily: font }}>
-              <AlertTriangle className="h-5 w-5" /> Confirm Deletion
+            <DialogTitle style={{ color: "#DC2626", display: "flex", alignItems: "center", gap: 8, fontFamily: font }}>
+              <AlertTriangle className="h-5 w-5" /> Delete Supervisor Account
             </DialogTitle>
           </DialogHeader>
-          <p style={{ fontSize: 13.5, color: "#334155", padding: "8px 0" }}>
-            Permanently delete <strong style={{ color: "#0F172A" }}>{supervisor.name}</strong>? This cannot be undone.
-          </p>
+
+          <div style={{ padding: "8px 0 4px" }}>
+            <p style={{ fontSize: 13.5, color: "#334155", marginBottom: 12 }}>
+              You're about to permanently delete <strong style={{ color: "#0F172A" }}>{supervisor?.name}</strong>.
+              This action <strong style={{ color: "#DC2626" }}>cannot be undone</strong>.
+            </p>
+
+            <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#991B1B", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                The following will be permanently removed:
+              </p>
+              <ul style={{ fontSize: 12.5, color: "#7F1D1D", lineHeight: 1.7, paddingLeft: 18, margin: 0 }}>
+                <li>Supervisor profile and contact details</li>
+                <li>Login account — they will no longer be able to access the app</li>
+                <li>All assigned company links</li>
+                <li>Wallet transaction history attributed to this supervisor</li>
+                <li>Daily spend statistics</li>
+                <li>Notification history</li>
+              </ul>
+              <p style={{ fontSize: 11.5, color: "#991B1B", marginTop: 10, fontStyle: "italic" }}>
+                Trips created by this supervisor will be retained for audit purposes but the supervisor reference will be cleared.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>
+                Type <strong style={{ color: "#DC2626", fontFamily: "monospace" }}>DELETE</strong> to confirm
+              </label>
+              <Input
+                value={deleteConfirm}
+                onChange={e => { setDeleteConfirm(e.target.value); setDeleteError(null); }}
+                placeholder="DELETE"
+                disabled={deleteSaving}
+                style={{ fontFamily: "monospace", letterSpacing: 1 }}
+              />
+              {deleteError && <p style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginTop: 4 }}>{deleteError}</p>}
+            </div>
+          </div>
+
           <DialogFooter style={{ gap: 8 }}>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} style={{ fontFamily: font }}>Cancel</Button>
-            <Button variant="destructive" onClick={() => { deleteSupervisor(supervisor.id); router.push("/dashboard/supervisors"); }} style={{ fontFamily: font }}>
-              Yes, Delete
+            <Button variant="outline" disabled={deleteSaving} onClick={() => setDeleteOpen(false)} style={{ fontFamily: font }}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteSaving || deleteConfirm.trim() !== "DELETE"}
+              onClick={async () => {
+                setDeleteError(null);
+                setDeleteSaving(true);
+                try {
+                  if (!supervisor) return;
+                  await deleteSupervisor(supervisor.id);
+                  router.push("/dashboard/supervisors");
+                } catch (err) {
+                  setDeleteError(err instanceof Error ? err.message : "Failed to delete supervisor");
+                  setDeleteSaving(false);
+                }
+              }}
+              style={{ fontFamily: font }}
+            >
+              {deleteSaving ? "Deleting…" : "Permanently Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
