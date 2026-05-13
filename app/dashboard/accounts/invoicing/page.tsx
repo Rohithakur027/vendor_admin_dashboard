@@ -10,6 +10,7 @@ import {
   type InvoiceListItem,
   type InvoiceDetail,
   type InvoiceSummary,
+  type InvoiceTripItem,
   type CompanyApiItem,
 } from "@/lib/api";
 import { DateRangePicker } from "@/modules/reports/DateRangePicker";

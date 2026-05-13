@@ -38,4 +38,5 @@ export interface Booking {
   // Live tracking
   bookingRef?: string | null;
   driverPhone?: string | null;
+  pickupTime?: string | null;
 }

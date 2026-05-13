@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, Fragment } from "react";
+import React, { useMemo, useState, Fragment } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -455,7 +455,7 @@ export default function PastBookingsPage() {
                       style={{ gridTemplateColumns: gridTemplate }}
                     >
                       {visibleCols.map((k, j) => {
-                        const r = (renderers as Record<string, { skeleton: () => JSX.Element }>)[k];
+                        const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
                         const stickyStyle = j === 0
                           ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
                           : undefined;

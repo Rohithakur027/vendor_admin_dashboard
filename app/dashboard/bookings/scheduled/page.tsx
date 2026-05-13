@@ -438,7 +438,7 @@ export default function ScheduledBookingsPage() {
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="grid items-center gap-4 px-6 py-3.5" style={{ gridTemplateColumns: gridTemplate }}>
                       {visibleCols.map((k, j) => {
-                        const r = (renderers as Record<string, { skeleton: () => JSX.Element }>)[k];
+                        const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
                         const stickyStyle = j === 0
                           ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
                           : undefined;
