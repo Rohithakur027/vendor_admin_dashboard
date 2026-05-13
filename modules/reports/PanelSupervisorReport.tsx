@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { reportsApi, type SupervisorSummaryData } from "@/lib/api";
+import { exportToCsv } from "@/lib/exportCsv";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   A, fmt, fmtINRk, toIsoDate,
@@ -10,7 +11,21 @@ import {
 } from "./primitives";
 import { SvgBarChart, SvgDonut } from "./charts";
 import { DateRangePicker } from "./DateRangePicker";
-import { Route } from "lucide-react";
+import { Route, ArrowRight } from "lucide-react";
+import { StatusBadge } from "@/components/StatusBadge";
+
+type TabKey = "overview" | "trips";
+
+function fmtCreatedAt(iso: string) {
+  try {
+    const d = new Date(iso);
+    const day  = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
+    return { day, time };
+  } catch {
+    return { day: "Unknown", time: "00:00 am" };
+  }
+}
 
 export function PanelSupervisorReport({
   supervisorId,
@@ -21,7 +36,8 @@ export function PanelSupervisorReport({
   hideHeader?: boolean;
   hideSupervisorPicker?: boolean;
 }) {
-  const { supervisors } = useVendor();
+  const { supervisors, bookings, drivers, apiCounts } = useVendor();
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [showPicker,  setShowPicker]  = useState(false);
   const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return toIsoDate(d); });
   const [dateTo,   setDateTo]   = useState(() => toIsoDate(new Date()));
@@ -112,7 +128,53 @@ export function PanelSupervisorReport({
     : `${supervisors.length} supervisors`;
   const dateLabel = `${new Date(dateFrom).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} — ${new Date(dateTo).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`;
 
+  // Only real API bookings (slice to apiCounts.bookings excludes any mock rows)
+  const apiBookings = useMemo(() => bookings.slice(0, apiCounts.bookings), [bookings, apiCounts.bookings]);
+
+  const filteredTrips = useMemo(() => {
+    return apiBookings
+      .filter((b) => {
+        if (b.status !== "Completed") return false;
+        if (effectiveSupId && b.supervisorId !== effectiveSupId) return false;
+        // Use scheduledTime (actual trip date) to match the API summary's date filtering,
+        // falling back to createdAt for instant trips where scheduledTime may be null.
+        const tripDateRaw = b.scheduledTime ?? b.createdAt;
+        if (!tripDateRaw) return false;
+        const tripDate = toIsoDate(new Date(tripDateRaw));
+        return tripDate >= dateFrom && tripDate <= dateTo;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [apiBookings, effectiveSupId, dateFrom, dateTo]);
+
+  function handleExportTrips() {
+    const rows = filteredTrips.map((b) => {
+      const driver = b.driverId ? drivers.find((d) => d.id === b.driverId) : null;
+      const supName = supervisors.find((s) => s.id === b.supervisorId)?.name ?? "";
+      return {
+        "Trip Ref":     b.bookingRef ?? "",
+        "Type":         b.type,
+        "Status":       b.status,
+        "Supervisor":   supName,
+        "Company":      b.bookingSource ?? "",
+        "Pickup":       b.pickupLocation,
+        "Drop":         b.dropLocation,
+        "Driver":       driver?.name ?? "",
+        "Driver Phone": b.driverPhone ?? driver?.phone ?? "",
+        "Vehicle Reg":  driver?.vehicleReg ?? "",
+        "Vehicle":      driver?.vehicle ?? "",
+        "Fare (₹)":     b.fare ?? "",
+        "Created At":   b.createdAt ? new Date(b.createdAt).toLocaleString("en-IN") : "",
+      };
+    });
+    exportToCsv(`trips-${title.replace(/\s+/g, "-").toLowerCase()}-${dateFrom}-to-${dateTo}`, rows);
+  }
+
   if (loading) return <ReportSkeleton hideHeader={hideHeader} statCount={3} />;
+
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "trips",    label: "Trips"    },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -136,6 +198,7 @@ export function PanelSupervisorReport({
         </Card>
       )}
 
+      {/* DATE PICKER + SUPERVISOR FILTER + EXPORT — shared across all tabs */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ position: "relative" }}>
           <button onClick={() => setShowPicker((v) => !v)}
@@ -168,7 +231,48 @@ export function PanelSupervisorReport({
             </SelectContent>
           </Select>
         )}
+        {activeTab === "trips" && (
+          <button
+            onClick={handleExportTrips}
+            disabled={filteredTrips.length === 0}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", marginLeft: "auto", background: filteredTrips.length === 0 ? "#F8FAFC" : "#fff", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 12.5, color: filteredTrips.length === 0 ? "#CBD5E1" : "#475569", fontFamily: "inherit", fontWeight: 600, cursor: filteredTrips.length === 0 ? "not-allowed" : "pointer" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Export CSV
+          </button>
+        )}
       </div>
+
+      {/* TABS */}
+      <div style={{ display: "flex", gap: 4, borderBottom: "1.5px solid #E2E8F0", marginBottom: -8 }}>
+        {TABS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            style={{
+              padding: "8px 16px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === key ? `2px solid ${A}` : "2px solid transparent",
+              color: activeTab === key ? A : "#94A3B8",
+              marginBottom: -1.5,
+              transition: "color 0.15s",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── OVERVIEW TAB ── */}
+      {activeTab === "overview" && <>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         <StatCard label="Total Trips" value={String(totalBookings)} sub="In selected period" iconBg="#F1F5F9"
@@ -379,6 +483,86 @@ export function PanelSupervisorReport({
           </div>
         );
       })()}
+
+      </>}
+
+      {/* ── TRIPS TAB ── */}
+      {activeTab === "trips" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 900 }}>
+              {/* Table header */}
+              <div style={{ display: "grid", gridTemplateColumns: "100px 2fr 150px 1.3fr 1.3fr 110px 90px", gap: 16, padding: "14px 24px", borderBottom: "1px solid #F1F5F9", background: "rgba(248,250,252,0.8)" }}>
+                {["TRIP ID & TYPE", "ROUTE", "SUPERVISOR", "VEHICLE", "DRIVER", "STATUS", "CREATED AT"].map((h) => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{h}</div>
+                ))}
+              </div>
+              {/* Table rows */}
+              <div>
+                {filteredTrips.length === 0 ? (
+                  <div style={{ padding: "48px 24px", textAlign: "center", color: "#94A3B8", fontSize: 13.5 }}>No trips found for this period.</div>
+                ) : (
+                  filteredTrips.map((booking) => {
+                    const { day, time } = fmtCreatedAt(booking.createdAt);
+                    const supName = supervisors.find((s) => s.id === booking.supervisorId)?.name || "Unknown";
+                    const driver  = booking.driverId ? drivers.find((d) => d.id === booking.driverId) : null;
+                    const driverName  = driver?.name ?? null;
+                    const vehicle     = driver?.vehicle ?? null;
+                    const vehicleReg  = driver?.vehicleReg ?? null;
+
+                    return (
+                      <div key={booking.id} style={{ display: "grid", gridTemplateColumns: "100px 2fr 150px 1.3fr 1.3fr 110px 90px", gap: 16, padding: "14px 24px", borderBottom: "1px solid #F8FAFC", alignItems: "center" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontWeight: 800, fontSize: 13, color: "#111827" }}>{booking.bookingRef ?? "—"}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", alignSelf: "flex-start", padding: "1px 6px", borderRadius: 4, background: "#EEF2FF", color: A, fontSize: 10, fontWeight: 700 }}>{booking.type}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, paddingRight: 16, overflow: "hidden" }}>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{booking.pickupLocation.split(",")[0]}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ width: 56, height: 2, borderRadius: 99, background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
+                            <ArrowRight size={12} color={A} />
+                          </div>
+                          <span style={{ fontSize: 12, color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{booking.dropLocation.split(",")[0]}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{supName}</span>
+                          {booking.bookingSource && (
+                            <span style={{ display: "inline-flex", alignSelf: "flex-start", padding: "1px 8px", borderRadius: 6, background: "#E2E8F0", border: "1px solid #CBD5E1", fontSize: 11, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>{booking.bookingSource}</span>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                          {driverName ? (
+                            <>
+                              <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vehicleReg || vehicle || "Unknown"}</span>
+                              {vehicleReg && vehicle && <span style={{ fontSize: 11, fontWeight: 600, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vehicle}</span>}
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 13, color: "#CBD5E1", fontStyle: "italic" }}>—</span>
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          {driverName
+                            ? <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{driverName}</span>
+                            : <span style={{ fontSize: 13, color: "#CBD5E1", fontStyle: "italic" }}>—</span>}
+                        </div>
+                        <div>
+                          <StatusBadge status={booking.status as "Completed" | "Active" | "Scheduled"} size="sm" />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{day}</span>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: "#94A3B8", marginTop: 2 }}>{time}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      )}
 
       {companyVisualize && (() => {
         const palette = [A, "#93C5FD", "#FB923C", "#10B981", "#A78BFA", "#F472B6", "#FBBF24", "#22D3EE", "#34D399", "#F87171"];

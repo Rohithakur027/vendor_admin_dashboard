@@ -284,6 +284,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
       { key: "driving_license" as const, label: "Driving License"   },
       { key: "insurance"       as const, label: "Vehicle Insurance" },
       { key: "tax_certificate" as const, label: "Vehicle Tax"       },
+      { key: "vehicle_rc"      as const, label: "Vehicle RC"        },
     ];
 
     return (

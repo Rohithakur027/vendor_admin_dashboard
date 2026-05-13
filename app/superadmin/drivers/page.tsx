@@ -16,15 +16,62 @@ import {
 
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
+const CARD: React.CSSProperties = {
+  background: "#fff",
+  border: "1.5px solid #E8EEF4",
+  borderRadius: 16,
+  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+  fontFamily: FONT,
+};
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  sub,
+  loading,
+}: {
+  label: string;
+  value: number | string;
+  icon: React.ElementType;
+  sub?: string;
+  loading?: boolean;
+}) {
+  return (
+    <div style={{ ...CARD, padding: "20px 22px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 10 }}>
+          {label}
+        </div>
+        <div style={{ width: 32, height: 32, borderRadius: 9, background: "#F1F5F9", border: "1.5px solid #E8EEF4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon size={16} color="#64748B" />
+        </div>
+      </div>
+      {loading ? (
+        <div style={{ height: 34, width: 60, borderRadius: 8, background: "#F1F5F9", animation: "pulse 1.5s ease-in-out infinite" }} />
+      ) : (
+        <div style={{ fontSize: 34, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{value}</div>
+      )}
+      {sub && (
+        loading
+          ? <div style={{ height: 10, width: 110, borderRadius: 6, background: "#F1F5F9", marginTop: 12, animation: "pulse 1.5s ease-in-out infinite" }} />
+          : <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8, fontWeight: 500 }}>{sub}</div>
+      )}
+    </div>
+  );
+}
+
 type StatusFilter = "All" | "Available" | "On Trip" | "Offline";
 
-function fmtDateTime(iso: string) {
-  const d = new Date(iso);
-  return (
-    d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) +
-    " " +
-    d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
-  );
+function formatDateStrings(iso: string) {
+  try {
+    const d = new Date(iso);
+    const day  = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });
+    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
+    return { day, time };
+  } catch {
+    return { day: "Unknown", time: "00:00 am" };
+  }
 }
 
 function fmtPhone(phone: string) {
@@ -75,35 +122,19 @@ export default function SuperAdminDriversPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
 
       {/* ── Stat cards ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
-        {[
-          { label: "Total Drivers", value: loading ? "—" : totalCt,     icon: Users },
-          { label: "On Trip",       value: loading ? "—" : onTripCt,    icon: Navigation },
-          { label: "Available",     value: loading ? "—" : availableCt, icon: CircleCheck },
-          { label: "Offline",       value: loading ? "—" : offlineCt,   icon: WifiOff },
-        ].map(({ label, value, icon: Icon }) => (
-          <div key={label} style={{
-            background: "#fff", borderRadius: 14, border: "1.5px solid #E8EEF4",
-            padding: "16px 18px", display: "flex", alignItems: "center", gap: 14,
-          }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, background: "#F1F5F9",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
-              <Icon className="h-5 w-5" style={{ color: "#64748B" }} />
-            </div>
-            <div>
-              {loading ? (
-                <Skeleton className="h-[22px] w-12 mb-1.5" />
-              ) : (
-                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{value}</p>
-              )}
-              <p style={{ fontSize: 11.5, color: "#64748B", marginTop: 3 }}>{label}</p>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
+        <StatCard loading={loading} label="Total Drivers" value={totalCt} icon={Users} />
+        <StatCard loading={loading} label="On Trip" value={onTripCt} icon={Navigation} />
+        <StatCard loading={loading} label="Available" value={availableCt} icon={CircleCheck} />
+        <StatCard loading={loading} label="Offline" value={offlineCt} icon={WifiOff} />
       </div>
 
       {/* ── Toolbar ── */}
@@ -134,7 +165,7 @@ export default function SuperAdminDriversPage() {
 
       {/* ── Table ── */}
       {(() => {
-        const COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_minmax(0,1.4fr)]";
+        const COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.4fr)]";
         const ROW  = `grid ${COLS} items-center gap-8 px-7 py-4`;
         return (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -143,8 +174,8 @@ export default function SuperAdminDriversPage() {
             <div className={`grid ${COLS} items-center gap-8 px-7 py-3.5 border-b border-slate-100 bg-slate-50/50`}>
               <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">DRIVER</div>
               <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">PHONE</div>
+              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">VEHICLE</div>
               <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-center">STATUS</div>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-center">TRIPS</div>
               <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-right">LAST ACTIVE</div>
             </div>
 
@@ -158,9 +189,12 @@ export default function SuperAdminDriversPage() {
                       <Skeleton className="h-3 w-2/5" />
                     </div>
                     <Skeleton className="h-3.5 w-32" />
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3.5 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
                     <div className="flex justify-center"><Skeleton className="h-6 w-20 rounded-full" /></div>
-                    <div className="flex justify-center"><Skeleton className="h-3.5 w-5" /></div>
-                    <div className="flex justify-end"><Skeleton className="h-3 w-36" /></div>
+                    <div className="flex justify-end"><Skeleton className="h-8 w-24" /></div>
                   </div>
                 ))
               ) : error ? (
@@ -170,39 +204,61 @@ export default function SuperAdminDriversPage() {
                   <p className="text-sm font-medium text-slate-500">No drivers found.</p>
                 </div>
               ) : (
-                drivers.map((d) => (
-                  <div
-                    key={d.id}
-                    onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
-                    className={`${ROW} hover:bg-slate-50 transition-colors cursor-pointer`}
-                  >
-                    {/* Driver — widest, left */}
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-extrabold text-[#111827] text-[13.5px] truncate leading-snug">{d.name}</span>
-                      <span className="text-[11px] text-slate-400 font-medium mt-0.5">{d.driverRef ?? d.id}</span>
+                drivers.map((d) => {
+                  const vehicles = (d as any).vehicles || (d.vehicle ? [d.vehicle] : []);
+                  const mainVehicle = vehicles[0];
+
+                  return (
+                    <div
+                      key={d.id}
+                      onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
+                      className={`${ROW} hover:bg-slate-50 transition-colors cursor-pointer`}
+                    >
+                      {/* Driver — widest, left */}
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-extrabold text-[#111827] text-[13.5px] truncate leading-snug">{d.name}</span>
+                        <span className="text-[11px] text-slate-400 font-medium mt-0.5">{d.driverRef ?? d.id}</span>
+                      </div>
+
+                      {/* Phone — left */}
+                      <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>
+
+                      {/* Vehicle */}
+                      <div className="flex flex-col gap-px min-w-0">
+                        {mainVehicle ? (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[13px] font-medium text-slate-600 truncate">
+                                {mainVehicle.plateNumber ?? mainVehicle.plate ?? "N/A"}
+                              </span>
+                              {vehicles.length > 1 && (
+                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-bold ring-1 ring-inset ring-blue-100/50 whitespace-nowrap">
+                                  +{vehicles.length - 1}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-500 truncate">
+                              {mainVehicle.model || "Unknown Model"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[13px] text-slate-300 font-medium italic">—</span>
+                        )}
+                      </div>
+
+                      {/* Status — centered */}
+                      <div className="flex justify-center">
+                        <StatusBadge status={d.status} size="sm" />
+                      </div>
+
+                      {/* Last Active — right-flush */}
+                      <div className="flex flex-col text-right items-end justify-center gap-0.5 whitespace-nowrap">
+                        <span className="text-[13px] font-medium text-slate-700">{formatDateStrings(d.lastActiveAt).day}</span>
+                        <span className="text-[11px] text-slate-400 font-medium">{formatDateStrings(d.lastActiveAt).time}</span>
+                      </div>
                     </div>
-
-                    {/* Phone — left */}
-                    <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>
-
-                    {/* Status — centered */}
-                    <div className="flex justify-center">
-                      <StatusBadge status={d.status} size="sm" />
-                    </div>
-
-                    {/* Trips — centered anchor */}
-                    <div className="flex justify-center">
-                      <span className={`text-[14px] font-bold ${d.totalTrips === 0 ? "text-slate-300" : "text-slate-800"}`}>
-                        {d.totalTrips}
-                      </span>
-                    </div>
-
-                    {/* Last Active — right-flush */}
-                    <span className="text-[12.5px] text-slate-500 font-medium whitespace-nowrap text-right">
-                      {fmtDateTime(d.lastActiveAt)}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

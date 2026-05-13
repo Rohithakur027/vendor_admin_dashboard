@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 import { useVendor } from "@/context/VendorContext";
@@ -9,13 +9,102 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, Route, ArrowRight } from "lucide-react";
-import type { Booking, BookingStatus } from "@/modules/bookings/types";
+import type { Booking } from "@/modules/bookings/types";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
+import { vendorsApi } from "@/lib/api";
+
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (document.getElementById("razorpay-script")) { resolve(true); return; }
+    const s = document.createElement("script");
+    s.id  = "razorpay-script";
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload  = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 
 export default function DashboardPage() {
-  const { supervisors, bookings, vendorWallet, isLoading, apiCounts } = useVendor();
+  const { supervisors, bookings, vendorWallet, isLoading, apiCounts, refreshWallet } = useVendor();
   const router = useRouter();
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
+  // ── Recharge modal ──
+  const [modalOpen,  setModalOpen]  = useState(false);
+  const [amount,     setAmount]     = useState("");
+  const [paying,     setPaying]     = useState(false);
+  const [payError,   setPayError]   = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState<string | null>(null);
+
+  const handleRecharge = useCallback(async () => {
+    const amt = Number(amount);
+    if (!amt || amt < 100 || amt > 100_000) { setPayError("Enter an amount between ₹100 and ₹1,00,000"); return; }
+    setPayError(null);
+    setPaying(true);
+    try {
+      const loaded = await loadRazorpayScript();
+      if (!loaded) { setPayError("Failed to load payment gateway. Check your connection."); setPaying(false); return; }
+
+      const orderRes = await vendorsApi.wallet.createOrder(amt);
+      const { order_id, amount: orderAmount, currency, key_id } = orderRes.data;
+
+      const rzp = new window.Razorpay({
+        key: key_id, amount: orderAmount, currency, order_id,
+        name: "SK Travels", description: "Wallet Recharge",
+        theme: { color: "#2563EB" },
+        // Whitelist of methods we want offered. PayLater is intentionally
+        // omitted. Razorpay still only renders methods that are also enabled
+        // on the merchant account — if UPI is disabled in the dashboard, no
+        // amount of client config will make it appear.
+        method: {
+          upi:        true,
+          card:       true,
+          netbanking: true,
+          wallet:     true,
+          emi:        true,
+        },
+        // Feature UPI as the top block in the checkout. show_default_blocks
+        // stays true so card/netbanking/wallet still appear naturally below.
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay using UPI",
+                instruments: [{ method: "upi" }],
+              },
+            },
+            sequence: ["block.upi"],
+            preferences: { show_default_blocks: true },
+          },
+        },
+        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          try {
+            await vendorsApi.wallet.verify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              amount:              amt,
+            });
+            await refreshWallet();
+            setPaySuccess(`₹${amt.toLocaleString("en-IN")} added to your wallet`);
+            setAmount("");
+            setModalOpen(false);
+          } catch { setPayError("Payment received but wallet update failed. Contact support."); }
+          finally  { setPaying(false); }
+        },
+        modal: { ondismiss: () => setPaying(false) },
+      });
+      rzp.open();
+    } catch { setPayError("Could not initiate payment. Please try again."); setPaying(false); }
+  }, [amount, refreshWallet]);
 
   const today = new Date().toISOString().split("T")[0];
   const bookingsToday = bookings.filter((b) => b.createdAt.startsWith(today));
@@ -38,6 +127,46 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Success toast ── */}
+      {paySuccess && (
+        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#DCFCE7", border: "1.5px solid #86EFAC", borderRadius: 12, padding: "12px 18px", fontSize: 13, fontWeight: 700, color: "#15803D", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span>✓</span> {paySuccess}
+          <button onClick={() => setPaySuccess(null)} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#15803D", fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+      )}
+
+      {/* ── Recharge modal ── */}
+      {modalOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 18, padding: "28px 28px 24px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Add Money to Wallet</p>
+              <button onClick={() => { setModalOpen(false); setPayError(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#94A3B8", lineHeight: 1 }}>×</button>
+            </div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Amount (₹)</p>
+            <input
+              type="number" min={100} max={100000} placeholder="e.g. 5000"
+              value={amount} onChange={(e) => { setAmount(e.target.value); setPayError(null); }}
+              style={{ width: "100%", height: 44, border: `1.5px solid ${payError ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 10, padding: "0 14px", fontSize: 15, fontWeight: 700, color: "#0F172A", outline: "none", boxSizing: "border-box", marginBottom: 8 }}
+            />
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {[500, 1000, 2000, 5000].map((q) => (
+                <button key={q} onClick={() => { setAmount(String(q)); setPayError(null); }}
+                  style={{ flex: 1, height: 30, borderRadius: 7, border: `1.5px solid ${amount === String(q) ? "#2563EB" : "#E2E8F0"}`, background: amount === String(q) ? "#EFF6FF" : "#F8FAFC", color: amount === String(q) ? "#2563EB" : "#64748B", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  ₹{q >= 1000 ? `${q / 1000}k` : q}
+                </button>
+              ))}
+            </div>
+            {payError && <p style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 12 }}>{payError}</p>}
+            <button onClick={handleRecharge} disabled={paying}
+              style={{ width: "100%", height: 44, borderRadius: 10, background: paying ? "#93C5FD" : "#2563EB", border: "none", color: "#fff", fontSize: 14, fontWeight: 800, cursor: paying ? "not-allowed" : "pointer" }}>
+              {paying ? "Processing…" : `Pay ₹${Number(amount) > 0 ? Number(amount).toLocaleString("en-IN") : "—"}`}
+            </button>
+            <p style={{ fontSize: 10.5, color: "#94A3B8", textAlign: "center", marginTop: 12 }}>Secured by Razorpay · UPI, Cards, Net Banking, Wallets &amp; EMI</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           title="Total Supervisors"
@@ -70,6 +199,7 @@ export default function DashboardPage() {
             totalLabel: `Total ₹${walletCapacity.toLocaleString("en-IN")}`,
           }}
           loading={isLoading}
+          onAction={{ label: "+ Add Money", onClick: () => { setModalOpen(true); setPayError(null); setPaySuccess(null); } }}
         />
       </div>
 

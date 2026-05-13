@@ -18,9 +18,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     },
   });
 
-  const body = await res.json().catch(() => ({})) as { error?: string; errors?: unknown };
+  const body = await res.json().catch(() => ({})) as { error?: string; message?: string; errors?: unknown };
   if (!res.ok) {
-    throw new Error((body.error as string) ?? `Request failed (${res.status})`);
+    const reason = body.error ?? body.message ?? `Request failed (${res.status})`;
+    throw new Error(reason);
   }
   return body as T;
 }
@@ -53,6 +54,30 @@ export interface MeResponse {
   };
 }
 
+// ── User preferences (column visibility / order) ─────────────────────────────
+
+export interface PreferenceResponse<T = unknown> {
+  success: true;
+  data: { value: T; updatedAt: string } | null;
+}
+export interface PreferenceListResponse {
+  success: true;
+  data: { key: string; value: unknown; updatedAt: string }[];
+}
+
+export const preferencesApi = {
+  list: () => apiFetch<PreferenceListResponse>("/api/preferences"),
+  get:  <T = unknown>(key: string) =>
+    apiFetch<PreferenceResponse<T>>(`/api/preferences/${encodeURIComponent(key)}`),
+  put:  <T = unknown>(key: string, value: T) =>
+    apiFetch<PreferenceResponse<T>>(`/api/preferences/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body:   JSON.stringify({ value }),
+    }),
+  delete: (key: string) =>
+    apiFetch<{ success: true }>(`/api/preferences/${encodeURIComponent(key)}`, { method: "DELETE" }),
+};
+
 export const authApi = {
   login: (email: string, password: string) =>
     apiFetch<LoginResponse>("/api/auth/login", {
@@ -72,6 +97,7 @@ export const authApi = {
 
 export interface CreateVendorPayload {
   name: string;
+  pan?: string;
   contactPerson: string;
   email: string;
   phone: string;
@@ -115,6 +141,20 @@ export const vendorsApi = {
   myWallet: () =>
     apiFetch<{ success: true; data: VendorWalletSnapshot }>("/api/vendor/vendors/me/wallet"),
 
+  wallet: {
+    createOrder: (amount: number) =>
+      apiFetch<{ success: true; data: { order_id: string; amount: number; currency: string; key_id: string } }>(
+        "/api/vendor/wallet/recharge/create-order",
+        { method: "POST", body: JSON.stringify({ amount }) },
+      ),
+
+    verify: (payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; amount: number }) =>
+      apiFetch<{ success: true; data: { new_balance?: number; already_processed?: boolean } }>(
+        "/api/vendor/wallet/recharge/verify",
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+  },
+
   create: (payload: CreateVendorPayload) =>
     apiFetch<{ success: true; data: Vendor }>("/api/superadmin/vendors", {
       method: "POST",
@@ -132,6 +172,20 @@ export const vendorsApi = {
       method: "POST",
       body: JSON.stringify({ amount }),
     }),
+
+  // Razorpay-backed recharge for a specific vendor (superadmin scope).
+  adminWallet: {
+    createOrder: (id: string, amount: number) =>
+      apiFetch<{ success: true; data: { order_id: string; amount: number; currency: string; key_id: string } }>(
+        `/api/superadmin/vendors/${id}/wallet/recharge/create-order`,
+        { method: "POST", body: JSON.stringify({ amount }) },
+      ),
+    verify: (id: string, payload: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string; amount: number }) =>
+      apiFetch<{ success: true; data: { new_balance?: number; already_processed?: boolean } }>(
+        `/api/superadmin/vendors/${id}/wallet/recharge/verify`,
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+  },
 
   transactions: (id: string) =>
     apiFetch<{ success: true; data: WalletTransaction[] }>(`/api/superadmin/vendors/${id}/transactions`),
@@ -277,13 +331,90 @@ export const superadminApi = {
         `/api/superadmin/drivers/${id}/trips${query ? `?${query}` : ""}`,
       );
     },
+
+    locationHistory: (
+      id:    string,
+      range: { from: string; to: string } | { hours: number },
+    ) => {
+      const qs = new URLSearchParams();
+      if ("from" in range) {
+        qs.set("from", range.from);
+        qs.set("to",   range.to);
+      } else {
+        qs.set("hours", String(range.hours));
+      }
+      return apiFetch<DriverLocationHistoryResponse>(
+        `/api/superadmin/drivers/${id}/location-history?${qs.toString()}`,
+      );
+    },
   },
 
   liveMap: {
     snapshot: () =>
       apiFetch<{ success: true; data: LiveDriver[] }>("/api/superadmin/live-map"),
   },
+
+  bookingEnquiries: {
+    listGeneral: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page)   qs.set("page",   String(params.page));
+      if (params?.limit)  qs.set("limit",  String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return apiFetch<{
+        success: true;
+        data: GeneralBookingEnquiry[];
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/superadmin/booking-enquiries/general${q ? `?${q}` : ""}`);
+    },
+
+    listSpecial: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page)   qs.set("page",   String(params.page));
+      if (params?.limit)  qs.set("limit",  String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return apiFetch<{
+        success: true;
+        data: SpecialBookingInquiry[];
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/superadmin/booking-enquiries/special${q ? `?${q}` : ""}`);
+    },
+  },
 };
+
+export interface GeneralBookingEnquiry {
+  id:              string;
+  createdAt:       string | null;
+  isScheduled:     boolean;
+  scheduledAt:     string | null;
+  pickupLocation:  string;
+  destination:     string;
+  distanceKm:      number | null;
+  bookingType:     string | null;
+  vehicleType:     string | null;
+  passengers:      number;
+  customerName:    string;
+  customerEmail:   string;
+  customerMobile:  string;
+  status:          string | null;
+  notes:           string | null;
+}
+
+export interface SpecialBookingInquiry {
+  id:          string;
+  firstName:   string;
+  lastName:    string;
+  email:       string;
+  phone:       string;
+  companyName: string;
+  message:     string;
+  status:      string;
+  notes:       string | null;
+  createdAt:   string | null;
+}
 
 export interface LiveDriver {
   driver_id:  string;
@@ -326,6 +457,7 @@ export interface DriverDocuments {
   driving_license: DriverDocument;
   insurance:       DriverDocument;
   tax_certificate: DriverDocument;
+  vehicle_rc:      DriverDocument;
 }
 
 export interface DriverTripItem {
@@ -355,6 +487,34 @@ export interface DriverTripsResponse {
     scheduledFare:  number;
   };
   weekDays: { date: string; total: number; bookings: number }[];
+}
+
+// ── Driver Location History ──────────────────────────────────────────────────
+
+export interface LocationHistoryPoint {
+  lat:         number;
+  lng:         number;
+  speed:       number | null;
+  bearing:     number | null;
+  recorded_at: string;
+}
+
+export interface DriverLocationHistoryResponse {
+  success: true;
+  data: {
+    driver: {
+      id:               string;
+      name:             string;
+      driver_ref:       string | null;
+      current_location: { lat: number; lng: number } | null;
+    };
+    history:      LocationHistoryPoint[];
+    total_points: number;
+    range: {
+      from: string;
+      to:   string;
+    };
+  };
 }
 
 // ── Superadmin — Driver Onboarding ──────────────────────────────────────────
@@ -508,6 +668,8 @@ export interface OverviewDriver {
   name: string;
   status: string;
   bookingsToday: number;
+  vehicle: string | null;
+  vehicleModel: string | null;
 }
 
 export interface OverviewData {
@@ -546,6 +708,7 @@ export interface TripApiItem {
   vehicleType: string | null;
   vehicleColor: string | null;
   vehicleMakeYear: number | null;
+  completedAt: string | null;
 }
 
 // ── Supervisor Report ────────────────────────────────────────────────────────
@@ -740,15 +903,25 @@ export interface InvoiceTripItem {
   pickupAddress:  string;
   dropAddress:    string;
   pickupTime:     string;
+  dropTime?:      string | null;
   fare:           number;
   supervisorName: string;
   driverName:     string;
+  driverId?:      string | null;
+  driverPhone?:   string | null;
+  vehicleModel?:  string | null;
+  vehicleReg?:    string | null;
+  passengers?:    number | null;
+  distanceKm?:    number | null;
+  tollCharges?:   number | null;
+  bookingType?:   string | null;
 }
 
 export interface InvoiceDetail extends InvoiceListItem {
-  paymentRef: string | null;
-  notes:      string | null;
-  trips:      InvoiceTripItem[];
+  paymentRef:     string | null;
+  notes:          string | null;
+  companyAddress: string | null;
+  trips:          InvoiceTripItem[];
 }
 
 export interface InvoiceSummary {
@@ -777,6 +950,11 @@ export const invoicesApi = {
 
   get: (id: string) =>
     apiFetch<{ success: true; data: InvoiceDetail }>(`/api/vendor/invoices/${id}`),
+
+  preview: (params: { companyId: string; periodFrom: string; periodTo: string }) => {
+    const qs = new URLSearchParams({ companyId: params.companyId, periodFrom: params.periodFrom, periodTo: params.periodTo });
+    return apiFetch<{ success: true; data: { tripCount: number; total: number; trips: InvoiceTripItem[] } }>(`/api/vendor/invoices/preview?${qs.toString()}`);
+  },
 
   create: (payload: { companyId: string; periodFrom: string; periodTo: string; notes?: string }) =>
     apiFetch<{ success: true; data: InvoiceDetail }>("/api/vendor/invoices", {

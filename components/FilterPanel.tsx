@@ -31,7 +31,7 @@ export function FilterPanel({
   const computePos = useCallback(() => {
     if (anchorRef.current) {
       const r = anchorRef.current.getBoundingClientRect();
-      setPanelPos({ top: r.top + 8, right: window.innerWidth - r.right });
+      setPanelPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
     }
   }, []);
 

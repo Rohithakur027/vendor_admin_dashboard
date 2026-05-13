@@ -26,6 +26,7 @@ export interface Booking {
   scheduledTime: string | null;
   status: BookingStatus;
   createdAt: string;
+  completedAt?: string | null;
   fare?: number;              // trip fare in ₹
   passengers?: number;        // number of passengers
   bookingSource?: string;    // company name or "Individual"
@@ -37,4 +38,5 @@ export interface Booking {
   // Live tracking
   bookingRef?: string | null;
   driverPhone?: string | null;
+  pickupTime?: string | null;
 }

@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useVendor } from "@/context/VendorContext";
+import { DriverHistoryMap } from "@/components/DriverHistoryMap";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft, Route, TrendingUp, Circle,
@@ -194,6 +195,7 @@ export default function DriverProfilePage() {
     { value: "overview", label: "Overview" },
     { value: "trips",    label: "Recent Trips" },
     { value: "earnings", label: "Earnings" },
+    { value: "history",  label: "Location History" },
     { value: "settings", label: "Settings" },
   ];
 
@@ -685,6 +687,27 @@ export default function DriverProfilePage() {
               })}
             </div>
           </div>
+        </div>
+      ))}
+
+      {/* ══ TAB: LOCATION HISTORY ══ */}
+      {activeTab === "history" && (isLoading || !driver ? (
+        <div style={{ ...CARD_STYLE, padding: "20px 24px" }}>
+          <Skeleton className="h-5 w-48 mb-4" />
+          <Skeleton className="h-[380px] w-full rounded-xl" />
+        </div>
+      ) : (
+        <div style={{ ...CARD_STYLE, padding: "20px 24px" }}>
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Location History</p>
+            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>GPS route replay for {driver.name}</p>
+          </div>
+          <DriverHistoryMap
+            driverId={String(id)}
+            driverName={driver.name}
+            hours={12}
+            apiBase="/api/vendor/drivers"
+          />
         </div>
       ))}
 

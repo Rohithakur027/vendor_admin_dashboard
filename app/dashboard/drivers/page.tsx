@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { DriverTable } from "@/modules/drivers/components/DriverTable";
 import { DriverFilters } from "@/modules/drivers/components/DriverFilters";
-import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
+import { SkeletonInline } from "@/components/ui/skeleton";
 import type { DriverStatus } from "@/modules/drivers/types";
 import { Info } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
+
+const TABLE_KEY = "drivers" as const;
 
 export default function DriversPage() {
   const { drivers, isLoading, apiCounts } = useVendor();
+  const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences(TABLE_KEY);
+  const spec = getTableSpec(TABLE_KEY);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<DriverStatus | "All">("All");
 
@@ -21,12 +31,39 @@ export default function DriversPage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Count how many API items made it through the filter — that's where the separator goes
   const apiInFiltered = filtered.filter((d) => {
     const idx = drivers.findIndex((x) => x.id === d.id);
     return idx < apiCounts.drivers;
   }).length;
   const splitAt = apiInFiltered > 0 && apiInFiltered < filtered.length ? apiInFiltered : undefined;
+
+  const gridTemplate = useMemo(() =>
+    visibleCols.map(key => {
+      const col = spec.columns.find(c => c.key === key);
+      return col ? `minmax(${col.minWidth}px, 1fr)` : "1fr";
+    }).join(" "),
+    [visibleCols, spec.columns],
+  );
+
+  const minTableWidth = useMemo(
+    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 48,
+    [visibleCols, spec.columns],
+  );
+
+  function handleExport() {
+    const rows = filtered.map((d) => ({
+      "Driver Ref":  d.driverRef ?? d.id,
+      "Name":        d.name,
+      "Phone":       d.phone,
+      "Status":      d.status,
+      "Supervisor":  d.assignedSupervisorName ?? "",
+      "Vehicle":     d.vehicle ?? "",
+      "Vehicle Reg": d.vehicleReg ?? "",
+      "Total Trips": d.totalTrips,
+      "Last Active": new Date(d.lastActive).toLocaleString("en-IN"),
+    }));
+    exportToCsv("drivers", rows);
+  }
 
   return (
     <div className="space-y-4">
@@ -34,11 +71,7 @@ export default function DriversPage() {
         <div>
           <h2 className="text-lg font-semibold">Drivers</h2>
           <p className="text-sm text-muted-foreground">
-            {isLoading ? (
-              <SkeletonInline className="h-3 w-8" />
-            ) : (
-              drivers.length
-            )} associated drivers
+            {isLoading ? <SkeletonInline className="h-3 w-8" /> : drivers.length} associated drivers
           </p>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg">
@@ -47,14 +80,28 @@ export default function DriversPage() {
         </div>
       </div>
 
-      <DriverFilters
-        search={search}
-        onSearchChange={setSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-      />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex-1">
+          <DriverFilters
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+          />
+        </div>
+        <ColumnsPopover tableKey={TABLE_KEY} visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
+        <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} />
+      </div>
 
-      <DriverTable drivers={filtered} splitAt={splitAt} loading={isLoading} />
+      <DriverTable
+        drivers={filtered}
+        splitAt={splitAt}
+        loading={isLoading}
+        visibleCols={visibleCols}
+        gridTemplate={gridTemplate}
+        minTableWidth={minTableWidth}
+        prefsLoading={prefsLoading}
+      />
     </div>
   );
 }
