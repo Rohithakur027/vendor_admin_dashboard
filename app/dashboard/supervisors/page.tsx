@@ -1,17 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { SupervisorTable } from "@/modules/supervisors/components/SupervisorTable";
 import { SupervisorDrawer } from "@/modules/supervisors/components/SupervisorDrawer";
 import { SupervisorFilters } from "@/modules/supervisors/components/SupervisorFilters";
 import { Button } from "@/components/ui/button";
-import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
+import { SkeletonInline } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import type { Supervisor, SupervisorFormData, SupervisorStatus } from "@/modules/supervisors/types";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
+
+const TABLE_KEY = "supervisors" as const;
 
 export default function SupervisorsPage() {
   const { supervisors, addSupervisor, updateSupervisor, deleteSupervisor, isLoading, apiCounts } = useVendor();
+  const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences(TABLE_KEY);
+  const spec = getTableSpec(TABLE_KEY);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Supervisor | null>(null);
@@ -32,6 +40,19 @@ export default function SupervisorsPage() {
   }).length;
   const splitAt = apiInFiltered > 0 && apiInFiltered < filtered.length ? apiInFiltered : undefined;
 
+  const gridTemplate = useMemo(() =>
+    visibleCols.map(key => {
+      const col = spec.columns.find(c => c.key === key);
+      return col ? `minmax(${col.minWidth}px, 1fr)` : "1fr";
+    }).join(" "),
+    [visibleCols, spec.columns],
+  );
+
+  const minTableWidth = useMemo(
+    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 48,
+    [visibleCols, spec.columns],
+  );
+
   function handleEdit(supervisor: Supervisor) {
     setEditTarget(supervisor);
     setDrawerOpen(true);
@@ -40,11 +61,8 @@ export default function SupervisorsPage() {
   async function handleSubmit(data: SupervisorFormData): Promise<void> {
     if (editTarget) {
       updateSupervisor(editTarget.id, {
-        name:      data.name,
-        email:     data.email,
-        phone:     data.phone,
-        status:    data.status,
-        companies: data.companies,
+        name: data.name, email: data.email, phone: data.phone,
+        status: data.status, companies: data.companies,
       });
       return;
     }
@@ -56,17 +74,27 @@ export default function SupervisorsPage() {
     setEditTarget(null);
   }
 
+  function handleExport() {
+    const rows = filtered.map((s) => ({
+      "Ref":     s.ref ?? "",
+      "Name":    s.name,
+      "Email":   s.email,
+      "Phone":   s.phone,
+      "Status":  s.status,
+      "Zone":    s.zone ?? "",
+      "Wallet Used": s.walletUsed ?? 0,
+      "Joined On":   s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN") : "",
+    }));
+    exportToCsv("supervisors", rows);
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Supervisors</h2>
           <p className="text-sm text-muted-foreground">
-            {isLoading ? (
-              <SkeletonInline className="h-3 w-8" />
-            ) : (
-              supervisors.length
-            )} total supervisors
+            {isLoading ? <SkeletonInline className="h-3 w-8" /> : supervisors.length} total supervisors
           </p>
         </div>
         <Button
@@ -81,12 +109,17 @@ export default function SupervisorsPage() {
         </Button>
       </div>
 
-      <SupervisorFilters
-        search={search}
-        onSearchChange={setSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-      />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex-1">
+          <SupervisorFilters
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+          />
+        </div>
+        <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} />
+      </div>
 
       <SupervisorTable
         supervisors={filtered}
@@ -94,6 +127,10 @@ export default function SupervisorsPage() {
         onDelete={deleteSupervisor}
         splitAt={splitAt}
         loading={isLoading}
+        visibleCols={visibleCols}
+        gridTemplate={gridTemplate}
+        minTableWidth={minTableWidth}
+        prefsLoading={prefsLoading}
       />
 
       <SupervisorDrawer

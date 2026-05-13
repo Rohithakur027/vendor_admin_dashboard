@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import TripInvoiceView from "./TripInvoiceView";
 import { Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText, Loader2, Ban, ChevronDown, CalendarDays } from "lucide-react";
+import { exportToCsv } from "@/lib/exportCsv";
 import {
   invoicesApi,
   companiesApi,
   type InvoiceListItem,
   type InvoiceDetail,
   type InvoiceSummary,
-  type InvoiceTripItem,
   type CompanyApiItem,
 } from "@/lib/api";
 import { DateRangePicker } from "@/modules/reports/DateRangePicker";
 import { toIsoDate } from "@/modules/reports/primitives";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
 
 const A    = "#2563EB";
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -51,53 +55,6 @@ function effectiveStatus(inv: { status: InvStatus; dueDate: string }): InvStatus
   return inv.status;
 }
 
-function generatePDF(inv: InvoiceDetail, vendorName: string) {
-  const sc = SC[inv.status];
-  const rowsHtml = inv.trips.map((t, i) => `
-    <tr>
-      <td>${i+1}</td>
-      <td style="font-family:monospace">${t.tripRef || "—"}</td>
-      <td>${t.supervisorName || "—"}</td>
-      <td>${t.pickupTime ? new Date(t.pickupTime).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—"}</td>
-      <td>${(t.pickupAddress || "").split(",")[0]} → ${(t.dropAddress || "").split(",")[0]}</td>
-      <td style="text-align:right;font-weight:700">₹${(t.fare||0).toLocaleString("en-IN")}</td>
-    </tr>`).join("");
-  const total = inv.trips.reduce((s,t)=>s+(t.fare||0),0);
-  const html = `<!DOCTYPE html><html><head><title>${inv.invoiceNumber}</title><style>
-    *{box-sizing:border-box}body{font-family:sans-serif;padding:40px;color:#0f172a;max-width:820px;margin:0 auto}
-    .hdr{display:flex;justify-content:space-between;margin-bottom:32px}
-    .logo{font-size:22px;font-weight:800}.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:${sc.bg};color:${sc.text}}
-    .meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;background:#f8fafc;border-radius:10px;margin-bottom:24px}
-    .lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}.val{font-size:15px;font-weight:700}
-    table{width:100%;border-collapse:collapse;margin-top:4px}
-    th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;border-bottom:1px solid #e8eef4}
-    td{padding:9px 12px;font-size:12px;border-bottom:1px solid #f1f5f9}
-    .tot td{font-weight:700;font-size:14px;border-top:2px solid #e8eef4;padding-top:12px}
-    @media print{body{padding:20px}}
-  </style></head><body>
-  <div class="hdr">
-    <div><div class="logo">${vendorName}</div><div style="font-size:12px;color:#64748b;margin-top:3px">Tax Invoice</div></div>
-    <div style="text-align:right">
-      <div style="font-size:18px;font-weight:800">${inv.invoiceNumber}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:4px">Issued: ${fmtDate(inv.issuedAt)}</div>
-      <div style="margin-top:6px"><span class="badge">${inv.status}</span></div>
-    </div>
-  </div>
-  <div class="meta">
-    <div><div class="lbl">Bill To</div><div class="val">${inv.companyName}</div></div>
-    <div><div class="lbl">Billing Period</div><div class="val">${fmtPeriod(inv.periodFrom, inv.periodTo)}</div></div>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Trip ID</th><th>Supervisor</th><th>Date</th><th>Route</th><th style="text-align:right">Fare</th></tr></thead>
-    <tbody>${rowsHtml}</tbody>
-    <tfoot><tr class="tot"><td colspan="5" style="text-align:right">Total Amount</td><td style="text-align:right;font-size:16px">₹${total.toLocaleString("en-IN")}</td></tr></tfoot>
-  </table>
-  </body></html>`;
-  const w = window.open("","_blank");
-  if (!w) return;
-  w.document.write(html); w.document.close();
-  setTimeout(() => { w.focus(); w.print(); }, 400);
-}
 
 function DrawerPanel({ open, onClose, children }: { open:boolean; onClose:()=>void; children:React.ReactNode }) {
   return (
@@ -119,9 +76,9 @@ function DrawerPanel({ open, onClose, children }: { open:boolean; onClose:()=>vo
 function StatusBadge({ status }: { status: InvStatus }) {
   const s = SC[status];
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:4, background:s.bg, color:s.text,
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:s.bg, color:s.text,
       border:`1px solid ${s.border}`, borderRadius:20, fontSize:11, fontWeight:700,
-      padding:"3px 10px", whiteSpace:"nowrap" }}>
+      padding:"3px 8px 3px 7px", whiteSpace:"nowrap" }}>
       <span style={{ width:5, height:5, borderRadius:"50%", background:s.dot, flexShrink:0 }}/>
       {status}
     </span>
@@ -158,12 +115,56 @@ function TripsMiniTable({ rows, total }: { rows: InvoiceTripItem[]; total: numbe
   );
 }
 
+function TripsMiniTableSkeleton() {
+  const bar = (w: string, h = 10) => (
+    <div className="animate-pulse" style={{ height:h, borderRadius:5, background:"#E2E8F0", width:w }}/>
+  );
+  return (
+    <div style={{ border:"1.5px solid #E8EEF4", borderRadius:12, overflow:"hidden" }}>
+      {/* header */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"9px 14px", background:"#F8FAFC", borderBottom:"1px solid #E8EEF4" }}>
+        {bar("55%")} {bar("60%")} {bar("50%")}
+      </div>
+      {/* rows */}
+      {[...Array(4)].map((_, i) => (
+        <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"13px 14px", borderBottom:"1px solid #F1F5F9", alignItems:"center" }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+            {bar("40%", 9)} {bar("70%", 8)}
+          </div>
+          {bar("65%", 9)} {bar("55%", 11)}
+        </div>
+      ))}
+      {/* footer */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"11px 14px", background:"#F8FAFC", borderTop:"2px solid #E8EEF4", alignItems:"center" }}>
+        <div style={{ gridColumn:"1/3" }}>{bar("30%", 10)}</div>
+        {bar("60%", 12)}
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════
    PAGE
 ══════════════════════════════════════ */
 export default function InvoicingPage() {
-  const vendorName = "SK Travels";
-  const todayStr   = toIsoDate(new Date());
+  const todayStr = toIsoDate(new Date());
+
+  const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences("invoices");
+  const spec = getTableSpec("invoices");
+
+  const gridTemplate = useMemo(() => {
+    // Always append a fixed 110px column for the Download action
+    const dataCols = visibleCols.map(key => {
+      const col = spec.columns.find(c => c.key === key);
+      return col ? `${col.minWidth}px` : "100px";
+    }).join(" ");
+    return `${dataCols} 110px`;
+  }, [visibleCols, spec.columns]);
+
+  const minTableWidth = useMemo(
+    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 110 + 40,
+    [visibleCols, spec.columns],
+  );
 
   const [invoices,    setInvoices]    = useState<InvoiceListItem[]>([]);
   const [summary,     setSummary]     = useState<InvoiceSummary>({ totalBilled: 0, collected: 0, outstanding: 0, totalCount: 0, paidCount: 0, unpaidCount: 0 });
@@ -187,6 +188,10 @@ export default function InvoicingPage() {
   const [generating,  setGenerating]  = useState(false);
   const [generateErr, setGenerateErr] = useState<string | null>(null);
   const [generatedInv, setGeneratedInv] = useState<InvoiceDetail | null>(null);
+  const [previewTrips,   setPreviewTrips]   = useState<InvoiceTripItem[]>([]);
+  const [previewTotal,   setPreviewTotal]   = useState(0);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewErr,     setPreviewErr]     = useState<string | null>(null);
 
   const [viewInv,     setViewInv]     = useState<InvoiceDetail | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
@@ -194,6 +199,11 @@ export default function InvoicingPage() {
   const [marking,     setMarking]     = useState(false);
   const [voiding,     setVoiding]     = useState(false);
   const [hovRow,      setHovRow]      = useState<number|null>(null);
+  const [exportMenu,    setExportMenu]    = useState<string|null>(null);
+  const [statusMenu,    setStatusMenu]    = useState<string|null>(null);
+  const [changingStatus, setChangingStatus] = useState<string|null>(null);
+  const [previewInv,     setPreviewInv]     = useState<InvoiceDetail | null>(null);
+  const [previewMode,    setPreviewMode]    = useState<"summary"|"detailed"|"auto">("auto");
 
   const step1Valid = !!selCompany && !!periodFrom && !!periodTo;
 
@@ -221,12 +231,29 @@ export default function InvoicingPage() {
     setSelCompany(""); setCompanyOpen(false);
     setPeriodFrom(todayStr); setPeriodTo(todayStr); setPickerOpen(false);
     setNotes("");
-    setStep(1); setGenerateErr(null); setGeneratedInv(null); setDrawerMode("new");
+    setStep(1); setGenerateErr(null); setGeneratedInv(null);
+    setPreviewTrips([]); setPreviewTotal(0); setPreviewErr(null);
+    setDrawerMode("new");
   }
   function closeDrawer() {
     setDrawerMode(null);
     setCompanyOpen(false); setPickerOpen(false);
     setViewInv(null); setViewError(null); setGeneratedInv(null); setGenerateErr(null);
+  }
+
+  async function goToStep2() {
+    if (!step1Valid) return;
+    setPreviewLoading(true); setPreviewErr(null); setPreviewTrips([]); setPreviewTotal(0);
+    setStep(2);
+    try {
+      const res = await invoicesApi.preview({ companyId: selCompany, periodFrom, periodTo });
+      setPreviewTrips(res.data.trips);
+      setPreviewTotal(res.data.total);
+    } catch (err) {
+      setPreviewErr(err instanceof Error ? err.message : "Failed to load trips");
+    } finally {
+      setPreviewLoading(false);
+    }
   }
 
   async function confirmGenerate() {
@@ -292,13 +319,40 @@ export default function InvoicingPage() {
     }
   }
 
-  async function downloadPdfFromList(id: string) {
+  async function quickChangeStatus(invId: string, action: "paid" | "void") {
+    if (changingStatus) return;
+    setChangingStatus(invId);
+    setStatusMenu(null);
+    try {
+      if (action === "paid") await invoicesApi.markPaid(invId);
+      else await invoicesApi.void(invId);
+      void reload();
+    } catch { /* best-effort */ } finally {
+      setChangingStatus(null);
+    }
+  }
+
+  async function viewInvoicePdf(id: string, mode: "summary"|"detailed") {
     try {
       const res = await invoicesApi.get(id);
-      generatePDF(res.data, vendorName);
-    } catch {
-      // best-effort; ignore
-    }
+      setPreviewMode(mode);
+      setPreviewInv(res.data);
+    } catch { /* best-effort */ }
+  }
+
+  function handleExportCsv() {
+    const rows = invoices.map((inv) => ({
+      "Invoice Number": inv.invoiceNumber,
+      "Company":        inv.companyName,
+      "Period From":    inv.periodFrom,
+      "Period To":      inv.periodTo,
+      "Amount (₹)":    inv.amount,
+      "Status":         effectiveStatus(inv),
+      "Issued At":      fmtDate(inv.issuedAt),
+      "Due Date":       fmtDate(inv.dueDate),
+      "Trip Count":     inv.tripCount,
+    }));
+    exportToCsv("invoices", rows);
   }
 
   const selCompanyName = companies.find(c => c.id === selCompany)?.name ?? "";
@@ -308,7 +362,8 @@ export default function InvoicingPage() {
 
   /* ── RENDER ── */
   return (
-    <div style={{ fontFamily:FONT, color:"#0F172A", display:"flex", flexDirection:"column", gap:20 }}>
+    <div style={{ fontFamily:FONT, color:"#0F172A", display:"flex", flexDirection:"column", gap:20 }}
+         onClick={() => { setExportMenu(null); setStatusMenu(null); }}>
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -353,33 +408,48 @@ export default function InvoicingPage() {
 
       {/* Invoice table */}
       <div style={CARD}>
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid #F1F5F9", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ padding:"16px 20px", borderBottom:"1px solid #F1F5F9", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
           <p style={{ fontSize:15, fontWeight:800 }}>All Invoices</p>
-          {loading
-            ? <Skeleton className="h-3 w-20" />
-            : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            {loading
+              ? <Skeleton className="h-3 w-20" />
+              : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
+            <ColumnsPopover tableKey="invoices" visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
+            {!loading && invoices.length > 0 && (
+              <button
+                onClick={handleExportCsv}
+                style={{ display:"flex", alignItems:"center", gap:6, fontSize:12.5, fontWeight:600, color:"#64748B",
+                  background:"none", border:"1px solid #E8EEF4", borderRadius:8, padding:"5px 12px",
+                  cursor:"pointer", fontFamily:FONT }}
+              >
+                <Download className="h-3 w-3"/> Export CSV
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ overflowX:"auto" }}>
-          <div style={{ minWidth:700 }}>
-            <div style={{ display:"grid", gridTemplateColumns:"110px 1fr 130px 120px 110px 90px", gap:12,
+          <div style={{ minWidth: minTableWidth }}>
+            <div style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
               padding:"10px 20px", borderBottom:"1px solid #F1F5F9", background:"#FAFBFC" }}>
-              {["INVOICE ID","COMPANY","PERIOD","AMOUNT","STATUS",""].map(h => (
-                <div key={h} style={{ fontSize:10.5, fontWeight:700, color:"#CBD5E1", textTransform:"uppercase", letterSpacing:"0.06em" }}>{h}</div>
-              ))}
+              {prefsLoading
+                ? Array.from({ length: visibleCols.length + 1 }).map((_, i) => (
+                    <Skeleton key={i} className="h-3 w-16" />
+                  ))
+                : [...visibleCols.map(k => {
+                    const col = spec.columns.find(c => c.key === k);
+                    return col?.label.toUpperCase() ?? k.toUpperCase();
+                  }), "DOWNLOAD"].map(h => (
+                    <div key={h} style={{ fontSize:10.5, fontWeight:700, color:"#CBD5E1", textTransform:"uppercase", letterSpacing:"0.06em" }}>{h}</div>
+                  ))}
             </div>
             {loading ? (
               <div>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} style={{ display:"grid", gridTemplateColumns:"110px 1fr 130px 120px 110px 90px", gap:12,
+                  <div key={i} style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
                     padding:"13px 20px", borderBottom: i < 4 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
-                    <Skeleton className="h-3.5 w-20" />
-                    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                      <Skeleton className="h-3.5 w-2/3" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                    <Skeleton className="h-3.5 w-24" />
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
+                    {visibleCols.map(k => (
+                      <Skeleton key={k} className="h-3.5 w-20" />
+                    ))}
                     <Skeleton className="h-7 w-14 rounded-md" />
                   </div>
                 ))}
@@ -398,28 +468,121 @@ export default function InvoicingPage() {
               </div>
             ) : invoices.map((inv, i) => {
               const status = effectiveStatus(inv);
+              const cellFor = (k: string): React.ReactNode => {
+                switch (k) {
+                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{inv.invoiceNumber}</span>;
+                  case "company":    return (
+                    <div>
+                      <p style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{inv.companyName}</p>
+                      <p style={{ fontSize:11.5, color:"#94A3B8", marginTop:1 }}>Issued {fmtDate(inv.issuedAt)} · {inv.tripCount} trip{inv.tripCount===1?"":"s"}</p>
+                    </div>
+                  );
+                  case "period":     return <span style={{ fontSize:13, color:"#475569" }}>{fmtPeriod(inv.periodFrom, inv.periodTo)}</span>;
+                  case "amount":     return <span style={{ fontSize:14, fontWeight:700, color:"#0F172A" }}>{fmt(inv.amount)}</span>;
+                  case "issuedAt":   return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.issuedAt)}</span>;
+                  case "dueDate":    return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.dueDate)}</span>;
+                  case "paidAt":     return inv.paidAt ? <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.paidAt)}</span> : <span style={{ fontSize:13, color:"#CBD5E1" }}>—</span>;
+                  case "paymentRef": return <span style={{ fontSize:13, color:"#475569" }}>—</span>;
+                  case "notes":      return <span style={{ fontSize:13, color:"#475569" }}>—</span>;
+                  case "createdAt":  return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.issuedAt)}</span>;
+                  case "status":     return null; // rendered separately below
+                  default:           return null;
+                }
+              };
               return (
                 <div key={inv.id}
                   onClick={() => openView(inv.id)}
                   onMouseEnter={() => setHovRow(i)} onMouseLeave={() => setHovRow(null)}
-                  style={{ display:"grid", gridTemplateColumns:"110px 1fr 130px 120px 110px 90px", gap:12,
+                  style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
                     padding:"13px 20px", borderBottom:"1px solid #F1F5F9",
                     background:hovRow===i?"#F8FAFC":"#fff", cursor:"pointer",
                     transition:"background 0.12s", alignItems:"center" }}>
-                  <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{inv.invoiceNumber}</span>
-                  <div>
-                    <p style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{inv.companyName}</p>
-                    <p style={{ fontSize:11.5, color:"#94A3B8", marginTop:1 }}>Issued {fmtDate(inv.issuedAt)} · {inv.tripCount} trip{inv.tripCount===1?"":"s"}</p>
+                  {visibleCols.map(k => {
+                    if (k === "status") return (
+                      <div key={k} style={{ position:"relative" }} onClick={e => e.stopPropagation()}>
+                        {changingStatus === inv.id ? (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11, color:"#94A3B8" }}>
+                            <Loader2 className="h-3 w-3 animate-spin"/> Saving…
+                          </span>
+                        ) : (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (status === "Paid" || status === "Voided") return;
+                              setStatusMenu(statusMenu === inv.id ? null : inv.id);
+                              setExportMenu(null);
+                            }}
+                            title={status === "Paid" || status === "Voided" ? undefined : "Click to change status"}
+                            style={{ background:"none", border:"none", padding:0, cursor: status==="Paid"||status==="Voided" ? "default" : "pointer",
+                              display:"inline-flex", alignItems:"center", gap:3 }}>
+                            <StatusBadge status={status}/>
+                            {status !== "Paid" && status !== "Voided" && (
+                              <ChevronDown style={{ width:10, height:10, color:"#94A3B8", flexShrink:0 }}/>
+                            )}
+                          </button>
+                        )}
+                        {statusMenu === inv.id && (
+                          <>
+                            <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setStatusMenu(null)}/>
+                            <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:99,
+                              background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
+                              boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden", minWidth:155 }}>
+                              <button
+                                onClick={() => quickChangeStatus(inv.id, "paid")}
+                                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px",
+                                  textAlign:"left", border:"none", borderBottom:"1px solid #F1F5F9",
+                                  cursor:"pointer", fontFamily:FONT, fontSize:13, background:"#fff", color:"#15803D", fontWeight:600 }}
+                                onMouseEnter={e=>(e.currentTarget.style.background="#F0FDF4")}
+                                onMouseLeave={e=>(e.currentTarget.style.background="#fff")}>
+                                <CheckCircle2 className="h-3.5 w-3.5"/> Mark as Paid
+                              </button>
+                              <button
+                                onClick={() => quickChangeStatus(inv.id, "void")}
+                                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px",
+                                  textAlign:"left", border:"none", cursor:"pointer", fontFamily:FONT, fontSize:13,
+                                  background:"#fff", color:"#B91C1C", fontWeight:600 }}
+                                onMouseEnter={e=>(e.currentTarget.style.background="#FEF2F2")}
+                                onMouseLeave={e=>(e.currentTarget.style.background="#fff")}>
+                                <Ban className="h-3.5 w-3.5"/> Void Invoice
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                    return <div key={k}>{cellFor(k)}</div>;
+                  })}
+
+                  {/* Download dropdown — always last, fixed 110px */}
+                  <div style={{ position:"relative" }} onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={e => { e.stopPropagation(); setExportMenu(exportMenu === inv.id ? null : inv.id); }}
+                      style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:600, color:"#64748B",
+                        background:"none", border:"1px solid #E8EEF4", borderRadius:7, padding:"5px 10px",
+                        cursor:"pointer", fontFamily:FONT }}>
+                      <Download className="h-3 w-3"/> Export <ChevronDown className="h-3 w-3"/>
+                    </button>
+                    {exportMenu === inv.id && (
+                      <>
+                        <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setExportMenu(null)}/>
+                        <div style={{ position:"absolute", top:"calc(100% + 4px)", right:0, zIndex:99,
+                          background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
+                          boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden", minWidth:140 }}>
+                          {(["summary","detailed"] as const).map((mode, i) => (
+                            <button key={mode}
+                              onClick={() => { void viewInvoicePdf(inv.id, mode); setExportMenu(null); }}
+                              style={{ display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
+                                border:"none", borderBottom: i === 0 ? "1px solid #F1F5F9" : "none",
+                                cursor:"pointer", fontFamily:FONT, fontSize:13, background:"#fff", color:"#0F172A" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
+                              {mode === "summary" ? "Summary" : "Detailed"}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
-                  <span style={{ fontSize:13, color:"#475569" }}>{fmtPeriod(inv.periodFrom, inv.periodTo)}</span>
-                  <span style={{ fontSize:14, fontWeight:700, color:"#0F172A" }}>{fmt(inv.amount)}</span>
-                  <StatusBadge status={status}/>
-                  <button onClick={e => { e.stopPropagation(); void downloadPdfFromList(inv.id); }}
-                    style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, fontWeight:600, color:"#64748B",
-                      background:"none", border:"1px solid #E8EEF4", borderRadius:7, padding:"5px 10px",
-                      cursor:"pointer", fontFamily:FONT }}>
-                    <Download className="h-3 w-3"/> PDF
-                  </button>
                 </div>
               );
             })}
@@ -562,7 +725,7 @@ export default function InvoicingPage() {
                 </>
               ) : (
                 <>
-                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", marginBottom:20, border:"1px solid #E8EEF4" }}>
+                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"14px 18px", marginBottom:16, border:"1px solid #E8EEF4" }}>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
                       {[
                         { lbl:"Company", val:selCompanyName || "—" },
@@ -575,15 +738,32 @@ export default function InvoicingPage() {
                       ))}
                     </div>
                   </div>
-                  <div style={{ textAlign:"center", padding:"20px 0" }}>
-                    <div style={{ width:48, height:48, borderRadius:14, background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
-                      <FileText style={{ color:"#94A3B8" }} className="h-5 w-5"/>
+
+                  {previewLoading ? (
+                    <TripsMiniTableSkeleton />
+                  ) : previewErr ? (
+                    <div style={{ padding:"10px 14px", background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:9, color:"#B91C1C", fontSize:12.5 }}>
+                      {previewErr}
                     </div>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", marginBottom:6 }}>Ready to generate</div>
-                    <div style={{ fontSize:12.5, color:"#94A3B8", lineHeight:1.6, maxWidth:340, margin:"0 auto" }}>
-                      Eligible completed trips for this company in the selected period will be bundled into a new invoice. Trips already on another invoice are skipped.
+                  ) : previewTrips.length === 0 ? (
+                    <div style={{ textAlign:"center", padding:"30px 0" }}>
+                      <div style={{ width:48, height:48, borderRadius:14, background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
+                        <FileText style={{ color:"#94A3B8" }} className="h-5 w-5"/>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", marginBottom:6 }}>No eligible trips</div>
+                      <div style={{ fontSize:12.5, color:"#94A3B8", lineHeight:1.6, maxWidth:300, margin:"0 auto" }}>
+                        No completed, uninvoiced trips found for this company in the selected period.
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#64748B", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                        {previewTrips.length} trip{previewTrips.length !== 1 ? "s" : ""} to invoice
+                      </div>
+                      <TripsMiniTable rows={previewTrips} total={previewTotal}/>
+                    </>
+                  )}
+
                   {generateErr && (
                     <div style={{ marginTop:16, padding:"10px 14px", background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:9, color:"#B91C1C", fontSize:12.5 }}>
                       {generateErr}
@@ -596,13 +776,13 @@ export default function InvoicingPage() {
 
           <div style={{ padding:"16px 24px", borderTop:"1.5px solid #F1F5F9", display:"flex", gap:10, flexShrink:0 }}>
             {step === 2 && !generatedInv && (
-              <button onClick={() => { setStep(1); setGenerateErr(null); }} disabled={generating}
+              <button onClick={() => { setStep(1); setGenerateErr(null); setPreviewTrips([]); setPreviewTotal(0); setPreviewErr(null); }} disabled={generating}
                 style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 18px", border:"1.5px solid #E2E8F0", borderRadius:10, background:"#fff", color:"#475569", fontSize:14, fontWeight:600, cursor: generating ? "default" : "pointer", fontFamily:FONT, opacity: generating ? 0.6 : 1 }}>
                 <ChevronLeft className="h-4 w-4"/> Back
               </button>
             )}
             {step === 1 ? (
-              <button disabled={!step1Valid} onClick={() => setStep(2)}
+              <button disabled={!step1Valid} onClick={() => { void goToStep2(); }}
                 style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10,
                   background:step1Valid?A:"#E2E8F0", color:step1Valid?"#fff":"#94A3B8",
                   fontSize:14, fontWeight:700, cursor:step1Valid?"pointer":"default", fontFamily:FONT }}>
@@ -614,11 +794,11 @@ export default function InvoicingPage() {
                 Done
               </button>
             ) : (
-              <button disabled={generating} onClick={confirmGenerate}
+              <button disabled={generating || previewLoading || previewTrips.length === 0} onClick={confirmGenerate}
                 style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10,
-                  background: generating ? "#93C5FD" : A,
+                  background: (generating || previewLoading || previewTrips.length === 0) ? "#93C5FD" : A,
                   color:"#fff", fontSize:14, fontWeight:700,
-                  cursor: generating ? "default" : "pointer", fontFamily:FONT,
+                  cursor: (generating || previewLoading || previewTrips.length === 0) ? "default" : "pointer", fontFamily:FONT,
                   display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
                 {generating && <Loader2 className="h-4 w-4 animate-spin"/>}
                 {generating ? "Generating…" : "Generate Invoice"}
@@ -641,12 +821,16 @@ export default function InvoicingPage() {
                   </div>
                 </div>
                 <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                  {viewInv && (
-                    <button onClick={() => generatePDF(viewInv, vendorName)}
-                      style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 14px", border:"1.5px solid #E2E8F0", borderRadius:9, background:"#fff", color:"#475569", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:FONT }}>
-                      <Download className="h-3.5 w-3.5"/> PDF
+                  {viewInv && (<>
+                    <button onClick={() => { setPreviewMode("summary"); setPreviewInv(viewInv); }}
+                      style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", border:"1.5px solid #C5CBF0", borderRadius:9, background:"#EEF0FB", color:"#1B2B7E", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:FONT, whiteSpace:"nowrap" }}>
+                      <FileText className="h-3 w-3"/> Summary
                     </button>
-                  )}
+                    <button onClick={() => { setPreviewMode("detailed"); setPreviewInv(viewInv); }}
+                      style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", border:"1.5px solid #E2E8F0", borderRadius:9, background:"#fff", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:FONT, whiteSpace:"nowrap" }}>
+                      <FileText className="h-3 w-3"/> Detailed
+                    </button>
+                  </>)}
                   <button onClick={closeDrawer} style={{ width:32, height:32, borderRadius:8, border:"1.5px solid #E2E8F0", background:"#F8FAFC", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                     <X className="h-4 w-4" style={{ color:"#64748B" }}/>
                   </button>
@@ -669,50 +853,39 @@ export default function InvoicingPage() {
                   </button>
                 </div>
               ) : viewInv ? (
-                <>
-                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", marginBottom:20, border:"1px solid #E8EEF4" }}>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-                      {[
-                        { lbl:"Company", val:viewInv.companyName },
-                        { lbl:"Period",  val:fmtPeriod(viewInv.periodFrom, viewInv.periodTo) },
-                        { lbl:"Amount",  val:fmt(viewInv.amount) },
-                        { lbl:"Due",     val:fmtDate(viewInv.dueDate) },
-                      ].map(({ lbl, val }) => (
-                        <div key={lbl}>
-                          <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{lbl}</div>
-                          <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{val}</div>
-                        </div>
-                      ))}
-                      <div>
-                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Status</div>
-                        <StatusBadge status={viewInv.status}/>
+                <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", border:"1px solid #E8EEF4" }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                    {[
+                      { lbl:"Company", val:viewInv.companyName },
+                      { lbl:"Period",  val:fmtPeriod(viewInv.periodFrom, viewInv.periodTo) },
+                      { lbl:"Amount",  val:fmt(viewInv.amount) },
+                      { lbl:"Trips",   val:`${viewInv.trips.length} trip${viewInv.trips.length===1?"":"s"}` },
+                      { lbl:"Due",     val:fmtDate(viewInv.dueDate) },
+                      { lbl:"Issued",  val:fmtDate(viewInv.issuedAt) },
+                    ].map(({ lbl, val }) => (
+                      <div key={lbl}>
+                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{lbl}</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{val}</div>
                       </div>
-                      {viewInv.paidAt && (
-                        <div>
-                          <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>Paid</div>
-                          <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{fmtDate(viewInv.paidAt)}</div>
-                        </div>
-                      )}
+                    ))}
+                    <div>
+                      <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Status</div>
+                      <StatusBadge status={viewInv.status}/>
                     </div>
-                    {viewInv.notes && (
-                      <div style={{ marginTop:14, paddingTop:12, borderTop:"1px dashed #E2E8F0" }}>
-                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Notes</div>
-                        <div style={{ fontSize:12.5, color:"#475569", lineHeight:1.5 }}>{viewInv.notes}</div>
+                    {viewInv.paidAt && (
+                      <div>
+                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>Paid</div>
+                        <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{fmtDate(viewInv.paidAt)}</div>
                       </div>
                     )}
                   </div>
-
-                  {viewInv.trips.length === 0 ? (
-                    <div style={{ textAlign:"center", padding:"32px 0", color:"#94A3B8", fontSize:13 }}>No trip details available.</div>
-                  ) : (
-                    <>
-                      <div style={{ fontSize:12, fontWeight:700, color:"#64748B", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.06em" }}>
-                        {viewInv.trips.length} Trip{viewInv.trips.length===1?"":"s"}
-                      </div>
-                      <TripsMiniTable rows={viewInv.trips} total={viewInv.amount}/>
-                    </>
+                  {viewInv.notes && (
+                    <div style={{ marginTop:14, paddingTop:12, borderTop:"1px dashed #E2E8F0" }}>
+                      <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Notes</div>
+                      <div style={{ fontSize:12.5, color:"#475569", lineHeight:1.5 }}>{viewInv.notes}</div>
+                    </div>
                   )}
-                </>
+                </div>
               ) : null}
             </div>
 
@@ -735,6 +908,11 @@ export default function InvoicingPage() {
           </>
         )}
       </DrawerPanel>
+
+      {/* ── Invoice preview overlay ── */}
+      {previewInv && (
+        <TripInvoiceView inv={previewInv} mode={previewMode} onClose={() => setPreviewInv(null)} />
+      )}
     </div>
   );
 }

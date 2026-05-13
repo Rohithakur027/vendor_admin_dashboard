@@ -60,7 +60,7 @@ export default function SuperAdminVendorsPage() {
   const [filterOpen,   setFilterOpen]  = useState(false);
 
   // Step 1 fields
-  const [form, setForm] = useState({ name: "", contactPerson: "", email: "", phone: "", city: "" });
+  const [form, setForm] = useState({ name: "", pan: "", contactPerson: "", email: "", phone: "", city: "" });
   const [pocs, setPocs] = useState<{ name: string; email: string; phone: string }[]>([]);
   const [errors, setErrors] = useState<Partial<typeof form>>({});
 
@@ -119,6 +119,8 @@ export default function SuperAdminVendorsPage() {
   function validateStep1(): boolean {
     const e: Partial<typeof form> = {};
     if (!form.name.trim())          e.name          = "Company name is required";
+    if (!form.pan.trim())           e.pan           = "PAN Number is required";
+    else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.pan.trim().toUpperCase())) e.pan = "Invalid PAN format (e.g. ABCDE1234F)";
     if (!form.contactPerson.trim()) e.contactPerson = "Contact person is required";
     if (!form.email.trim())         e.email         = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Invalid email format";
@@ -145,7 +147,9 @@ export default function SuperAdminVendorsPage() {
     setSubmitError("");
 
     const payload: CreateVendorPayload = {
-      name: form.name, contactPerson: form.contactPerson,
+      name: form.name,
+      ...(form.pan.trim() ? { pan: form.pan.trim().toUpperCase() } : {}),
+      contactPerson: form.contactPerson,
       email: form.email, phone: form.phone, city: form.city,
       password,
       secondaryPOCs: pocs.filter((p) => p.name || p.email || p.phone),
@@ -168,7 +172,7 @@ export default function SuperAdminVendorsPage() {
   function closeModal() {
     setDrawerOpen(false);
     setStep(1);
-    setForm({ name: "", contactPerson: "", email: "", phone: "", city: "" });
+    setForm({ name: "", pan: "", contactPerson: "", email: "", phone: "", city: "" });
     setPocs([]);
     setErrors({});
     setPassword("");
@@ -366,6 +370,16 @@ export default function SuperAdminVendorsPage() {
                       <Input placeholder="e.g. Bangalore" value={form.city} onChange={(e) => field("city", e.target.value)} className="h-[38px] rounded-xl border-slate-200 text-[13px]" />
                     </Field>
                   </div>
+
+                  <Field label="PAN Number" error={errors.pan}>
+                    <Input
+                      placeholder="e.g. ABCDE1234F"
+                      value={form.pan}
+                      onChange={(e) => field("pan", e.target.value.toUpperCase().slice(0, 10))}
+                      maxLength={10}
+                      className="h-[38px] rounded-xl border-slate-200 text-[13px] font-mono tracking-widest uppercase"
+                    />
+                  </Field>
 
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Contact Person" error={errors.contactPerson}>

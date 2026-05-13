@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Settings,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,7 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
   return (
     <div className="relative group/nav">
       {children}
-      <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 delay-75">
+      <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-[9999] opacity-0 group-hover/nav:opacity-100 transition-opacity duration-150 delay-75">
         <div className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-slate-800" />
         <div className="bg-slate-800 text-white text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap shadow-lg tracking-wide">
           {label}
@@ -116,7 +117,7 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex-1 py-4 space-y-1 overflow-y-auto", isCollapsed ? "px-2" : "px-3")}>
+      <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
         {navItems.map(({ label, href, icon: Icon, subItems }) => {
           const active = subItems ? pathname.startsWith(href) : pathname === href;
 
@@ -216,6 +217,27 @@ export function Sidebar({
         })}
       </nav>
 
+      {/* Settings — pinned just above the user profile */}
+      <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
+        {(() => {
+          const settingsActive = pathname.startsWith("/dashboard/settings");
+          const linkClass = cn(
+            "flex items-center gap-3 rounded-lg text-sm transition-colors",
+            isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
+            settingsActive
+              ? "bg-blue-50/70 text-blue-600 font-medium"
+              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          );
+          const link = (
+            <Link href="/dashboard/settings" onClick={onLinkClick} className={linkClass}>
+              <Settings className="h-4 w-4 shrink-0" />
+              {!isCollapsed && "Settings"}
+            </Link>
+          );
+          return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
+        })()}
+      </div>
+
       {/* User profile — bottom */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-3 py-4 flex justify-center" : "px-4 py-4")}>
         {isCollapsed ? (
@@ -242,7 +264,7 @@ export function Sidebar({
       {/* ── Desktop sidebar (xl+): full width, user-collapsible ── */}
       <aside
         className={cn(
-          "hidden xl:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300 relative z-[60]",
+          "hidden xl:flex flex-col border-r bg-white h-screen sticky top-0 shrink-0 transition-all duration-300 relative z-[200]",
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
@@ -269,7 +291,7 @@ export function Sidebar({
         onMouseLeave={handleTabletLeave}
       >
         {/* Always-visible 60px icon strip */}
-        <div className="w-[60px] h-full flex flex-col bg-white border-r overflow-hidden">
+        <div className="w-[60px] h-full flex flex-col bg-white border-r">
           <SidebarContent isCollapsed={true} />
         </div>
 

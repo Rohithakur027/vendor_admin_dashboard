@@ -12,7 +12,7 @@ export function toIsoDate(d: Date) {
   return d.toISOString().split("T")[0];
 }
 export function inRange(d: Date, from: string, to: string) {
-  return d >= new Date(from + "T00:00:00") && d <= new Date(to + "T23:59:59");
+  return d >= new Date(from + "T00:00:00+05:30") && d <= new Date(to + "T23:59:59.999+05:30");
 }
 
 export function Card({

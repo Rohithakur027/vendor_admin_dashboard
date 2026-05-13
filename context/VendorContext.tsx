@@ -22,6 +22,7 @@ interface VendorContextValue {
   updateSupervisor: (id: string, data: Partial<Supervisor>) => Promise<void>;
   deleteSupervisor: (id: string) => Promise<void>;
   toggleAppAccess: (id: string) => Promise<void>;
+  refreshWallet: () => Promise<void>;
 }
 
 const VendorContext = createContext<VendorContextValue | null>(null);
@@ -39,6 +40,7 @@ function toBooking(item: TripApiItem): Booking {
     dropLocation:    item.dropLocation,
     scheduledTime:   item.scheduledTime,
     createdAt:       item.createdAt,
+    completedAt:     item.completedAt ?? null,
     fare:            item.fare       ?? undefined,
     passengers:      item.passengers ?? undefined,
     bookingSource:   item.bookingSource,
@@ -189,6 +191,11 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchAll]);
 
+  const refreshWallet = useCallback(async () => {
+    const walletRes = await vendorsApi.myWallet().catch(() => null);
+    setVendorWallet(walletRes?.data ?? null);
+  }, []);
+
   const toggleAppAccess = useCallback(async (id: string) => {
     setApiSups((prev) =>
       prev.map((s) => (s.id === id ? { ...s, appAccess: !s.appAccess } : s))
@@ -219,6 +226,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
         updateSupervisor,
         deleteSupervisor,
         toggleAppAccess,
+        refreshWallet,
       }}
     >
       {children}

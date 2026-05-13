@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { superadminApi, type DriverApiItem, type DriverTripsResponse } from "@/lib/api";
+import { DriverHistoryMap } from "@/components/DriverHistoryMap";
 import type { Driver, DriverStatus } from "@/modules/drivers/types";
 import {
   ArrowLeft, Phone, Car, TrendingUp, IndianRupee, User,
@@ -504,6 +505,7 @@ export default function SuperAdminDriverProfilePage() {
     { value: "overview",  label: "Overview" },
     { value: "trips",     label: "Recent Trips" },
     { value: "earnings",  label: "Earnings" },
+    { value: "history",   label: "Location History" },
     { value: "documents", label: "Documents" },
     { value: "settings",  label: "Settings" },
   ];
@@ -577,9 +579,7 @@ export default function SuperAdminDriverProfilePage() {
                 <span style={{ background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}`, fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20 }}>
                   {driver.status}
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: isOnline ? "#22C55E" : "#94A3B8" }}>
-                  <Circle className="h-2 w-2 fill-current" />{isOnline ? "Online" : "Offline"}
-                </span>
+
               </div>
               <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" as const }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
@@ -791,6 +791,24 @@ export default function SuperAdminDriverProfilePage() {
             <EarningsSplitCard
               instantTotal={tripsData?.stats.instantFare ?? 0}
               scheduledTotal={tripsData?.stats.scheduledFare ?? 0}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ══ TAB: LOCATION HISTORY ══ */}
+      {activeTab === "history" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.04)", padding: "20px 24px" }}>
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Location History</p>
+              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>GPS route replay for {driver.name}</p>
+            </div>
+            <DriverHistoryMap
+              driverId={id}
+              driverName={driver.name}
+              hours={12}
+              apiBase="/api/superadmin/drivers"
             />
           </div>
         </div>

@@ -12,9 +12,10 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange, placeholder = "Search…", className }: SearchBarProps) {
   return (
-    <div className={`relative flex-1 max-w-[380px] ${className ?? ""}`}>
+    <div className={`relative flex-1 max-w-[380px] z-10 ${className ?? ""}`}>
       <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
       <Input
+        autoComplete="off"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}

@@ -3,6 +3,25 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { vendorsApi, type VendorDetailApiItem, type WalletTransaction } from "@/lib/api";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => { open(): void };
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") { resolve(false); return; }
+    if (document.getElementById("razorpay-script")) { resolve(true); return; }
+    const s = document.createElement("script");
+    s.id  = "razorpay-script";
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload  = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 import {
   ArrowLeft, Building2, MapPin, Phone, Mail, Users,
   Calendar, TrendingUp, Wallet, ShieldOff, ShieldCheck,
@@ -70,32 +89,93 @@ export default function VendorProfilePage() {
     }
   }
 
+  async function refreshAfterRecharge(creditedAmount: number, newBalance: number) {
+    setVendor((v) => v ? { ...v, wallet_balance: newBalance } : v);
+    // Best-effort transaction refresh — fall back to optimistic insert on failure.
+    try {
+      const tx = await vendorsApi.transactions(id);
+      setTransactions(tx.data);
+    } catch {
+      setTransactions(prev => [{
+        id:             crypto.randomUUID(),
+        type:           "CREDIT",
+        amount:         creditedAmount,
+        note:           "Wallet recharge by superadmin via Razorpay",
+        balance_before: (newBalance - creditedAmount) || null,
+        balance_after:  newBalance,
+        created_at:     new Date().toISOString(),
+      }, ...prev]);
+    }
+  }
+
   async function handleRecharge() {
     const amt = parseFloat(rechargeAmt);
     if (!rechargeAmt || isNaN(amt) || amt <= 0) {
       setRechargeErr("Enter a valid amount");
       return;
     }
+    if (amt < 100 || amt > 100_000) {
+      setRechargeErr("Amount must be between ₹100 and ₹1,00,000");
+      return;
+    }
     setRecharging(true);
     setRechargeErr("");
     try {
-      const res = await vendorsApi.recharge(id, amt);
-      setVendor((v) => v ? { ...v, wallet_balance: res.data.wallet_balance } : v);
-      setTransactions(prev => [{
-        id:             crypto.randomUUID(),
-        type:           "CREDIT",
-        amount:         amt,
-        note:           "Wallet recharge by superadmin",
-        balance_before: vendor?.wallet_balance ?? null,
-        balance_after:  res.data.wallet_balance,
-        created_at:     new Date().toISOString(),
-      }, ...prev]);
-      setRechargeOpen(false);
-      setRechargeAmt("");
-      showToast(`${fmtCurrency(amt)} added to wallet.`);
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        setRechargeErr("Failed to load payment gateway. Check your connection.");
+        setRecharging(false);
+        return;
+      }
+
+      const orderRes = await vendorsApi.adminWallet.createOrder(id, amt);
+      const { order_id, amount: orderAmount, currency, key_id } = orderRes.data;
+
+      const rzp = new window.Razorpay({
+        key: key_id, amount: orderAmount, currency, order_id,
+        name: "SK Travels", description: `Wallet recharge — ${vendor?.name ?? "Vendor"}`,
+        theme: { color: BLUE },
+        method: {
+          upi: true, card: true, netbanking: true, wallet: true, emi: true,
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: { name: "Pay using UPI", instruments: [{ method: "upi" }] },
+            },
+            sequence: ["block.upi"],
+            preferences: { show_default_blocks: true },
+          },
+        },
+        prefill: {
+          name:    vendor?.name    ?? undefined,
+          email:   vendor?.email   ?? undefined,
+          contact: vendor?.phone   ?? undefined,
+        },
+        handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          try {
+            const verifyRes = await vendorsApi.adminWallet.verify(id, {
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              amount:              amt,
+            });
+            const newBalance = verifyRes.data.new_balance ?? ((vendor?.wallet_balance ?? 0) + amt);
+            await refreshAfterRecharge(amt, newBalance);
+            setRechargeOpen(false);
+            setRechargeAmt("");
+            showToast(`${fmtCurrency(amt)} added to ${vendor?.name ?? "vendor"}'s wallet.`);
+          } catch (err) {
+            setRechargeErr(err instanceof Error ? err.message : "Payment received but wallet update failed. Contact engineering.");
+          } finally {
+            setRecharging(false);
+          }
+        },
+        modal: { ondismiss: () => setRecharging(false) },
+      });
+      rzp.open();
     } catch (err) {
-      setRechargeErr(err instanceof Error ? err.message : "Recharge failed.");
-    } finally {
+      setRechargeErr(err instanceof Error ? err.message : "Could not initiate payment.");
       setRecharging(false);
     }
   }
@@ -484,7 +564,7 @@ export default function VendorProfilePage() {
                 }}
               >
                 {recharging && <Loader2 style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} />}
-                {recharging ? "Processing…" : "Add to Wallet"}
+                {recharging ? "Opening Razorpay…" : "Pay via Razorpay"}
               </button>
               <button
                 onClick={() => { setRechargeOpen(false); setRechargeAmt(""); setRechargeErr(""); }}

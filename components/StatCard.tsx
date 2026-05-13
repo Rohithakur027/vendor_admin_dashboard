@@ -14,9 +14,10 @@ interface StatCardProps {
     totalLabel: string;
   };
   loading?: boolean;
+  onAction?: { label: string; onClick: () => void };
 }
 
-export function StatCard({ title, value, icon: Icon, description, progress, loading }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, description, progress, loading, onAction }: StatCardProps) {
   const pct = progress ? Math.min((progress.used / progress.total) * 100, 100) : 0;
 
   if (progress) {
@@ -43,11 +44,20 @@ export function StatCard({ title, value, icon: Icon, description, progress, load
         {loading ? (
           <Skeleton className="h-9 w-28 mb-3 bg-white/25" />
         ) : (
-          <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1.1, marginBottom: 12, letterSpacing: -1 }}>
+          <div style={{ fontSize: 38, fontWeight: 800, color: "#fff", lineHeight: 1.1, marginBottom: onAction ? 8 : 12, letterSpacing: -1 }}>
             {value}
           </div>
         )}
-        <div />
+        {onAction && (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={onAction.onClick}
+              style={{ height: 30, padding: "0 14px", borderRadius: 8, background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", fontSize: 11.5, fontWeight: 700, cursor: "pointer", backdropFilter: "blur(4px)", letterSpacing: 0.2 }}
+            >
+              {onAction.label}
+            </button>
+          </div>
+        )}
       </div>
     );
   }

@@ -53,10 +53,11 @@ function StatCard({
   );
 }
 
-function SkeletonRow({ cols }: { cols: string }) {
+function SkeletonRow({ cols, extra }: { cols: string; extra?: boolean }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "13px 20px", alignItems: "center" }}>
       <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", width: "60%" }} />
+      {extra && <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", width: "70%" }} />}
       <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", marginLeft: "auto", width: 32 }} />
       <div style={{ height: 22, borderRadius: 99, background: "#F1F5F9", marginLeft: "auto", width: 60 }} />
     </div>
@@ -178,9 +179,10 @@ export default function SuperAdminOverviewPage() {
           </div>
 
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 320 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 100px", gap: 12, padding: "10px 20px 8px", borderBottom: "1.5px solid #F8FAFC" }}>
+            <div style={{ minWidth: 480 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 110px 100px", gap: 12, padding: "10px 20px 8px", borderBottom: "1.5px solid #F8FAFC" }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>DRIVER</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>VEHICLE</div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" }}>TODAY TRIPS</div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "right" }}>STATUS</div>
               </div>
@@ -188,7 +190,7 @@ export default function SuperAdminOverviewPage() {
               <div>
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => (
-                      <SkeletonRow key={i} cols="1fr 110px 100px" />
+                      <SkeletonRow key={i} cols="1fr 140px 110px 100px" extra />
                     ))
                   : drivers.slice(0, 5).map((driver, i) => {
                       const badge = getStatusStyle(driver.status);
@@ -197,7 +199,7 @@ export default function SuperAdminOverviewPage() {
                           key={driver.id}
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "1fr 110px 100px",
+                            gridTemplateColumns: "1fr 140px 110px 100px",
                             gap: 12,
                             padding: "13px 20px",
                             borderBottom: i < Math.min(drivers.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
@@ -205,6 +207,18 @@ export default function SuperAdminOverviewPage() {
                           }}
                         >
                           <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{driver.name}</div>
+                          <div>
+                            {driver.vehicle ? (
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{driver.vehicle}</div>
+                                {driver.vehicleModel && (
+                                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 1 }}>{driver.vehicleModel}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: 11, color: "#64748B", fontWeight: 400, fontStyle: "italic" }}>No vehicle assigned</span>
+                            )}
+                          </div>
                           <div style={{ textAlign: "center" }}>
                             <span style={{ fontSize: 14, fontWeight: 800, color: driver.bookingsToday === 0 ? "#CBD5E1" : "#0F172A" }}>
                               {driver.bookingsToday}
