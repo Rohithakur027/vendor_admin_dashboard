@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { superadminApi, type OverviewData, type OverviewVendor, type OverviewDriver } from "@/lib/api";
+import { useDriverStatusFeed, type DriverStatusEvent } from "@/lib/useDriverStatusFeed";
 import { Building2, Users, CheckCircle2, Route } from "lucide-react";
 import Link from "next/link";
 import { getStatusStyle } from "@/components/StatusBadge";
@@ -75,6 +76,25 @@ export default function SuperAdminOverviewPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // Patch the matching driver row + recompute the On Trip / Available
+  // aggregates so the stat cards stay in sync without a page reload.
+  const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const idx = prev.drivers.findIndex((d) => d.id === ev.driver_id);
+      if (idx === -1) return prev;
+      const nextDrivers = prev.drivers.slice();
+      nextDrivers[idx] = { ...nextDrivers[idx], status: ev.status };
+      return {
+        ...prev,
+        drivers: nextDrivers,
+        driversOnTrip:    nextDrivers.filter((d) => d.status === "On Trip").length,
+        driversAvailable: nextDrivers.filter((d) => d.status === "Available").length,
+      };
+    });
+  }, []);
+  useDriverStatusFeed(onDriverStatus);
 
   const vendors: OverviewVendor[] = data?.vendors ?? [];
   const drivers: OverviewDriver[] = data?.drivers ?? [];

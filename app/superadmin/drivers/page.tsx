@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { superadminApi, type DriverApiItem } from "@/lib/api";
+import { useDriverStatusFeed, type DriverStatusEvent } from "@/lib/useDriverStatusFeed";
 import { Users, Navigation, CircleCheck, WifiOff } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -114,6 +115,32 @@ export default function SuperAdminDriversPage() {
     const t = setTimeout(fetchDrivers, search ? 350 : 0);
     return () => clearTimeout(t);
   }, [fetchDrivers, search]);
+
+  // Live status updates — patch the matching row in place. If the changed
+  // driver is filtered out by the current status filter, drop them from the
+  // list; if a hidden driver flips into the current filter, fall back to a
+  // re-fetch so they appear with full fields populated.
+  const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
+    setDrivers((prev) => {
+      const idx = prev.findIndex((d) => d.id === ev.driver_id);
+      if (idx === -1) {
+        if (statusFilter !== "All" && ev.status === statusFilter) fetchDrivers();
+        return prev;
+      }
+      if (statusFilter !== "All" && ev.status !== statusFilter) {
+        return prev.filter((_, i) => i !== idx);
+      }
+      const next = prev.slice();
+      next[idx] = {
+        ...next[idx],
+        isOnline:   ev.is_online,
+        status:     ev.status,
+        lastSeenAt: ev.last_seen_at,
+      };
+      return next;
+    });
+  }, [statusFilter, fetchDrivers]);
+  useDriverStatusFeed(onDriverStatus);
 
   const totalCt     = drivers.length;
   const onTripCt    = drivers.filter(d => d.status === "On Trip").length;
