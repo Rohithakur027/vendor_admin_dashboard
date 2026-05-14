@@ -6,6 +6,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { Navigation, Circle, Search, AlertCircle, ChevronRight, ChevronLeft, X, Clock, ArrowLeft, Calendar, ArrowRight } from "lucide-react";
 import { superadminApi, type LiveDriver, type LiveLocationEvent, type LocationHistoryPoint } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
+import type { DriverStatusEvent } from "@/lib/useDriverStatusFeed";
 
 const ACCENT = "#2563EB";
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -319,21 +320,34 @@ export default function LiveMapPage() {
         return next;
       });
     };
-    const onOffline = (ev: { driver_id: string; user_id: string }) => {
+    const onStatus = (ev: DriverStatusEvent) => {
       if (!ev.driver_id) return;
       setDrivers((prev) => {
         const idx = prev.findIndex((d) => d.driver_id === ev.driver_id);
-        if (idx === -1) return prev;
+        if (idx === -1) {
+          // Driver isn't in the current snapshot (e.g. just came online for the
+          // first time today) — refetch so they show up.
+          loadSnapshot();
+          return prev;
+        }
         const next = prev.slice();
-        next[idx] = { ...next[idx], is_online: false, status: "Offline", speed: null };
+        next[idx] = {
+          ...next[idx],
+          is_online:  ev.is_online,
+          status:     ev.status as LiveDriver["status"],
+          speed:      ev.is_online ? next[idx].speed : null,
+          updated_at: ev.last_seen_at,
+          ...(ev.lat != null ? { lat: ev.lat } : {}),
+          ...(ev.lng != null ? { lng: ev.lng } : {}),
+        };
         return next;
       });
     };
     sock.on("superadmin:location:update", onUpdate);
-    sock.on("superadmin:driver:offline",  onOffline);
+    sock.on("superadmin:driver:status",   onStatus);
     return () => {
       sock.off("superadmin:location:update", onUpdate);
-      sock.off("superadmin:driver:offline",  onOffline);
+      sock.off("superadmin:driver:status",   onStatus);
     };
   }, [loadSnapshot]);
 
@@ -533,7 +547,7 @@ export default function LiveMapPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 18, padding: "4px 10px" }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16A34A", display: "inline-block" }} className="animate-pulse" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D" }}>{onlineCount} live</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#15803D" }}>{onlineCount} online</span>
           </div>
           {offlineCount > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 18, padding: "4px 10px" }}>
@@ -574,7 +588,7 @@ export default function LiveMapPage() {
           style={{ position: "absolute", top: 16, right: 16, zIndex: 10, display: "flex", alignItems: "center", gap: 6, padding: "9px 12px", height: 42, borderRadius: 11, border: "1.5px solid rgba(226,232,240,0.9)", background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)", boxShadow: "0 4px 20px rgba(0,0,0,0.12)", cursor: "pointer", color: "#0F172A", fontFamily: font, fontWeight: 700, fontSize: 12.5 }}
         >
           <ChevronLeft className="h-4 w-4" style={{ color: "#64748B" }} />
-          <span>{onlineCount} live{offlineCount > 0 ? ` · ${offlineCount} offline` : ""}</span>
+          <span>{onlineCount} online{offlineCount > 0 ? ` · ${offlineCount} offline` : ""}</span>
         </button>
       )}
 
@@ -588,7 +602,7 @@ export default function LiveMapPage() {
               onClick={() => setMode("live")}
               style={{ flex: 1, height: 32, borderRadius: 8, border: `1.5px solid ${mode === "live" ? ACCENT : "#E2E8F0"}`, background: mode === "live" ? "#EFF6FF" : "#fff", color: mode === "live" ? ACCENT : "#64748B", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, fontFamily: font }}
             >
-              <Circle className="h-3 w-3 fill-current" /> Live
+              <Circle className="h-3 w-3 fill-current" /> Online
             </button>
             <button
               onClick={() => setMode("history")}
@@ -626,11 +640,25 @@ export default function LiveMapPage() {
               </div>
               <div style={{ padding: "9px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
                 <p style={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>Drivers</p>
-                <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>{filtered.length} shown · {onlineCount} live · {offlineCount} offline</span>
+                <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>{filtered.length} shown · {onlineCount} online · {offlineCount} offline</span>
               </div>
               <div style={{ flex: 1, overflowY: "auto" }}>
                 {loading ? (
-                  <p style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+                  <div className="animate-pulse">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} style={{ padding: "11px 15px", borderBottom: "1px solid #F8FAFC", borderLeft: "3px solid transparent" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <div style={{ width: 92, height: 12, borderRadius: 4, background: "#E2E8F0" }} />
+                          <div style={{ width: 42, height: 11, borderRadius: 4, background: "#E2E8F0" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                          <div style={{ width: 96, height: 11, borderRadius: 4, background: "#EEF2F7" }} />
+                          <div style={{ width: 64, height: 11, borderRadius: 4, background: "#EEF2F7" }} />
+                        </div>
+                        <div style={{ width: "78%", height: 10, borderRadius: 4, background: "#EEF2F7" }} />
+                      </div>
+                    ))}
+                  </div>
                 ) : filtered.length === 0 ? (
                   <p style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8", fontSize: 13 }}>
                     {drivers.length === 0 ? "No drivers online right now." : "No results."}
@@ -649,7 +677,7 @@ export default function LiveMapPage() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                         <span style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.3px" }}>{plate}</span>
                         <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, color: !d.is_online ? "#94A3B8" : "#16A34A" }}>
-                          <Circle className="h-2 w-2 fill-current" /> {!d.is_online ? "Offline" : "Live"}
+                          <Circle className="h-2 w-2 fill-current" /> {!d.is_online ? "Offline" : "Online"}
                         </span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 3 }}>
@@ -697,7 +725,17 @@ export default function LiveMapPage() {
                   </div>
                   <div style={{ flex: 1, overflowY: "auto" }}>
                     {loading ? (
-                      <p style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8", fontSize: 13 }}>Loading…</p>
+                      <div className="animate-pulse">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} style={{ padding: "11px 15px", borderBottom: "1px solid #F8FAFC" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                              <div style={{ width: 110, height: 12, borderRadius: 4, background: "#E2E8F0" }} />
+                              <div style={{ width: 42, height: 11, borderRadius: 4, background: "#E2E8F0" }} />
+                            </div>
+                            <div style={{ width: 140, height: 11, borderRadius: 4, background: "#EEF2F7" }} />
+                          </div>
+                        ))}
+                      </div>
                     ) : histFiltered.length === 0 ? (
                       <p style={{ textAlign: "center", padding: "32px 0", color: "#94A3B8", fontSize: 13 }}>No drivers found.</p>
                     ) : histFiltered.map((d) => (
@@ -714,7 +752,7 @@ export default function LiveMapPage() {
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{d.name}</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, color: d.is_online ? "#16A34A" : "#94A3B8" }}>
-                            <Circle className="h-2 w-2 fill-current" /> {d.is_online ? "Live" : "Offline"}
+                            <Circle className="h-2 w-2 fill-current" /> {d.is_online ? "Online" : "Offline"}
                           </span>
                         </div>
                         {d.vehicle && (
@@ -971,8 +1009,38 @@ export default function LiveMapPage() {
 
                     {/* Loading */}
                     {histLoading && (
-                      <div style={{ textAlign: "center", padding: "28px 0", color: "#94A3B8", fontSize: 13 }}>
-                        Loading history…
+                      <div className="animate-pulse">
+                        {/* Stats grid skeleton */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                          <div style={{ background: "#EFF6FF", borderRadius: 10, padding: "12px 14px" }}>
+                            <div style={{ width: 44, height: 22, borderRadius: 4, background: "#DBE9FF", marginBottom: 6 }} />
+                            <div style={{ width: 90, height: 10, borderRadius: 4, background: "#DBE9FF" }} />
+                          </div>
+                          <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "12px 14px" }}>
+                            <div style={{ width: 86, height: 13, borderRadius: 4, background: "#E2E8F0", marginBottom: 6 }} />
+                            <div style={{ width: 70, height: 10, borderRadius: 4, background: "#E2E8F0" }} />
+                          </div>
+                        </div>
+
+                        {/* Route window skeleton */}
+                        <div style={{ background: "#F8FAFC", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                          <div style={{ width: 84, height: 10, borderRadius: 4, background: "#E2E8F0", marginBottom: 10 }} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#E2E8F0", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ width: 56, height: 12, borderRadius: 4, background: "#E2E8F0", marginBottom: 4 }} />
+                              <div style={{ width: 32, height: 10, borderRadius: 4, background: "#EEF2F7" }} />
+                            </div>
+                          </div>
+                          <div style={{ marginLeft: 4.5, width: 1, height: 14, background: "#E2E8F0", marginBottom: 8 }} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#E2E8F0", flexShrink: 0 }} />
+                            <div>
+                              <div style={{ width: 56, height: 12, borderRadius: 4, background: "#E2E8F0", marginBottom: 4 }} />
+                              <div style={{ width: 38, height: 10, borderRadius: 4, background: "#EEF2F7" }} />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 

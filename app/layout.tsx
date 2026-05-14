@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { VendorProvider } from "@/context/VendorContext";
@@ -24,6 +24,9 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "SK Travels — Vendor Dashboard",
   description: "Vendor management portal for SK Travels",
+};
+
+export const viewport: Viewport = {
   colorScheme: "light",
 };
 
@@ -34,9 +37,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${plusJakartaSans.variable} h-full`}>
-      <head>
-        <meta name="color-scheme" content="light" />
-      </head>
       <body className="h-full bg-gray-50 antialiased">
         <AuthProvider>
           <VendorProvider>
