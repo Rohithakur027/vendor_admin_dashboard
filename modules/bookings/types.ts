@@ -35,8 +35,14 @@ export interface Booking {
   supervisorDecisionAt?: string | null;
   // Instant booking specific
   timeline?: BookingTimelineEvent[];
+  // Intermediate stops
+  stops?: { id: string; address: string; stopOrder: number }[];
   // Live tracking
   bookingRef?: string | null;
   driverPhone?: string | null;
   pickupTime?: string | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropLat?: number | null;
+  dropLng?: number | null;
 }

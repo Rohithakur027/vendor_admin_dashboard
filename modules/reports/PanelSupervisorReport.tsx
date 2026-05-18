@@ -11,21 +11,19 @@ import {
 } from "./primitives";
 import { SvgBarChart, SvgDonut } from "./charts";
 import { DateRangePicker } from "./DateRangePicker";
-import { Route, ArrowRight } from "lucide-react";
-import { StatusBadge } from "@/components/StatusBadge";
+import { Route } from "lucide-react";
+import { ExportButton } from "@/components/ExportButton";
+import { SearchBar } from "@/components/SearchBar";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
+import { buildTripRenderers, EM_DASH } from "@/modules/bookings/tripRenderers";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { Booking } from "@/modules/bookings/types";
+
+const TRIPS_TABLE_KEY = "pastTrips" as const;
 
 type TabKey = "overview" | "trips";
-
-function fmtCreatedAt(iso: string) {
-  try {
-    const d = new Date(iso);
-    const day  = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
-    return { day, time };
-  } catch {
-    return { day: "Unknown", time: "00:00 am" };
-  }
-}
 
 export function PanelSupervisorReport({
   supervisorId,
@@ -37,7 +35,10 @@ export function PanelSupervisorReport({
   hideSupervisorPicker?: boolean;
 }) {
   const { supervisors, bookings, drivers, apiCounts } = useVendor();
+  const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences(TRIPS_TABLE_KEY);
+  const tripsSpec = getTableSpec(TRIPS_TABLE_KEY);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [search, setSearch] = useState("");
   const [showPicker,  setShowPicker]  = useState(false);
   const [dateFrom, setDateFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 29); return toIsoDate(d); });
   const [dateTo,   setDateTo]   = useState(() => toIsoDate(new Date()));
@@ -141,30 +142,105 @@ export function PanelSupervisorReport({
         const tripDateRaw = b.scheduledTime ?? b.createdAt;
         if (!tripDateRaw) return false;
         const tripDate = toIsoDate(new Date(tripDateRaw));
-        return tripDate >= dateFrom && tripDate <= dateTo;
+        if (tripDate < dateFrom || tripDate > dateTo) return false;
+
+        const q = search.toLowerCase();
+        if (q) {
+          const driver = b.driverId ? drivers.find((d) => d.id === b.driverId) : null;
+          const driverName = driver?.name || "";
+          const driverPhone = (b.driverPhone ?? driver?.phone ?? "").toLowerCase();
+          const vehicleModel = driver?.vehicle || "";
+          const vehicleReg = driver?.vehicleReg || "";
+          const companyName = b.bookingSource || "";
+          const supName = supervisors.find(s => s.id === b.supervisorId)?.name || "";
+
+          if (
+            !b.id.toLowerCase().includes(q) &&
+            !(b.bookingRef?.toLowerCase().includes(q)) &&
+            !b.pickupLocation.toLowerCase().includes(q) &&
+            !b.dropLocation.toLowerCase().includes(q) &&
+            !driverName.toLowerCase().includes(q) &&
+            !driverPhone.includes(q) &&
+            !vehicleModel.toLowerCase().includes(q) &&
+            !vehicleReg.toLowerCase().replace(/\s+/g, "").includes(q.replace(/\s+/g, "")) &&
+            !companyName.toLowerCase().includes(q) &&
+            !supName.toLowerCase().includes(q)
+          ) {
+            return false;
+          }
+        }
+        return true;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [apiBookings, effectiveSupId, dateFrom, dateTo]);
+  }, [apiBookings, effectiveSupId, dateFrom, dateTo, search, drivers, supervisors]);
+
+  // Column-system: renderers + grid template (mirrors Past Trips page)
+  const supervisorLookup = (id: string | null | undefined) =>
+    supervisors.find((s) => s.id === id)?.name || "Unknown";
+
+  const driverFor = (b: Booking) => {
+    const driver = b.driverId ? drivers.find((d) => d.id === b.driverId) : null;
+    return {
+      name:        driver?.name ?? null,
+      vehicle:     driver?.vehicle ?? null,
+      vehicleReg:  driver?.vehicleReg ?? null,
+      vehicleType: driver?.vehicleType ?? null,
+      phone:       b.driverPhone ?? driver?.phone ?? null,
+    };
+  };
+
+  const renderers = useMemo(
+    () => buildTripRenderers(supervisorLookup, driverFor),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [supervisors, drivers],
+  );
+
+  const gridTemplate = useMemo(() =>
+    visibleCols.map(key => {
+      const col = tripsSpec.columns.find(c => c.key === key);
+      return col ? `minmax(${col.minWidth}px, 1fr)` : "1fr";
+    }).join(" "),
+    [visibleCols, tripsSpec.columns],
+  );
+
+  const minTableWidth = useMemo(
+    () => visibleCols.reduce((sum, k) => sum + (tripsSpec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 48,
+    [visibleCols, tripsSpec.columns],
+  );
 
   function handleExportTrips() {
     const rows = filteredTrips.map((b) => {
-      const driver = b.driverId ? drivers.find((d) => d.id === b.driverId) : null;
-      const supName = supervisors.find((s) => s.id === b.supervisorId)?.name ?? "";
-      return {
-        "Trip Ref":     b.bookingRef ?? "",
-        "Type":         b.type,
-        "Status":       b.status,
-        "Supervisor":   supName,
-        "Company":      b.bookingSource ?? "",
-        "Pickup":       b.pickupLocation,
-        "Drop":         b.dropLocation,
-        "Driver":       driver?.name ?? "",
-        "Driver Phone": b.driverPhone ?? driver?.phone ?? "",
-        "Vehicle Reg":  driver?.vehicleReg ?? "",
-        "Vehicle":      driver?.vehicle ?? "",
-        "Fare (₹)":     b.fare ?? "",
-        "Created At":   b.createdAt ? new Date(b.createdAt).toLocaleString("en-IN") : "",
-      };
+      const out: Record<string, string | number> = {};
+      for (const k of visibleCols) {
+        const col = tripsSpec.columns.find(c => c.key === k);
+        if (!col) continue;
+
+        if (k === "tripId") {
+          out["Trip ID"]   = b.bookingRef ?? "";
+          out["Trip Type"] = b.type ?? "";
+          continue;
+        }
+        if (k === "route") {
+          out["Pickup Address"]      = b.pickupLocation;
+          out["Destination Address"] = b.dropLocation;
+          continue;
+        }
+        if (k === "supervisorCompany") {
+          out["Supervisor"] = supervisorLookup(b.supervisorId);
+          out["Company"]    = b.bookingSource ?? "";
+          continue;
+        }
+        if (k === "vehicle") {
+          const d = driverFor(b);
+          out["Vehicle Reg"]   = d.vehicleReg ?? "";
+          out["Vehicle Model"] = d.vehicle    ?? "";
+          continue;
+        }
+
+        const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
+        out[col.label] = r ? r.csv(b) : "";
+      }
+      return out;
     });
     exportToCsv(`trips-${title.replace(/\s+/g, "-").toLowerCase()}-${dateFrom}-to-${dateTo}`, rows);
   }
@@ -232,17 +308,21 @@ export function PanelSupervisorReport({
           </Select>
         )}
         {activeTab === "trips" && (
-          <button
-            onClick={handleExportTrips}
-            disabled={filteredTrips.length === 0}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", marginLeft: "auto", background: filteredTrips.length === 0 ? "#F8FAFC" : "#fff", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 12.5, color: filteredTrips.length === 0 ? "#CBD5E1" : "#475569", fontFamily: "inherit", fontWeight: 600, cursor: filteredTrips.length === 0 ? "not-allowed" : "pointer" }}
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Export CSV
-          </button>
+          <>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search by ID, route, name, vehicle, company..." className="ml-2" />
+            <ColumnsPopover
+              tableKey={TRIPS_TABLE_KEY}
+              visible={visibleCols}
+              totalCount={totalCount}
+              onToggle={toggle}
+              onReset={reset}
+            />
+            <ExportButton
+              onClick={handleExportTrips}
+              disabled={filteredTrips.length === 0}
+              className="ml-auto"
+            />
+          </>
         )}
       </div>
 
@@ -489,73 +569,76 @@ export function PanelSupervisorReport({
       {/* ── TRIPS TAB ── */}
       {activeTab === "trips" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 16, overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 900 }}>
-              {/* Table header */}
-              <div style={{ display: "grid", gridTemplateColumns: "100px 2fr 150px 1.3fr 1.3fr 110px 90px", gap: 16, padding: "14px 24px", borderBottom: "1px solid #F1F5F9", background: "rgba(248,250,252,0.8)" }}>
-                {["TRIP ID & TYPE", "ROUTE", "SUPERVISOR", "VEHICLE", "DRIVER", "STATUS", "CREATED AT"].map((h) => (
-                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>{h}</div>
-                ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#64748B" }}>
+          <span style={{ fontWeight: 600, color: "#94A3B8", fontSize: 14 }}>{filteredTrips.length}</span>
+          <span>{filteredTrips.length === 1 ? "trip" : "trips"} on this page</span>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="w-full overflow-x-auto">
+            <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
+              {/* Header */}
+              <div
+                className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
+                style={{ gridTemplateColumns: gridTemplate }}
+              >
+                {prefsLoading
+                  ? Array.from({ length: visibleCols.length }).map((_, i) => (
+                      <Skeleton key={i} className={`h-3 ${i === 0 ? "w-24" : "w-16"}`} />
+                    ))
+                  : visibleCols.map((k, i) => {
+                      const col = tripsSpec.columns.find(c => c.key === k);
+                      if (!col) return null;
+                      const headerClass = "text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate";
+                      const stickyStyle = i === 0
+                        ? { position: "sticky" as const, left: 0, background: "rgb(248 250 252 / 0.95)", zIndex: 3 }
+                        : undefined;
+                      return (
+                        <div key={k} className={headerClass} style={stickyStyle} title={col.label}>
+                          {col.label}
+                        </div>
+                      );
+                    })}
               </div>
-              {/* Table rows */}
-              <div>
-                {filteredTrips.length === 0 ? (
-                  <div style={{ padding: "48px 24px", textAlign: "center", color: "#94A3B8", fontSize: 13.5 }}>No trips found for this period.</div>
-                ) : (
-                  filteredTrips.map((booking) => {
-                    const { day, time } = fmtCreatedAt(booking.createdAt);
-                    const supName = supervisors.find((s) => s.id === booking.supervisorId)?.name || "Unknown";
-                    const driver  = booking.driverId ? drivers.find((d) => d.id === booking.driverId) : null;
-                    const driverName  = driver?.name ?? null;
-                    const vehicle     = driver?.vehicle ?? null;
-                    const vehicleReg  = driver?.vehicleReg ?? null;
 
-                    return (
-                      <div key={booking.id} style={{ display: "grid", gridTemplateColumns: "100px 2fr 150px 1.3fr 1.3fr 110px 90px", gap: 16, padding: "14px 24px", borderBottom: "1px solid #F8FAFC", alignItems: "center" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <span style={{ fontWeight: 800, fontSize: 13, color: "#111827" }}>{booking.bookingRef ?? "—"}</span>
-                          <span style={{ display: "inline-flex", alignItems: "center", alignSelf: "flex-start", padding: "1px 6px", borderRadius: 4, background: "#EEF2FF", color: A, fontSize: 10, fontWeight: 700 }}>{booking.type}</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, paddingRight: 16, overflow: "hidden" }}>
-                          <span style={{ fontWeight: 600, fontSize: 13, color: "#1E293B", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{booking.pickupLocation.split(",")[0]}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <div style={{ width: 56, height: 2, borderRadius: 99, background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
-                            <ArrowRight size={12} color={A} />
+              {/* Body */}
+              <div className="flex flex-col divide-y divide-slate-100">
+                {prefsLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i}
+                      className="grid items-center gap-4 px-6 py-3.5 bg-white"
+                      style={{ gridTemplateColumns: gridTemplate }}
+                    >
+                      {visibleCols.map((k, j) => {
+                        const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
+                        const stickyStyle = j === 0
+                          ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
+                          : undefined;
+                        return <div key={k} style={stickyStyle} className="min-w-0">{r?.skeleton() ?? <Skeleton className="h-3.5 w-14" />}</div>;
+                      })}
+                    </div>
+                  ))
+                ) : filteredTrips.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">No trips found for this period.</div>
+                ) : (
+                  filteredTrips.map((booking) => (
+                    <div
+                      key={booking.id}
+                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors group"
+                      style={{ gridTemplateColumns: gridTemplate }}
+                    >
+                      {visibleCols.map((k, j) => {
+                        const r = (renderers as Record<string, { body: (b: Booking) => React.ReactNode }>)[k];
+                        const stickyStyle = j === 0
+                          ? { position: "sticky" as const, left: 0, background: "inherit", zIndex: 1 }
+                          : undefined;
+                        return (
+                          <div key={k} style={stickyStyle} className="min-w-0">
+                            {r ? r.body(booking) : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>}
                           </div>
-                          <span style={{ fontSize: 12, color: "#6B7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{booking.dropLocation.split(",")[0]}</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{supName}</span>
-                          {booking.bookingSource && (
-                            <span style={{ display: "inline-flex", alignSelf: "flex-start", padding: "1px 8px", borderRadius: 6, background: "#E2E8F0", border: "1px solid #CBD5E1", fontSize: 11, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>{booking.bookingSource}</span>
-                          )}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                          {driverName ? (
-                            <>
-                              <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vehicleReg || vehicle || "Unknown"}</span>
-                              {vehicleReg && vehicle && <span style={{ fontSize: 11, fontWeight: 600, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{vehicle}</span>}
-                            </>
-                          ) : (
-                            <span style={{ fontSize: 13, color: "#CBD5E1", fontStyle: "italic" }}>—</span>
-                          )}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          {driverName
-                            ? <span style={{ fontSize: 13, fontWeight: 500, color: "#475569", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{driverName}</span>
-                            : <span style={{ fontSize: 13, color: "#CBD5E1", fontStyle: "italic" }}>—</span>}
-                        </div>
-                        <div>
-                          <StatusBadge status={booking.status as "Completed" | "Active" | "Scheduled"} size="sm" />
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{day}</span>
-                          <span style={{ fontSize: 11, fontWeight: 500, color: "#94A3B8", marginTop: 2 }}>{time}</span>
-                        </div>
-                      </div>
-                    );
-                  })
+                        );
+                      })}
+                    </div>
+                  ))
                 )}
               </div>
             </div>

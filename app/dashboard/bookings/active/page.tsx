@@ -5,6 +5,8 @@ import { useVendor } from "@/context/VendorContext";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Car, ArrowRight } from "lucide-react";
+import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
+import { toIsoDate } from "@/modules/reports/primitives";
 import { SearchBar } from "@/components/SearchBar";
 import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
@@ -47,7 +49,7 @@ function MockSeparator() {
 
 function buildRenderers(
   supervisorName: (id: string | null | undefined) => string,
-  driverFor: (b: Booking) => { name: string | null; vehicle: string | null; vehicleReg: string | null; phone: string | null },
+  driverFor: (b: Booking) => { name: string | null; vehicle: string | null; vehicleReg: string | null; vehicleType: string | null; phone: string | null },
 ) {
   return {
     tripId: {
@@ -103,10 +105,11 @@ function buildRenderers(
           <div className="flex flex-col gap-px min-w-0">
             <span className="text-[13px] font-medium text-slate-600 truncate">{d.vehicleReg || d.vehicle}</span>
             {d.vehicleReg && d.vehicle && <span className="text-[11px] font-semibold text-slate-500 truncate">{d.vehicle}</span>}
+            {d.vehicleType && <span className="text-[11px] font-medium text-slate-500 truncate">{d.vehicleType}</span>}
           </div>
         );
       },
-      skeleton: () => (<div className="space-y-1.5"><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3 w-16" /></div>),
+      skeleton: () => (<div className="space-y-1.5"><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3 w-16" /><Skeleton className="h-2.5 w-12" /></div>),
       csv:      (b: Booking) => { const d = driverFor(b); return [d.vehicleReg, d.vehicle].filter(Boolean).join(" · "); },
     },
     driver: {
@@ -249,6 +252,32 @@ function buildRenderers(
       skeleton: () => <Skeleton className="h-3.5 w-16" />,
       csv:      (b: Booking) => (b as Booking & { invoiceId?: string | null }).invoiceId ?? "",
     },
+    pickupLatLng: {
+      header:   () => "PICKUP LAT/LNG",
+      body:     (b: Booking) => b.pickupLat != null && b.pickupLng != null
+        ? (
+          <div className="flex flex-col gap-px font-mono tabular-nums">
+            <span className="text-[12px] text-slate-700">{b.pickupLat.toFixed(6)}</span>
+            <span className="text-[11px] text-slate-400">{b.pickupLng.toFixed(6)}</span>
+          </div>
+        )
+        : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>,
+      skeleton: () => (<div className="space-y-1"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-20" /></div>),
+      csv:      (b: Booking) => b.pickupLat != null && b.pickupLng != null ? `${b.pickupLat},${b.pickupLng}` : "",
+    },
+    dropLatLng: {
+      header:   () => "DROP LAT/LNG",
+      body:     (b: Booking) => b.dropLat != null && b.dropLng != null
+        ? (
+          <div className="flex flex-col gap-px font-mono tabular-nums">
+            <span className="text-[12px] text-slate-700">{b.dropLat.toFixed(6)}</span>
+            <span className="text-[11px] text-slate-400">{b.dropLng.toFixed(6)}</span>
+          </div>
+        )
+        : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>,
+      skeleton: () => (<div className="space-y-1"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-20" /></div>),
+      csv:      (b: Booking) => b.dropLat != null && b.dropLng != null ? `${b.dropLat},${b.dropLng}` : "",
+    },
   } as const;
 }
 
@@ -257,12 +286,26 @@ export default function ActiveBookingsPage() {
   const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences(TABLE_KEY);
   const spec = getTableSpec(TABLE_KEY);
 
-  const [search, setSearch] = useState("");
+  const [search,       setSearch]       = useState("");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [period,   setPeriod]   = useState<TripPeriod>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
 
   const ongoingBookings = bookings.filter((b) => b.status === "Ongoing");
 
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const filtered = ongoingBookings.filter((b) => {
+    if (period === "custom") {
+      const d = b.createdAt ? toIsoDate(new Date(b.createdAt)) : "";
+      if (!d || d < dateFrom || d > dateTo) return false;
+    } else if (period !== "all") {
+      const d = new Date(b.createdAt);
+      if (period === "today"  && d < startOfToday) return false;
+      if (period === "7days"  && d < new Date(now.getTime() - 7  * 86400_000)) return false;
+      if (period === "30days" && d < new Date(now.getTime() - 30 * 86400_000)) return false;
+    }
     const q = search.toLowerCase();
     if (!q) return true;
     const driver = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
@@ -298,10 +341,11 @@ export default function ActiveBookingsPage() {
       b  => {
         const driver = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
         return {
-          name:       driver?.name ?? null,
-          vehicle:    driver?.vehicle ?? null,
-          vehicleReg: driver?.vehicleReg ?? null,
-          phone:      b.driverPhone ?? driver?.phone ?? null,
+          name:        driver?.name ?? null,
+          vehicle:     driver?.vehicle ?? null,
+          vehicleReg:  driver?.vehicleReg ?? null,
+          vehicleType: driver?.vehicleType ?? null,
+          phone:       b.driverPhone ?? driver?.phone ?? null,
         };
       },
     ),
@@ -357,13 +401,23 @@ export default function ActiveBookingsPage() {
       <div className="space-y-5">
         <div className="flex gap-3 items-center flex-wrap">
           <SearchBar value={search} onChange={setSearch} placeholder="Search by ID, route, name, vehicle, company..." />
+
+          <TripDateFilter
+            period={period}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onChangePeriod={setPeriod}
+            onApplyCustom={(f, t) => { setDateFrom(f); setDateTo(t); }}
+            direction="past"
+          />
+
           <ColumnsPopover tableKey={TABLE_KEY} visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
           <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" />
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="w-full overflow-x-auto">
-            <div style={{ minWidth: minTableWidth }}>
+            <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
               {/* Header */}
               <div
                 className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
@@ -391,7 +445,7 @@ export default function ActiveBookingsPage() {
               <div className="flex flex-col divide-y divide-slate-100">
                 {(isLoading || prefsLoading) ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid items-center gap-4 px-6 py-3.5" style={{ gridTemplateColumns: gridTemplate }}>
+                    <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: gridTemplate }}>
                       {visibleCols.map((k, j) => {
                         const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
                         const stickyStyle = j === 0
@@ -411,14 +465,14 @@ export default function ActiveBookingsPage() {
                     <Fragment key={booking.id}>
                       {idx === splitAt && <MockSeparator />}
                       <div
-                        className="grid items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer group"
+                        className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer group"
                         style={{ gridTemplateColumns: gridTemplate }}
                         onClick={() => setSelectedBooking(booking)}
                       >
                         {visibleCols.map((k, j) => {
                           const r = (renderers as Record<string, { body: (b: Booking) => React.ReactNode }>)[k];
                           const stickyStyle = j === 0
-                            ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
+                            ? { position: "sticky" as const, left: 0, background: "inherit", zIndex: 1 }
                             : undefined;
                           return (
                             <div key={k} style={stickyStyle} className="min-w-0">

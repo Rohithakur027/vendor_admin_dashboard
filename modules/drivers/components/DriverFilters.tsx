@@ -1,14 +1,13 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { SearchBar } from "@/components/SearchBar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search } from "lucide-react";
+  FilterPanel,
+  FilterSection,
+  FilterPill,
+  FilterTrigger,
+} from "@/components/FilterPanel";
 import type { DriverStatus } from "../types";
 
 interface DriverFiltersProps {
@@ -18,38 +17,48 @@ interface DriverFiltersProps {
   onStatusFilterChange: (v: DriverStatus | "All") => void;
 }
 
+const STATUS_OPTIONS: DriverStatus[] = ["Available", "On Trip", "Offline"];
+
 export function DriverFilters({
   search,
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
 }: DriverFiltersProps) {
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const activeCount = statusFilter !== "All" ? 1 : 0;
+
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
-      <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          autoComplete="off"
-          placeholder="Search by name or phone…"
-          className="pl-9"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+    <div className="flex gap-3 items-center">
+      <SearchBar
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search by name or phone…"
+      />
+      <div className="relative shrink-0">
+        <FilterTrigger
+          onClick={() => setFilterOpen((v) => !v)}
+          activeCount={activeCount}
         />
+        <FilterPanel
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          activeCount={activeCount}
+          onClearAll={() => onStatusFilterChange("All")}
+        >
+          <FilterSection label="Status">
+            {STATUS_OPTIONS.map((s) => (
+              <FilterPill
+                key={s}
+                label={s}
+                active={statusFilter === s}
+                onClick={() => onStatusFilterChange(statusFilter === s ? "All" : s)}
+              />
+            ))}
+          </FilterSection>
+        </FilterPanel>
       </div>
-      <Select
-        value={statusFilter}
-        onValueChange={(v) => onStatusFilterChange(v as DriverStatus | "All")}
-      >
-        <SelectTrigger className="w-44">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Statuses</SelectItem>
-          <SelectItem value="Available">Available</SelectItem>
-          <SelectItem value="On Trip">On Trip</SelectItem>
-          <SelectItem value="Offline">Offline</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   );
 }

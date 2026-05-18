@@ -20,8 +20,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const role = await login(email, password);
-      if (role === "vendor")     router.push("/dashboard");
-      else if (role === "superadmin") router.push("/superadmin");
+      if (role === "vendor" || role === "vendor_member") router.push("/dashboard");
+      else if (role === "superadmin" || role === "superadmin_member") router.push("/superadmin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
     } finally {
@@ -223,6 +223,21 @@ export default function LoginPage() {
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
+
+          {/* Vendor sign-up prompt */}
+          <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid #f1f5f9", textAlign: "center" as const }}>
+            <p style={{ fontSize: 13, color: "#94a3b8" }}>
+              New vendor on the platform?{" "}
+              <a
+                href="/signup"
+                style={{ color: "#2563eb", fontWeight: 700, textDecoration: "none" }}
+                onMouseEnter={e => (e.currentTarget.style.textDecoration = "underline")}
+                onMouseLeave={e => (e.currentTarget.style.textDecoration = "none")}
+              >
+                Sign up here
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

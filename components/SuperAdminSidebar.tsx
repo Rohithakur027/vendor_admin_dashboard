@@ -4,22 +4,37 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid, Building2, Users, Shield, ClipboardCheck, BarChart2, MapPin,
-  ChevronLeft, ChevronRight, Settings, MessageSquare,
+  ChevronLeft, ChevronRight, Settings, MessageSquare, LogOut,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { SUPERADMIN_PERMISSION_KEYS, hasModuleAccess } from "@/lib/permissions";
 
-type NavItem = { label: string; href: string; icon: React.ElementType };
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  // null = always shown; otherwise hidden for superadmin_member without this permission.
+  permission?: keyof typeof SUPERADMIN_PERMISSION_KEYS | null;
+};
 
-const navItems: NavItem[] = [
-  { label: "Dashboard",         href: "/superadmin",                   icon: LayoutGrid },
-  { label: "Vendors",           href: "/superadmin/vendors",           icon: Building2 },
-  { label: "Live Map",          href: "/superadmin/live-map",          icon: MapPin },
-  { label: "Drivers",           href: "/superadmin/drivers",           icon: Users },
-  { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck },
-  { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare },
-  { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2 },
+const ALL_NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard",         href: "/superadmin",                   icon: LayoutGrid,    permission: null },
+  { label: "Vendors",           href: "/superadmin/vendors",           icon: Building2,     permission: "VENDOR_MANAGEMENT" },
+  { label: "Live Map",          href: "/superadmin/live-map",          icon: MapPin,        permission: "TRIP_MONITORING" },
+  { label: "Drivers",           href: "/superadmin/drivers",           icon: Users,         permission: "DRIVER_MANAGEMENT" },
+  { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck, permission: "DRIVER_MANAGEMENT" },
+  { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare, permission: "TRIP_MONITORING" },
+  { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2,     permission: "REPORTS_MANAGEMENT" },
 ];
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "SK";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -43,6 +58,21 @@ export function SuperAdminSidebar({
   onMobileOpenChange: (open: boolean) => void;
 }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const isMember     = user?.role === "superadmin_member";
+  const brandName    = "SK Travels";
+  const displayName  = isMember ? (user?.full_name?.trim() || brandName) : brandName;
+  const roleLabel    = isMember ? (user?.role_label?.trim() || "Team Member") : "Super Admin";
+  const initials     = getInitials(displayName);
+
+  const navItems = useMemo<NavItem[]>(() => {
+    if (!isMember) return ALL_NAV_ITEMS;
+    return ALL_NAV_ITEMS.filter(item => {
+      if (item.permission == null) return true;
+      return hasModuleAccess(user?.permissions, SUPERADMIN_PERMISSION_KEYS[item.permission]);
+    });
+  }, [isMember, user?.permissions]);
+
   const [collapsed, setCollapsed] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
   const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,24 +142,43 @@ export function SuperAdminSidebar({
         })}
       </nav>
 
-      {/* Settings — pinned just above the user profile */}
+      {/* Settings — pinned just above the user profile; admins only */}
+      {!isMember && (
+        <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
+          {(() => {
+            const settingsActive = pathname.startsWith("/superadmin/settings");
+            const linkClass = cn(
+              "flex items-center gap-3 rounded-lg text-sm transition-colors",
+              isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
+              settingsActive
+                ? "bg-blue-50/70 text-blue-600 font-medium"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            );
+            const link = (
+              <Link href="/superadmin/settings" onClick={onLinkClick} className={linkClass}>
+                <Settings className="h-4 w-4 shrink-0" />
+                {!isCollapsed && "Settings"}
+              </Link>
+            );
+            return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
+          })()}
+        </div>
+      )}
+
+      {/* Sign out — pinned above the user profile, red accent */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
         {(() => {
-          const settingsActive = pathname.startsWith("/superadmin/settings");
-          const linkClass = cn(
-            "flex items-center gap-3 rounded-lg text-sm transition-colors",
-            isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
-            settingsActive
-              ? "bg-blue-50/70 text-blue-600 font-medium"
-              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          const btnClass = cn(
+            "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors text-red-600 hover:bg-red-50 hover:text-red-700",
+            isCollapsed ? "px-0 py-2.5 justify-center w-full" : "px-3 py-2.5 w-full"
           );
-          const link = (
-            <Link href="/superadmin/settings" onClick={onLinkClick} className={linkClass}>
-              <Settings className="h-4 w-4 shrink-0" />
-              {!isCollapsed && "Settings"}
-            </Link>
+          const btn = (
+            <button onClick={logout} className={btnClass}>
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!isCollapsed && "Sign out"}
+            </button>
           );
-          return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
+          return isCollapsed ? <NavTooltip label="Sign out">{btn}</NavTooltip> : btn;
         })()}
       </div>
 
@@ -137,16 +186,16 @@ export function SuperAdminSidebar({
       <div className={cn("border-t shrink-0", isCollapsed ? "px-3 py-4 flex justify-center" : "px-4 py-4")}>
         {isCollapsed ? (
           <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-            SK
+            {initials}
           </div>
         ) : (
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              SK
+              {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800 leading-none truncate">SK Travels</p>
-              <p className="text-xs text-slate-400 mt-0.5">Super Admin</p>
+              <p className="text-sm font-bold text-slate-800 leading-none truncate">{displayName}</p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">{roleLabel}</p>
             </div>
           </div>
         )}

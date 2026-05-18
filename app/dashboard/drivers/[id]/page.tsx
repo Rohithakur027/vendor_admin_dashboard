@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useVendor } from "@/context/VendorContext";
 import { DriverHistoryMap } from "@/components/DriverHistoryMap";
+import { vendorDriversApi } from "@/lib/api";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft, Route, TrendingUp, Circle,
@@ -706,7 +707,10 @@ export default function DriverProfilePage() {
             driverId={String(id)}
             driverName={driver.name}
             hours={12}
-            apiBase="/api/vendor/drivers"
+            fetchPoints={async (dId, range) => {
+              const res = await vendorDriversApi.locationHistory(dId, range);
+              return res.data?.history ?? [];
+            }}
           />
         </div>
       ))}

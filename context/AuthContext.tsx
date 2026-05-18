@@ -4,15 +4,18 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 
-export type UserRole = "vendor" | "superadmin";
+export type UserRole = "vendor" | "vendor_member" | "superadmin" | "superadmin_member";
 
 interface AuthUser {
   id: string;
   email: string;
   full_name: string;
   role: UserRole;
+  role_label: string | null;
   vendor_id: string | null;
+  vendor_name: string | null;
   supervisor_id: string | null;
+  permissions: Record<string, string[]>;
 }
 
 interface AuthContextValue {
@@ -24,8 +27,10 @@ interface AuthContextValue {
 }
 
 function toFrontendRole(backendRole: string): UserRole | null {
-  if (backendRole === "superadmin") return "superadmin";
-  if (backendRole === "vendor_admin") return "vendor";
+  if (backendRole === "superadmin")        return "superadmin";
+  if (backendRole === "superadmin_member") return "superadmin_member";
+  if (backendRole === "vendor_admin")      return "vendor";
+  if (backendRole === "vendor_member")     return "vendor_member";
   return null;
 }
 
@@ -39,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // On mount: restore session immediately from cache, then verify in background.
   useEffect(() => {
-    const token   = localStorage.getItem("auth_token");
-    const rawUser = localStorage.getItem("auth_user");
+    const token   = sessionStorage.getItem("auth_token");
+    const rawUser = sessionStorage.getItem("auth_user");
 
     if (!token) {
       setIsLoading(false);
@@ -68,10 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email:         res.data.email,
           full_name:     res.data.full_name,
           role,
+          role_label:    res.data.role_label,
           vendor_id:     res.data.vendor_id,
+          vendor_name:   res.data.vendor_name,
           supervisor_id: res.data.supervisor_id,
+          permissions:   res.data.permissions ?? {},
         };
-        localStorage.setItem("auth_user", JSON.stringify(fresh));
+        sessionStorage.setItem("auth_user", JSON.stringify(fresh));
         setUser(fresh);
         setIsAuthenticated(true);
       })
@@ -86,8 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function clearSession() {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
+    sessionStorage.removeItem("auth_token");
+    sessionStorage.removeItem("auth_user");
     setUser(null);
     setIsAuthenticated(false);
   }
@@ -104,12 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: res.user.email,
       full_name: res.user.full_name,
       role,
+      role_label: res.user.role_label,
       vendor_id: res.user.vendor_id,
+      vendor_name: res.user.vendor_name,
       supervisor_id: res.user.supervisor_id,
+      permissions: res.user.permissions ?? {},
     };
 
-    localStorage.setItem("auth_token", res.token);
-    localStorage.setItem("auth_user", JSON.stringify(authUser));
+    sessionStorage.setItem("auth_token", res.token);
+    sessionStorage.setItem("auth_user", JSON.stringify(authUser));
     setUser(authUser);
     setIsAuthenticated(true);
     return role;

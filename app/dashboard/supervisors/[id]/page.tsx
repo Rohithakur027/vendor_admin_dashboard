@@ -151,10 +151,12 @@ export default function SupervisorDetailPage() {
   const router   = useRouter();
   const { supervisors, bookings, drivers, updateSupervisor, deleteSupervisor, toggleAppAccess, isLoading } = useVendor();
 
+  const [fetchedSup,   setFetchedSup]   = useState<typeof supervisors[0] | null>(null);
+  const [fetchLoading, setFetchLoading] = useState(false);
   const [activeTab,    setActiveTab]    = useState("overview");
   const [deleteOpen,   setDeleteOpen]   = useState(false);
   const [settingsSection, setSettingsSection] = useState<"profile" | "security">("profile");
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as string[] });
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as { name: string; address: string | null; city: string | null; state: string | null; pincode: string | null }[] });
   const [editSaving, setEditSaving] = useState(false);
   const [editError,  setEditError]  = useState<string | null>(null);
   const [toast,      setToast]      = useState<string>("");
@@ -198,14 +200,24 @@ export default function SupervisorDetailPage() {
 
   function addCompany() {
     const t = addCompanyInput.trim();
-    if (t && !editForm.companies.includes(t)) {
-      setEditForm(f => ({ ...f, companies: [...f.companies, t] }));
+    if (!t) { setAddCompanyInput(""); return; }
+    if (editForm.companies.some(c => c.name.toLowerCase() === t.toLowerCase())) {
+      setAddCompanyInput("");
+      return;
     }
+    setEditForm(f => ({ ...f, companies: [...f.companies, { name: t, address: null, city: null, state: null, pincode: null }] }));
     setAddCompanyInput("");
   }
-  
-  function removeCompany(c: string) {
-    setEditForm(f => ({ ...f, companies: f.companies.filter(x => x !== c) }));
+
+  function removeCompany(name: string) {
+    setEditForm(f => ({ ...f, companies: f.companies.filter(c => c.name !== name) }));
+  }
+
+  function updateCompanyField(name: string, key: "address" | "city" | "state" | "pincode", value: string) {
+    setEditForm(f => ({
+      ...f,
+      companies: f.companies.map(c => c.name === name ? { ...c, [key]: value || null } : c),
+    }));
   }
 
   useEffect(() => {
@@ -213,9 +225,24 @@ export default function SupervisorDetailPage() {
     if (sup) setEditForm({ name: sup.name, email: sup.email, phone: sup.phone, zone: sup.zone, status: sup.status, shift: "Morning", companies: sup.companies ?? [] });
   }, [id, supervisors]);
 
-  const supervisor = supervisors.find(s => s.id === id);
+  // Fetch directly from API if not present in context (e.g. direct URL nav)
+  useEffect(() => {
+    if (isLoading) return;
+    if (supervisors.find(s => s.id === id)) return;
+    setFetchLoading(true);
+    supervisorsApi.get(id)
+      .then(res => {
+        const sup = res.data as unknown as typeof supervisors[0];
+        setFetchedSup(sup);
+        setEditForm({ name: sup.name, email: sup.email, phone: sup.phone, zone: sup.zone, status: sup.status, shift: "Morning", companies: sup.companies ?? [] });
+      })
+      .catch(() => setFetchedSup(null))
+      .finally(() => setFetchLoading(false));
+  }, [id, isLoading, supervisors]);
 
-  if (!isLoading && !supervisor) {
+  const supervisor = supervisors.find(s => s.id === id) ?? fetchedSup;
+
+  if (!isLoading && !fetchLoading && !supervisor) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p style={{ color: "#64748B" }}>Supervisor not found.</p>
@@ -294,7 +321,7 @@ export default function SupervisorDetailPage() {
           <div>
             <p style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>Supervisor Profile</p>
             <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
-              {isLoading || !supervisor ? (
+              {isLoading || fetchLoading || !supervisor ? (
                 <SkeletonInline className="h-3 w-32" />
               ) : (
                 <>{supervisor.name} · Full details</>
@@ -330,7 +357,7 @@ export default function SupervisorDetailPage() {
       </div>
 
       {/* ══ TAB: OVERVIEW ══ */}
-      {activeTab === "overview" && (isLoading || !supervisor ? (
+      {activeTab === "overview" && (isLoading || fetchLoading || !supervisor ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ ...CARD_STYLE, padding: 20, display: "flex", alignItems: "center", gap: 18 }}>
             <Skeleton className="h-[60px] w-[60px] rounded-full shrink-0" />
@@ -460,28 +487,41 @@ export default function SupervisorDetailPage() {
                     {supervisor.companies.length} total
                   </span>
                 </div>
-                <div style={{ padding: "0 16px 16px", display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                   {supervisor.companies.length === 0 ? (
                     <p style={{ color: "#94A3B8", fontSize: 12.5, padding: "8px 0" }}>No companies assigned.</p>
                   ) : (
-                    supervisor.companies.map((c) => (
-                      <span
-                        key={c}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          background: "#2563EB",
-                          color: "#fff",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          padding: "6px 12px",
-                          borderRadius: 8,
-                          letterSpacing: 0.1,
-                        }}
-                      >
-                        {c}
-                      </span>
-                    ))
+                    supervisor.companies.map((c) => {
+                      const cityStateLine = [c.city, c.state].filter(Boolean).join(", ");
+                      return (
+                        <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignSelf: "flex-start",
+                              alignItems: "center",
+                              background: "#2563EB",
+                              color: "#fff",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              padding: "6px 12px",
+                              borderRadius: 8,
+                              letterSpacing: 0.1,
+                            }}
+                          >
+                            {c.name}
+                          </span>
+                          {c.address && (
+                            <p style={{ fontSize: 11.5, color: "#64748B", paddingLeft: 2, lineHeight: 1.4 }}>{c.address}</p>
+                          )}
+                          {(cityStateLine || c.pincode) && (
+                            <p style={{ fontSize: 11.5, color: "#64748B", paddingLeft: 2, lineHeight: 1.4 }}>
+                              {cityStateLine}{cityStateLine && c.pincode ? " — " : ""}{c.pincode ?? ""}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -709,7 +749,7 @@ export default function SupervisorDetailPage() {
       })()}
 
       {/* ══ TAB: SPEND BREAKDOWN ══ */}
-      {activeTab === "spend" && (isLoading || !supervisor ? (
+      {activeTab === "spend" && (isLoading || fetchLoading || !supervisor ? (
         <div className="space-y-4">
           <Skeleton className="h-32 w-full rounded-2xl" />
           <Skeleton className="h-64 w-full rounded-2xl" />
@@ -720,7 +760,7 @@ export default function SupervisorDetailPage() {
 
       {/* ══ TAB: TRANSACTIONS ══ */}
       {/* ══ TAB: SETTINGS ══ */}
-      {activeTab === "settings" && (isLoading || !supervisor ? (
+      {activeTab === "settings" && (isLoading || fetchLoading || !supervisor ? (
         <div style={{ display: "flex", gap: 20 }}>
           <div style={{ width: 210, flexShrink: 0 }}>
             <div style={{ ...CARD_STYLE, padding: 6 }} className="space-y-1">
@@ -814,18 +854,46 @@ export default function SupervisorDetailPage() {
                       </button>
                     </div>
                     {editForm.companies && editForm.companies.length > 0 ? (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                        {editForm.companies.map((c: string) => (
-                          <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8 }}>
-                            {c}
-                            <button
-                              type="button"
-                              onClick={() => removeCompany(c)}
-                              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.2)", border: "none", cursor: "pointer" }}
-                            >
-                              <X className="h-2 w-2" style={{ color: "#fff" }} />
-                            </button>
-                          </span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                        {editForm.companies.map((c) => (
+                          <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, border: "1px solid #E2E8F0", borderRadius: 12, background: "#F8FAFC" }}>
+                            <span style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 6, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8 }}>
+                              {c.name}
+                              <button
+                                type="button"
+                                onClick={() => removeCompany(c.name)}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.2)", border: "none", cursor: "pointer" }}
+                              >
+                                <X className="h-2 w-2" style={{ color: "#fff" }} />
+                              </button>
+                            </span>
+                            <Input
+                              placeholder={`Street address for ${c.name} (optional)`}
+                              value={c.address ?? ""}
+                              onChange={e => updateCompanyField(c.name, "address", e.target.value)}
+                              style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                            />
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                              <Input
+                                placeholder="City"
+                                value={c.city ?? ""}
+                                onChange={e => updateCompanyField(c.name, "city", e.target.value)}
+                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                              />
+                              <Input
+                                placeholder="State"
+                                value={c.state ?? ""}
+                                onChange={e => updateCompanyField(c.name, "state", e.target.value)}
+                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                              />
+                              <Input
+                                placeholder="Pincode"
+                                value={c.pincode ?? ""}
+                                onChange={e => updateCompanyField(c.name, "pincode", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                              />
+                            </div>
+                          </div>
                         ))}
                       </div>
                     ) : (

@@ -38,6 +38,10 @@ function toBooking(item: TripApiItem): Booking {
     driverName:      item.driverName,
     pickupLocation:  item.pickupLocation,
     dropLocation:    item.dropLocation,
+    pickupLat:       item.pickupLat,
+    pickupLng:       item.pickupLng,
+    dropLat:         item.dropLat,
+    dropLng:         item.dropLng,
     scheduledTime:   item.scheduledTime,
     createdAt:       item.createdAt,
     completedAt:     item.completedAt ?? null,
@@ -46,6 +50,7 @@ function toBooking(item: TripApiItem): Booking {
     bookingSource:   item.bookingSource,
     bookingRef:      item.tripRef,
     driverPhone:     item.driverPhone,
+    stops:           item.stops ?? [],
   };
 }
 
@@ -136,7 +141,7 @@ export function VendorProvider({ children }: { children: ReactNode }) {
     // Vendor APIs are scoped to a single vendor via JWT vendor_id. Superadmins
     // (and unauthenticated visitors) have no vendor scope and would just hit
     // 400/403s. Skip the fetch entirely for them.
-    if (!isAuthenticated || user?.role !== "vendor") {
+    if (!isAuthenticated || (user?.role !== "vendor" && user?.role !== "vendor_member")) {
       setIsLoading(false);
       return;
     }

@@ -111,7 +111,7 @@ export default function LiveTrackingMap({
     if (!mapContainerRef.current) return
 
     // ── Socket setup (independent of map state) ──────────────────────────────
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('auth_token') : null
     const socket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],

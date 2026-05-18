@@ -6,6 +6,14 @@ export interface DailyRecord {
   bookings: number;
 }
 
+export interface SupervisorCompany {
+  name:    string;
+  address: string | null;
+  city:    string | null;
+  state:   string | null;
+  pincode: string | null;
+}
+
 export interface Supervisor {
   id: string;
   ref: string;
@@ -19,7 +27,7 @@ export interface Supervisor {
   isOnline: boolean;
   createdAt: string;
   walletUsed: number;
-  companies: string[];
+  companies: SupervisorCompany[];
   dailyHistory: DailyRecord[];
 }
 
@@ -30,6 +38,6 @@ export interface SupervisorFormData {
   zone: string;
   password: string;
   status: SupervisorStatus;
-  companies: string[];
+  companies: SupervisorCompany[];
   sendCredentials?: boolean;
 }

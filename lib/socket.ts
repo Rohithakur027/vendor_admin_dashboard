@@ -10,7 +10,7 @@ export function getSocket(): Socket {
   }
   if (socket?.connected) return socket;
 
-  const token = localStorage.getItem("auth_token");
+  const token = sessionStorage.getItem("auth_token");
 
   if (socket) {
     socket.auth = { token };

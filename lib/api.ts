@@ -4,7 +4,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("auth_token");
+  return sessionStorage.getItem("auth_token");
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -26,6 +26,18 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return body as T;
 }
 
+async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: formData,
+  });
+  const body = await res.json().catch(() => ({})) as { error?: string; message?: string };
+  if (!res.ok) throw new Error(body.error ?? body.message ?? `Upload failed (${res.status})`);
+  return body as T;
+}
+
 // ── Auth ────────────────────────────────────────────────────────────────────
 
 export interface LoginResponse {
@@ -36,8 +48,11 @@ export interface LoginResponse {
     full_name: string;
     email: string;
     role: string;
+    role_label: string | null;
     vendor_id: string | null;
+    vendor_name: string | null;
     supervisor_id: string | null;
+    permissions: Record<string, string[]>;
   };
 }
 
@@ -48,9 +63,12 @@ export interface MeResponse {
     full_name: string;
     email: string;
     role: string;
+    role_label: string | null;
     vendor_id: string | null;
+    vendor_name: string | null;
     supervisor_id: string | null;
     is_active: boolean;
+    permissions: Record<string, string[]>;
   };
 }
 
@@ -95,6 +113,21 @@ export const authApi = {
 
 // ── Vendors ─────────────────────────────────────────────────────────────────
 
+export interface VendorDocument {
+  id:          string;
+  vendor_id:   string;
+  doc_type:    string;
+  doc_number:  string | null;
+  expiry_date: string | null;
+  file_url:    string | null;
+  is_verified: boolean;
+  verified_at: string | null;
+  verified_by: string | null;
+  note:        string | null;
+  created_at:  string;
+  updated_at:  string;
+}
+
 export interface CreateVendorPayload {
   name: string;
   pan?: string;
@@ -102,6 +135,7 @@ export interface CreateVendorPayload {
   email: string;
   phone: string;
   city: string;
+  address?: string;
   password: string;
   secondaryPOCs?: { name: string; email: string; phone: string }[];
   walletAmount?: number;
@@ -161,10 +195,38 @@ export const vendorsApi = {
       body: JSON.stringify(payload),
     }),
 
-  update: (id: string, payload: { status?: "Active" | "Inactive"; name?: string; city?: string }) =>
+  uploadDocument: async (vendorId: string, docType: "PAN_CARD" | "GST_CERTIFICATE", docNumber: string | undefined, file: File | undefined) => {
+    const fd = new FormData();
+    fd.append("doc_type", docType);
+    if (docNumber) fd.append("doc_number", docNumber);
+    if (file) fd.append("file", file);
+    return apiUpload<{ success: true; data: unknown }>(`/api/superadmin/vendors/${vendorId}/documents/upload`, fd);
+  },
+
+  update: (id: string, payload: {
+    status?: "Active" | "Inactive";
+    name?: string;
+    city?: string;
+    contactPerson?: string;
+    phone?: string;
+    email?: string;
+    pan?: string;
+    gst?: string;
+  }) =>
     apiFetch<{ success: true; data: VendorDetailApiItem }>(`/api/superadmin/vendors/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+
+  verify: (id: string) =>
+    apiFetch<{ success: true; data: VendorDetailApiItem }>(`/api/superadmin/vendors/${id}/verify`, {
+      method: "POST",
+    }),
+
+  reject: (id: string, reason?: string) =>
+    apiFetch<{ success: true }>(`/api/superadmin/vendors/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
     }),
 
   recharge: (id: string, amount: number) =>
@@ -189,9 +251,51 @@ export const vendorsApi = {
 
   transactions: (id: string) =>
     apiFetch<{ success: true; data: WalletTransaction[] }>(`/api/superadmin/vendors/${id}/transactions`),
+
+  trips: (id: string, limit = 100) =>
+    apiFetch<{ success: true; data: TripApiItem[] }>(`/api/superadmin/vendors/${id}/trips?limit=${limit}`),
+
+  documents: {
+    upload: (id: string, formData: FormData) =>
+      apiUpload<{ success: true; data: VendorDocument }>(`/api/superadmin/vendors/${id}/documents/upload`, formData),
+    list: (id: string) =>
+      apiFetch<{ success: true; data: VendorDocument[] }>(`/api/superadmin/vendors/${id}/documents`),
+    patch: (id: string, docType: string, action: "approve" | "reject", note?: string) =>
+      apiFetch<{ success: true; data: VendorDocument }>(`/api/superadmin/vendors/${id}/documents/${docType}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, note }),
+      }),
+  },
+};
+
+// ── Vendor Self-Registration ─────────────────────────────────────────────────
+
+export interface VendorSignupPayload {
+  name:          string;
+  city:          string;
+  contactPerson: string;
+  email:         string;
+  phone:         string;
+  password:      string;
+}
+
+export const vendorSignupApi = {
+  signup: (payload: VendorSignupPayload) =>
+    apiFetch<LoginResponse>("/api/auth/vendor-signup", {
+      method: "POST",
+      body:   JSON.stringify(payload),
+    }),
 };
 
 // ── Supervisors ──────────────────────────────────────────────────────────────
+
+export interface SupervisorCompany {
+  name:    string;
+  address: string | null;
+  city:    string | null;
+  state:   string | null;
+  pincode: string | null;
+}
 
 export interface SupervisorApiData {
   id: string;
@@ -206,7 +310,7 @@ export interface SupervisorApiData {
   isOnline: boolean;
   createdAt: string;
   walletUsed: number;
-  companies: string[];
+  companies: SupervisorCompany[];
   dailyHistory: { date: string; amount: number; bookings: number }[];
 }
 
@@ -214,10 +318,13 @@ export const supervisorsApi = {
   list: () =>
     apiFetch<{ success: true; data: SupervisorApiData[] }>("/api/vendor/supervisors"),
 
+  get: (id: string) =>
+    apiFetch<{ success: true; data: SupervisorApiData }>(`/api/vendor/supervisors/${id}`),
+
   create: (payload: {
     name: string; email: string; phone: string; zone?: string;
     password: string; status?: "Active" | "Inactive";
-    companies?: string[];
+    companies?: SupervisorCompany[];
     sendCredentials?: boolean;
   }) =>
     apiFetch<{ success: true; data: SupervisorApiData }>("/api/vendor/supervisors", {
@@ -228,7 +335,7 @@ export const supervisorsApi = {
   update: (id: string, payload: {
     name?: string; email?: string; phone?: string; zone?: string;
     status?: "Active" | "Inactive";
-    companies?: string[];
+    companies?: SupervisorCompany[];
   }) =>
     apiFetch<{ success: true; data: SupervisorApiData }>(`/api/vendor/supervisors/${id}`, {
       method: "PUT",
@@ -320,6 +427,11 @@ export const superadminApi = {
 
     documents: (id: string) =>
       apiFetch<{ success: true; data: DriverDocuments }>(`/api/superadmin/drivers/${id}/documents`),
+
+    onboardingDocs: (id: string) =>
+      apiFetch<{ success: true; data: { onboardingId: string | null; documents: OnboardingDetail["documents"] | null; doc_counts: OnboardingDetail["doc_counts"] | null } }>(
+        `/api/superadmin/drivers/${id}/onboarding-docs`,
+      ),
 
     trips: (id: string, params?: { startDate?: string; endDate?: string; limit?: number }) => {
       const qs = new URLSearchParams();
@@ -670,6 +782,7 @@ export interface OverviewDriver {
   bookingsToday: number;
   vehicle: string | null;
   vehicleModel: string | null;
+  vehicleType: string | null;
 }
 
 export interface OverviewData {
@@ -693,6 +806,10 @@ export interface TripApiItem {
   status: string;
   pickupLocation: string;
   dropLocation: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  dropLat: number | null;
+  dropLng: number | null;
   scheduledTime: string | null;
   fare: number | null;
   passengers: number | null;
@@ -709,6 +826,7 @@ export interface TripApiItem {
   vehicleColor: string | null;
   vehicleMakeYear: number | null;
   completedAt: string | null;
+  stops: { id: string; address: string; stopOrder: number }[];
 }
 
 // ── Supervisor Report ────────────────────────────────────────────────────────
@@ -972,4 +1090,154 @@ export const invoicesApi = {
     apiFetch<{ success: true }>(`/api/vendor/invoices/${id}/void`, {
       method: "POST",
     }),
+};
+
+// ── Superadmin — Team Members ────────────────────────────────────────────────
+
+interface ApiTeamMember {
+  id:            string;
+  full_name:     string;
+  email:         string | null;
+  mobile_number: string;
+  role_label:    string | null;
+  permissions:   Record<string, string[]> | null;
+  is_active:     boolean | null;
+  last_login_at: string | null;
+  created_at:    string | null;
+}
+
+export interface TeamMemberShape {
+  id:            string;
+  full_name:     string;
+  email:         string;
+  phone:         string;
+  role_label:    string;
+  permissions:   Record<string, string[]>;
+  is_active:     boolean;
+  last_login_at: string | null;
+  created_at:    string;
+}
+
+function normalizeTeamMember(m: ApiTeamMember): TeamMemberShape {
+  return {
+    id:            m.id,
+    full_name:     m.full_name,
+    email:         m.email ?? "",
+    phone:         m.mobile_number,
+    role_label:    m.role_label ?? "",
+    permissions:   (m.permissions ?? {}) as Record<string, string[]>,
+    is_active:     m.is_active ?? true,
+    last_login_at: m.last_login_at ?? null,
+    created_at:    m.created_at ?? new Date().toISOString(),
+  };
+}
+
+export const superadminTeamApi = {
+  list: () =>
+    apiFetch<{ success: true; data: ApiTeamMember[] }>("/api/superadmin/team")
+      .then(r => r.data.map(normalizeTeamMember)),
+
+  create: (body: {
+    full_name:     string;
+    email:         string;
+    mobile_number: string;
+    password:      string;
+    role_label:    string;
+    permissions:   Record<string, string[]>;
+    is_active?:    boolean;
+  }) =>
+    apiFetch<{ success: true; data: ApiTeamMember }>("/api/superadmin/team", {
+      method: "POST",
+      body:   JSON.stringify(body),
+    }).then(r => normalizeTeamMember(r.data)),
+
+  update: (id: string, body: {
+    full_name?:     string;
+    email?:         string;
+    mobile_number?: string;
+    password?:      string;
+    role_label?:    string;
+    permissions?:   Record<string, string[]>;
+    is_active?:     boolean;
+  }) =>
+    apiFetch<{ success: true; data: ApiTeamMember }>(`/api/superadmin/team/${id}`, {
+      method: "PUT",
+      body:   JSON.stringify(body),
+    }).then(r => normalizeTeamMember(r.data)),
+
+  toggleStatus: (id: string) =>
+    apiFetch<{ success: true; data: { id: string; is_active: boolean } }>(
+      `/api/superadmin/team/${id}/toggle-status`,
+      { method: "PATCH" },
+    ).then(r => r.data),
+
+  delete: (id: string) =>
+    apiFetch<{ success: true; message: string }>(`/api/superadmin/team/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+// ── Vendor Dashboard — Team Members ──────────────────────────────────────────
+
+export const vendorTeamApi = {
+  list: () =>
+    apiFetch<{ success: true; data: ApiTeamMember[] }>("/api/vendor/team")
+      .then(r => r.data.map(normalizeTeamMember)),
+
+  create: (body: {
+    full_name:     string;
+    email:         string;
+    mobile_number: string;
+    password:      string;
+    role_label:    string;
+    permissions:   Record<string, string[]>;
+    is_active?:    boolean;
+  }) =>
+    apiFetch<{ success: true; data: ApiTeamMember }>("/api/vendor/team", {
+      method: "POST",
+      body:   JSON.stringify(body),
+    }).then(r => normalizeTeamMember(r.data)),
+
+  update: (id: string, body: {
+    full_name?:     string;
+    email?:         string;
+    mobile_number?: string;
+    password?:      string;
+    role_label?:    string;
+    permissions?:   Record<string, string[]>;
+    is_active?:     boolean;
+  }) =>
+    apiFetch<{ success: true; data: ApiTeamMember }>(`/api/vendor/team/${id}`, {
+      method: "PUT",
+      body:   JSON.stringify(body),
+    }).then(r => normalizeTeamMember(r.data)),
+
+  toggleStatus: (id: string) =>
+    apiFetch<{ success: true; data: { id: string; is_active: boolean } }>(
+      `/api/vendor/team/${id}/toggle-status`,
+      { method: "PATCH" },
+    ).then(r => r.data),
+
+  delete: (id: string) =>
+    apiFetch<{ success: true; message: string }>(`/api/vendor/team/${id}`, {
+      method: "DELETE",
+    }),
+};
+
+export const vendorDriversApi = {
+  locationHistory: (
+    id:    string,
+    range: { from: string; to: string } | { hours: number },
+  ) => {
+    const qs = new URLSearchParams();
+    if ("from" in range) {
+      qs.set("from", range.from);
+      qs.set("to",   range.to);
+    } else {
+      qs.set("hours", String(range.hours));
+    }
+    return apiFetch<DriverLocationHistoryResponse>(
+      `/api/vendor/drivers/${id}/location-history?${qs.toString()}`,
+    );
+  },
 };

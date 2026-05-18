@@ -66,27 +66,27 @@ export default function DriverOnboardingPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
 
       {/* Page header */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Driver Onboarding</h2>
-          <button
-            style={{
-              display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
-              padding: "9px 16px", borderRadius: 10, border: "none", cursor: "pointer",
-              background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FONT,
-              whiteSpace: "nowrap" as const,
-            }}
-          >
-            <span style={{
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              width: 18, height: 18, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.5)",
-            }}>
-              <Plus style={{ width: 10, height: 10 }} />
-            </span>
-            Onboard Driver
-          </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", margin: 0 }}>Driver Onboarding</h2>
+          <p style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0 0" }}>Review and verify pending driver registrations</p>
         </div>
-        <p style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>Review and verify pending driver registrations</p>
+        <button
+          style={{
+            display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+            padding: "9px 16px", borderRadius: 10, border: "none", cursor: "pointer",
+            background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, fontFamily: FONT,
+            whiteSpace: "nowrap" as const,
+          }}
+        >
+          <span style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: 18, height: 18, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.5)",
+          }}>
+            <Plus style={{ width: 10, height: 10 }} />
+          </span>
+          Onboard Driver
+        </button>
       </div>
 
       {/* Stat cards */}
