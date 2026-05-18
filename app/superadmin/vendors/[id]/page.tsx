@@ -18,7 +18,47 @@ const DocumentViewer = dynamic(
 );
 import { SearchBar } from "@/components/SearchBar";
 import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { TripsTable } from "@/modules/bookings/components/TripsTable";
+import { buildTripRenderers, formatIST } from "@/modules/bookings/tripRenderers";
+import type { Booking, BookingStatus, BookingType } from "@/modules/bookings/types";
 import { cn } from "@/lib/utils";
+
+const VENDOR_TRIPS_TABLE_KEY = "vendorTripsAdmin" as const;
+
+// Adapt the superadmin trips API shape (TripApiItem) into the Booking shape
+// the shared TripsTable + tripRenderers expect. supervisorName/driver info
+// stay attached so the renderers (which take id-based lookups) can resolve
+// them through the maps we build alongside.
+function tripApiItemToBooking(t: TripApiItem): Booking {
+  return {
+    id:              t.id,
+    type:            (t.type as BookingType) ?? "Instant",
+    supervisorId:    t.supervisorId ?? "",
+    supervisorName:  t.supervisorName ?? "",
+    driverId:        t.driverId,
+    driverName:      t.driverName,
+    pickupLocation:  t.pickupLocation,
+    dropLocation:    t.dropLocation,
+    scheduledTime:   t.scheduledTime,
+    status:          (t.status as BookingStatus) ?? "Pending",
+    createdAt:       t.createdAt,
+    completedAt:     t.completedAt,
+    fare:            t.fare ?? undefined,
+    passengers:      t.passengers ?? undefined,
+    bookingSource:   t.bookingSource,
+    bookingRef:      t.tripRef,
+    driverPhone:     t.driverPhone,
+    pickupLat:       t.pickupLat,
+    pickupLng:       t.pickupLng,
+    dropLat:         t.dropLat,
+    dropLng:         t.dropLng,
+    stops:           t.stops,
+  };
+}
 
 declare global {
   interface Window {
@@ -147,6 +187,16 @@ export default function VendorProfilePage() {
   function cancelTripFilter() { setTripFilterOpen(false); }
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Column visibility for the superadmin Trips tab — shared infra with Past Trips
+  // so the Columns popover and the rendering pipeline are identical.
+  const {
+    columns: tripsVisibleCols,
+    toggle:  toggleTripsCol,
+    reset:   resetTripsCols,
+    totalCount: tripsTotalCols,
+    loading: tripsPrefsLoading,
+  } = useColumnPreferences(VENDOR_TRIPS_TABLE_KEY);
 
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [rechargeAmt,  setRechargeAmt]  = useState("");
@@ -655,6 +705,35 @@ export default function VendorProfilePage() {
           return matchQ && matchSt && matchTy && matchDate;
         });
 
+        // Adapt the API rows into Booking shape so the shared TripsTable +
+        // tripRenderers can render them identically to Past Trips.
+        const filteredBookings: Booking[] = filtered.map(tripApiItemToBooking);
+        const tripSupervisorMap = new Map(
+          filtered.filter(t => t.supervisorId).map(t => [t.supervisorId as string, t.supervisorName ?? ""]),
+        );
+        const tripDriverMap = new Map(
+          filtered.map(t => [t.id, {
+            name:        t.driverName,
+            phone:       t.driverPhone,
+            vehicle:     t.vehicleModel,
+            vehicleReg:  t.vehicleReg,
+            vehicleType: t.vehicleType,
+          }]),
+        );
+        const tripsRenderers = buildTripRenderers(
+          (id) => (id ? (tripSupervisorMap.get(id) ?? "") : ""),
+          (b)  => {
+            const d = tripDriverMap.get(b.id) ?? { name: null, phone: null, vehicle: null, vehicleReg: null, vehicleType: null };
+            return {
+              name:        d.name ?? null,
+              vehicle:     d.vehicle ?? null,
+              vehicleReg:  d.vehicleReg ?? null,
+              vehicleType: d.vehicleType ?? null,
+              phone:       d.phone ?? null,
+            };
+          },
+        );
+
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {/* Search + Filter row */}
@@ -829,116 +908,52 @@ export default function VendorProfilePage() {
                   })()}
                 </FilterPanel>
               </div>
+
+              <ColumnsPopover
+                tableKey={VENDOR_TRIPS_TABLE_KEY}
+                visible={tripsVisibleCols}
+                totalCount={tripsTotalCols}
+                onToggle={toggleTripsCol}
+                onReset={resetTripsCols}
+              />
+
+              <ExportButton
+                onClick={() => {
+                  const rows = filteredBookings.map((b) => {
+                    const out: Record<string, string | number> = {};
+                    out["Trip ID"]   = b.bookingRef ?? "";
+                    out["Trip Type"] = b.type ?? "";
+                    out["Route"]     = `${b.pickupLocation} → ${b.dropLocation}`;
+                    out["Supervisor"] = b.supervisorName ?? "";
+                    out["Company"]    = b.bookingSource ?? "";
+                    out["Vehicle"]    = [tripDriverMap.get(b.id)?.vehicleReg, tripDriverMap.get(b.id)?.vehicle].filter(Boolean).join(" · ");
+                    out["Driver"]     = b.driverName ?? "";
+                    out["Status"]     = b.status;
+                    out["Fare"]       = b.fare ?? "";
+                    out["Created At"] = formatIST(b.createdAt) ?? "";
+                    return out;
+                  });
+                  exportToCsv(`vendor-${id}-trips`, rows);
+                }}
+                disabled={tripsLoading || filteredBookings.length === 0}
+                className="ml-auto"
+              />
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-              <div className="w-full overflow-x-auto">
-                <div className="min-w-[860px]">
-                  {/* Header */}
-                  <div className="grid grid-cols-[100px_2fr_140px_150px_110px_90px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                    {["TRIP ID & TYPE","ROUTE","SUPERVISOR","DRIVER","STATUS","CREATED AT"].map(h => (
-                      <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
-                    ))}
-                  </div>
-
-                  {/* Rows */}
-                  <div className="flex flex-col divide-y divide-slate-100">
-                    {tripsLoading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="grid grid-cols-[100px_2fr_140px_150px_110px_90px] items-center gap-4 px-6 py-3.5">
-                          <div className="space-y-2">
-                            <SkeletonBox w={80} h={14} />
-                            <SkeletonBox w={48} h={14} r={4} />
-                          </div>
-                          <div className="space-y-1.5 pr-4">
-                            <SkeletonBox w="75%" h={14} />
-                            <SkeletonBox w={56} h={8} />
-                            <SkeletonBox w="60%" h={12} />
-                          </div>
-                          <SkeletonBox w={100} h={14} />
-                          <div className="space-y-1.5">
-                            <SkeletonBox w={96} h={14} />
-                            <SkeletonBox w={72} h={12} />
-                          </div>
-                          <SkeletonBox w={80} h={22} r={20} />
-                          <div className="space-y-1">
-                            <SkeletonBox w={56} h={14} />
-                            <SkeletonBox w={44} h={12} />
-                          </div>
-                        </div>
-                      ))
-                    ) : filtered.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
-                        <p className="text-sm font-medium">{trips.length === 0 ? "No trips yet." : "No trips match your filters."}</p>
-                      </div>
-                    ) : (
-                      filtered.map(trip => {
-                        const d   = new Date(trip.createdAt);
-                        const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-                        const tm  = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
-                        return (
-                          <div key={trip.id} className="grid grid-cols-[100px_2fr_140px_150px_110px_90px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors">
-                            {/* TRIP ID & TYPE */}
-                            <div className="flex flex-col items-start gap-1">
-                              <span className="font-extrabold text-[#111827] text-[13px]">{trip.tripRef ?? "—"}</span>
-                              <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
-                                {trip.type}
-                              </span>
-                            </div>
-
-                            {/* ROUTE */}
-                            <div className="flex flex-col min-w-0 pr-4 gap-px">
-                              <span className="font-semibold text-[13px] text-slate-800 leading-tight truncate">
-                                {trip.pickupLocation.split(",")[0]}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <div className="w-14 h-[2px] rounded-full" style={{ background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
-                                <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
-                              </div>
-                              <span className="text-[12px] text-gray-500 truncate">
-                                {trip.dropLocation.split(",")[0]}
-                              </span>
-                            </div>
-
-                            {/* SUPERVISOR */}
-                            <div className="flex flex-col items-start gap-1">
-                              {trip.supervisorName ? (
-                                <span className="text-[13px] font-medium text-slate-600 truncate max-w-[130px]">{trip.supervisorName}</span>
-                              ) : (
-                                <span className="text-[13px] text-slate-300 font-medium italic">—</span>
-                              )}
-                            </div>
-
-                            {/* DRIVER */}
-                            <div className="flex flex-col gap-px">
-                              {trip.driverName ? (
-                                <>
-                                  <span className="text-[13px] font-medium text-slate-600 truncate">{trip.driverName}</span>
-                                  {trip.driverPhone && <span className="text-[11px] text-slate-400 truncate">{trip.driverPhone}</span>}
-                                </>
-                              ) : (
-                                <span className="text-[13px] text-slate-300 font-medium italic">Awaiting</span>
-                              )}
-                            </div>
-
-                            {/* STATUS */}
-                            <div>
-                              <StatusPill status={trip.status} />
-                            </div>
-
-                            {/* CREATED AT */}
-                            <div className="flex flex-col text-left">
-                              <span className="text-[13px] font-medium text-slate-700">{day}</span>
-                              <span className="text-[11px] text-slate-400 font-medium mt-0.5">{tm}</span>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 text-[13px] text-slate-500">
+              <span className="font-semibold text-slate-400 text-[14px]">{filteredBookings.length}</span>
+              <span>{filteredBookings.length === 1 ? "trip" : "trips"} on this page</span>
             </div>
+
+            <TripsTable
+              items={filteredBookings}
+              visibleCols={tripsVisibleCols}
+              renderers={tripsRenderers}
+              tableKey={VENDOR_TRIPS_TABLE_KEY}
+              isLoading={tripsLoading}
+              prefsLoading={tripsPrefsLoading}
+              emptyMessage={trips.length === 0 ? "No trips yet." : "No trips match your filters."}
+            />
           </div>
         );
       })()}

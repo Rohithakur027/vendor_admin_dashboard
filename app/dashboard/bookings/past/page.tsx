@@ -1,20 +1,21 @@
 "use client";
 
-import React, { useMemo, useState, Fragment } from "react";
+import React, { useMemo, useState } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SearchBar } from "@/components/SearchBar";
 import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
 import { toIsoDate } from "@/modules/reports/primitives";
-import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
+import { SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
 import { ExportButton } from "@/components/ExportButton";
 import { exportToCsv } from "@/lib/exportCsv";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
-import { buildTripRenderers, EM_DASH } from "@/modules/bookings/tripRenderers";
+import { buildTripRenderers } from "@/modules/bookings/tripRenderers";
+import { TripsTable } from "@/modules/bookings/components/TripsTable";
 
 const TABLE_KEY = "pastTrips" as const;
 
@@ -106,21 +107,6 @@ export default function PastBookingsPage() {
     [supervisors, drivers],
   );
 
-  // Compute the grid-template-columns string from visible columns + their minWidths.
-  const gridTemplate = useMemo(() => {
-    return visibleCols
-      .map(key => {
-        const col = spec.columns.find(c => c.key === key);
-        return col ? `minmax(${col.minWidth}px, 1fr)` : "1fr";
-      })
-      .join(" ");
-  }, [visibleCols, spec.columns]);
-
-  const minTableWidth = useMemo(
-    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 48,
-    [visibleCols, spec.columns],
-  );
-
   function handleExport() {
     const rows = filtered.map(b => {
       const out: Record<string, string | number> = {};
@@ -196,82 +182,18 @@ export default function PastBookingsPage() {
           <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" />
         </div>
 
-        {/* TABLE */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="w-full overflow-x-auto">
-            <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
-              {/* Header — sticky to top of scroll container */}
-              <div
-                className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
-                style={{ gridTemplateColumns: gridTemplate }}
-              >
-                {prefsLoading
-                  ? Array.from({ length: visibleCols.length }).map((_, i) => (
-                      <Skeleton key={i} className={`h-3 ${i === 0 ? "w-24" : "w-16"}`} />
-                    ))
-                  : visibleCols.map((k, i) => {
-                      const col = spec.columns.find(c => c.key === k);
-                      if (!col) return null;
-                      const headerClass = "text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate";
-                      // Sticky first column
-                      const stickyStyle = i === 0
-                        ? { position: "sticky" as const, left: 0, background: "rgb(248 250 252 / 0.95)", zIndex: 3 }
-                        : undefined;
-                      return (
-                        <div key={k} className={headerClass} style={stickyStyle} title={col.label}>
-                          {col.label}
-                        </div>
-                      );
-                    })}
-              </div>
-
-              {/* Body */}
-              <div className="flex flex-col divide-y divide-slate-100">
-                {(isLoading || prefsLoading) ? (
-                  Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i}
-                      className="grid items-center gap-4 px-6 py-3.5 bg-white"
-                      style={{ gridTemplateColumns: gridTemplate }}
-                    >
-                      {visibleCols.map((k, j) => {
-                        const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
-                        const stickyStyle = j === 0
-                          ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
-                          : undefined;
-                        return <div key={k} style={stickyStyle} className="min-w-0">{r?.skeleton() ?? <Skeleton className="h-3.5 w-14" />}</div>;
-                      })}
-                    </div>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">No past trips found.</div>
-                ) : (
-                  filtered.map((booking, idx) => (
-                    <Fragment key={booking.id}>
-                      {idx === splitAt && <MockSeparator />}
-                      <div
-                        className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer group"
-                        style={{ gridTemplateColumns: gridTemplate }}
-                        onClick={() => setSelectedBooking(booking)}
-                      >
-                        {visibleCols.map((k, j) => {
-                          const r = (renderers as Record<string, { body: (b: Booking) => React.ReactNode }>)[k];
-                          const stickyStyle = j === 0
-                            ? { position: "sticky" as const, left: 0, background: "inherit", zIndex: 1 }
-                            : undefined;
-                          return (
-                            <div key={k} style={stickyStyle} className="min-w-0">
-                              {r ? r.body(booking) : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </Fragment>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TripsTable
+          items={filtered}
+          visibleCols={visibleCols}
+          renderers={renderers}
+          tableKey={TABLE_KEY}
+          isLoading={isLoading}
+          prefsLoading={prefsLoading}
+          onRowClick={setSelectedBooking}
+          splitAt={splitAt}
+          separator={<MockSeparator />}
+          emptyMessage="No past trips found."
+        />
       </div>
 
       <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />

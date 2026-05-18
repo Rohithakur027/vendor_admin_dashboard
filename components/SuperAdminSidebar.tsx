@@ -17,6 +17,8 @@ type NavItem = {
   icon: React.ElementType;
   // null = always shown; otherwise hidden for superadmin_member without this permission.
   permission?: keyof typeof SUPERADMIN_PERMISSION_KEYS | null;
+  // true = hidden from superadmin_member entirely (e.g. team management).
+  adminOnly?: boolean;
 };
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -27,6 +29,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck, permission: "DRIVER_MANAGEMENT" },
   { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare, permission: "TRIP_MONITORING" },
   { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2,     permission: "REPORTS_MANAGEMENT" },
+  { label: "Settings",          href: "/superadmin/settings",          icon: Settings,      permission: null, adminOnly: true },
 ];
 
 function getInitials(name: string): string {
@@ -68,6 +71,7 @@ export function SuperAdminSidebar({
   const navItems = useMemo<NavItem[]>(() => {
     if (!isMember) return ALL_NAV_ITEMS;
     return ALL_NAV_ITEMS.filter(item => {
+      if (item.adminOnly) return false;
       if (item.permission == null) return true;
       return hasModuleAccess(user?.permissions, SUPERADMIN_PERMISSION_KEYS[item.permission]);
     });
@@ -142,28 +146,6 @@ export function SuperAdminSidebar({
         })}
       </nav>
 
-      {/* Settings — pinned just above the user profile; admins only */}
-      {!isMember && (
-        <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
-          {(() => {
-            const settingsActive = pathname.startsWith("/superadmin/settings");
-            const linkClass = cn(
-              "flex items-center gap-3 rounded-lg text-sm transition-colors",
-              isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
-              settingsActive
-                ? "bg-blue-50/70 text-blue-600 font-medium"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            );
-            const link = (
-              <Link href="/superadmin/settings" onClick={onLinkClick} className={linkClass}>
-                <Settings className="h-4 w-4 shrink-0" />
-                {!isCollapsed && "Settings"}
-              </Link>
-            );
-            return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
-          })()}
-        </div>
-      )}
 
       {/* Sign out — pinned above the user profile, red accent */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>

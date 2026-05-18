@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { vendorsApi, type VendorDetailApiItem } from "@/lib/api";
+import { vendorsApi, type VendorDetailApiItem, type VendorDocument } from "@/lib/api";
 import {
   ArrowLeft, Building2, Mail, Phone, MapPin, User,
-  CheckCircle2, XCircle, Loader2, AlertCircle, FileText, Users,
+  CheckCircle2, XCircle, Loader2, AlertCircle, FileText, Users, ExternalLink,
 } from "lucide-react";
 
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -53,6 +53,7 @@ export default function VendorReviewPage() {
   const router  = useRouter();
 
   const [vendor,   setVendor]   = useState<VendorDetailApiItem | null>(null);
+  const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState("");
 
@@ -66,8 +67,11 @@ export default function VendorReviewPage() {
 
   useEffect(() => {
     if (!id) return;
-    vendorsApi.get(id)
-      .then(res => setVendor(res.data))
+    Promise.all([
+      vendorsApi.get(id),
+      vendorsApi.documents.list(id).catch(() => ({ success: true as const, data: [] as VendorDocument[] })),
+    ])
+      .then(([vRes, dRes]) => { setVendor(vRes.data); setDocuments(dRes.data ?? []); })
       .catch(err => setError(err instanceof Error ? err.message : "Failed to load vendor"))
       .finally(() => setLoading(false));
   }, [id]);
@@ -132,6 +136,29 @@ export default function VendorReviewPage() {
         </div>
       </div>
 
+      {/* ── Current status badge ── */}
+      {(() => {
+        const v = vendor as VendorDetailApiItem & { is_verified?: boolean; verification_note?: string | null };
+        const isVerified = v.is_verified === true;
+        const isRejected = v.is_verified === false && !!v.verification_note;
+        const bg     = isVerified ? "#F0FDF4" : isRejected ? "#FEF2F2" : "#FFFBEB";
+        const border = isVerified ? "#BBF7D0" : isRejected ? "#FECACA" : "#FDE68A";
+        const color  = isVerified ? "#15803D" : isRejected ? "#B91C1C" : "#92400E";
+        const dot    = isVerified ? "#16A34A" : isRejected ? "#DC2626" : "#F59E0B";
+        const label  = isVerified ? "Verified" : isRejected ? "Rejected" : "Pending review";
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, background: bg, border: `1.5px solid ${border}`, borderRadius: 12, padding: "12px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: dot }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color }}>{label}</span>
+            </div>
+            {v.verification_note && (
+              <span style={{ fontSize: 12, color, fontWeight: 600, opacity: 0.85 }}>Reason: {v.verification_note}</span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Done banner ── */}
       {done && (
         <div style={{
@@ -186,22 +213,36 @@ export default function VendorReviewPage() {
       )}
 
       {/* ── Documents ── */}
-      {vendor.secondaryPOCs !== undefined && (
-        <SectionCard title="Submitted Documents">
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {(["PAN_CARD", "GST_CERTIFICATE"] as const).map(docType => {
-              const label = docType === "PAN_CARD" ? "PAN Card" : "GST Registration Certificate";
-              return (
-                <div key={docType} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#F8FAFC", borderRadius: 10, border: "1px solid #E8EEF4" }}>
-                  <FileText style={{ width: 16, height: 16, color: "#94A3B8", flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", flex: 1 }}>{label}</span>
-                  <span style={{ fontSize: 11.5, color: "#94A3B8", fontWeight: 500 }}>Not submitted</span>
+      <SectionCard title="Submitted Documents">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {(["PAN_CARD", "GST_CERTIFICATE"] as const).map(docType => {
+            const label = docType === "PAN_CARD" ? "PAN Card" : "GST Registration Certificate";
+            const doc = documents.find(d => d.doc_type === docType);
+            return (
+              <div key={docType} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "#F8FAFC", borderRadius: 10, border: "1px solid #E8EEF4" }}>
+                <FileText style={{ width: 16, height: 16, color: doc ? "#2563EB" : "#94A3B8", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{label}</p>
+                  {doc && (
+                    <p style={{ fontSize: 11.5, color: "#64748B", marginTop: 2 }}>
+                      {doc.doc_number || "No number"}
+                      {doc.expiry_date ? ` · expires ${fmtDate(doc.expiry_date)}` : ""}
+                    </p>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </SectionCard>
-      )}
+                {doc?.file_url ? (
+                  <a href={doc.file_url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700, color: "#2563EB", textDecoration: "none" }}>
+                    View <ExternalLink style={{ width: 12, height: 12 }} />
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 11.5, color: "#94A3B8", fontWeight: 500 }}>{doc ? "No file" : "Not submitted"}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </SectionCard>
 
       {/* ── Action error ── */}
       {actionErr && (

@@ -22,6 +22,18 @@ import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailM
 import type { Booking } from "@/modules/bookings/types";
 import { SearchBar } from "@/components/SearchBar";
 import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { TripsTable } from "@/modules/bookings/components/TripsTable";
+import { buildTripRenderers, formatIST } from "@/modules/bookings/tripRenderers";
+import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
+import { toIsoDate } from "@/modules/reports/primitives";
+
+// Own preference key so a vendor admin can configure the supervisor profile's
+// Recent Trips table independently of the global Past Trips view.
+const SUPERVISOR_TRIPS_TABLE_KEY = "supervisorRecentTrips" as const;
 
 // ── constants ───────────────────────────────────────────────────────────────
 const ACCENT = "#2563EB";
@@ -154,6 +166,15 @@ export default function SupervisorDetailPage() {
   const [fetchedSup,   setFetchedSup]   = useState<typeof supervisors[0] | null>(null);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [activeTab,    setActiveTab]    = useState("overview");
+
+  // Column visibility for the Recent Trips table — same plumbing as Past Trips.
+  const {
+    columns: tripsVisibleCols,
+    toggle:  toggleTripsCol,
+    reset:   resetTripsCols,
+    totalCount: tripsTotalCols,
+    loading: tripsPrefsLoading,
+  } = useColumnPreferences(SUPERVISOR_TRIPS_TABLE_KEY);
   const [deleteOpen,   setDeleteOpen]   = useState(false);
   const [settingsSection, setSettingsSection] = useState<"profile" | "security">("profile");
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as { name: string; address: string | null; city: string | null; state: string | null; pincode: string | null }[] });
@@ -183,6 +204,9 @@ export default function SupervisorDetailPage() {
   const [draftTripStatus,  setDraftTripStatus]  = useState("All Status");
   const [draftTripType,    setDraftTripType]    = useState("All Types");
   const [tripFilterOpen,   setTripFilterOpen]   = useState(false);
+  const [tripPeriod,       setTripPeriod]       = useState<TripPeriod>("all");
+  const [tripDateFrom,     setTripDateFrom]     = useState("");
+  const [tripDateTo,       setTripDateTo]       = useState("");
 
   function openTripFilter() {
     setDraftTripStatus(tripStatus);
@@ -446,6 +470,7 @@ export default function SupervisorDetailPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
 
             {/* Wallet Card — blue gradient matching dashboard */}
+            {/* No alignSelf — grid stretches it to match Assigned Companies' height. */}
             <div
               style={{
                 background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)",
@@ -453,7 +478,9 @@ export default function SupervisorDetailPage() {
                 padding: "18px 22px 20px",
                 position: "relative",
                 overflow: "hidden",
-                alignSelf: "start",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
               }}
             >
               {/* decorative circles */}
@@ -487,69 +514,28 @@ export default function SupervisorDetailPage() {
                     {supervisor.companies.length} total
                   </span>
                 </div>
-                <div style={{ padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ padding: "0 16px 16px", display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {supervisor.companies.length === 0 ? (
                     <p style={{ color: "#94A3B8", fontSize: 12.5, padding: "8px 0" }}>No companies assigned.</p>
                   ) : (
-                    supervisor.companies.map((c) => {
-                      const cityStateLine = [c.city, c.state].filter(Boolean).join(", ");
-                      return (
-                        <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignSelf: "flex-start",
-                              alignItems: "center",
-                              background: "#2563EB",
-                              color: "#fff",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              letterSpacing: 0.1,
-                            }}
-                          >
-                            {c.name}
-                          </span>
-                          {c.address && (
-                            <p style={{ fontSize: 11.5, color: "#64748B", paddingLeft: 2, lineHeight: 1.4 }}>{c.address}</p>
-                          )}
-                          {(cityStateLine || c.pincode) && (
-                            <p style={{ fontSize: 11.5, color: "#64748B", paddingLeft: 2, lineHeight: 1.4 }}>
-                              {cityStateLine}{cityStateLine && c.pincode ? " — " : ""}{c.pincode ?? ""}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Recent Activity */}
-              <div style={{ ...CARD_STYLE, flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px 12px" }}>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Recent Activity</p>
-                  <button onClick={() => setActiveTab("bookings")} style={{ fontSize: 12, fontWeight: 700, color: ACCENT, background: "none", border: "none", cursor: "pointer", fontFamily: font }}>
-                    View all →
-                  </button>
-                </div>
-                <div>
-                  {supBookings.slice(0, 4).map(booking => (
-                    <div key={booking.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: "1px solid #F8FAFC" }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {booking.pickupLocation} → {booking.dropLocation}
-                        </p>
-                        <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{fmtDate(booking.createdAt)}</p>
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", flexShrink: 0, marginLeft: 16 }}>
-                        {booking.fare ? `₹${booking.fare.toLocaleString()}` : "—"}
+                    supervisor.companies.map((c) => (
+                      <span
+                        key={c.name}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          background: "#2563EB",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          letterSpacing: 0.1,
+                        }}
+                      >
+                        {c.name}
                       </span>
-                    </div>
-                  ))}
-                  {supBookings.length === 0 && (
-                    <p style={{ textAlign: "center", color: "#94A3B8", fontSize: 12.5, padding: "16px 0 20px" }}>No recent trips.</p>
+                    ))
                   )}
                 </div>
               </div>
@@ -562,7 +548,20 @@ export default function SupervisorDetailPage() {
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "bookings" && (() => {
         const tripFilterCount = (tripStatus !== "All Status" ? 1 : 0) + (tripType !== "All Types" ? 1 : 0);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const filteredBookings = supBookings.filter(b => {
+          // Date period filter (matches Past Trips behaviour)
+          if (tripPeriod === "custom") {
+            const d = b.createdAt ? toIsoDate(new Date(b.createdAt)) : "";
+            if (!d || d < tripDateFrom || d > tripDateTo) return false;
+          } else if (tripPeriod !== "all") {
+            const d = new Date(b.createdAt);
+            if (tripPeriod === "today"  && d < startOfToday) return false;
+            if (tripPeriod === "7days"  && d < new Date(now.getTime() - 7  * 86400_000)) return false;
+            if (tripPeriod === "30days" && d < new Date(now.getTime() - 30 * 86400_000)) return false;
+          }
+
           const q   = tripSearch.toLowerCase();
           const drv = drivers.find(d => d.id === b.driverId);
           const driverPhone  = (b.driverPhone ?? drv?.phone ?? "").toLowerCase();
@@ -582,6 +581,23 @@ export default function SupervisorDetailPage() {
           const matchTy = tripType   === "All Types"  || b.type   === tripType;
           return matchQ && matchSt && matchTy;
         });
+
+        // Renderers identical to Past Trips. supervisorName is constant on
+        // this page (we're inside a single supervisor's profile), so the
+        // callback ignores the id and returns the profile name.
+        const tripsRenderers = buildTripRenderers(
+          () => supervisor?.name ?? "",
+          (b) => {
+            const d = b.driverId ? drivers.find(x => x.id === b.driverId) : null;
+            return {
+              name:        d?.name ?? null,
+              vehicle:     d?.vehicle ?? null,
+              vehicleReg:  d?.vehicleReg ?? null,
+              vehicleType: d?.vehicleType ?? null,
+              phone:       b.driverPhone ?? d?.phone ?? null,
+            };
+          },
+        );
 
         return (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -610,140 +626,57 @@ export default function SupervisorDetailPage() {
                 </FilterSection>
               </FilterPanel>
             </div>
+
+            <TripDateFilter
+              period={tripPeriod}
+              dateFrom={tripDateFrom}
+              dateTo={tripDateTo}
+              onChangePeriod={setTripPeriod}
+              onApplyCustom={(f, t) => { setTripDateFrom(f); setTripDateTo(t); }}
+              direction="past"
+            />
+
+            <ColumnsPopover
+              tableKey={SUPERVISOR_TRIPS_TABLE_KEY}
+              visible={tripsVisibleCols}
+              totalCount={tripsTotalCols}
+              onToggle={toggleTripsCol}
+              onReset={resetTripsCols}
+            />
+
+            <ExportButton
+              onClick={() => {
+                const rows = filteredBookings.map(b => {
+                  const drv = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
+                  return {
+                    "Trip ID":   b.bookingRef ?? "",
+                    "Trip Type": b.type ?? "",
+                    "Route":     `${b.pickupLocation} → ${b.dropLocation}`,
+                    "Company":   b.bookingSource ?? "",
+                    "Vehicle":   [drv?.vehicleReg, drv?.vehicle].filter(Boolean).join(" · "),
+                    "Driver":    drv?.name ?? "",
+                    "Status":    b.status,
+                    "Fare":      b.fare ?? "",
+                    "Created At": formatIST(b.createdAt) ?? "",
+                  };
+                });
+                exportToCsv(`supervisor-${id}-trips`, rows);
+              }}
+              disabled={isLoading || filteredBookings.length === 0}
+              className="ml-auto"
+            />
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="w-full overflow-x-auto">
-            <div className="min-w-[900px]">
-              {/* Header */}
-              <div className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                {["TRIP ID & TYPE", "ROUTE", "COMPANY", "VEHICLE", "DRIVER", "STATUS", "CREATED AT"].map(h => (
-                  <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
-                ))}
-              </div>
-
-              {/* Rows */}
-              <div className="flex flex-col divide-y divide-slate-100">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5">
-                      <div className="space-y-2">
-                        <Skeleton className="h-3.5 w-16" />
-                        <Skeleton className="h-4 w-12 rounded" />
-                      </div>
-                      <div className="space-y-1.5 pr-4">
-                        <Skeleton className="h-3.5 w-3/4" />
-                        <Skeleton className="h-2 w-16" />
-                        <Skeleton className="h-3 w-2/3" />
-                      </div>
-                      <Skeleton className="h-4 w-20 rounded" />
-                      <div className="space-y-1.5">
-                        <Skeleton className="h-3.5 w-24" />
-                        <Skeleton className="h-3 w-16" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Skeleton className="h-3.5 w-24" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                      <div className="space-y-1">
-                        <Skeleton className="h-3.5 w-14" />
-                        <Skeleton className="h-3 w-12" />
-                      </div>
-                    </div>
-                  ))
-                ) : filteredBookings.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
-                    <p className="text-sm font-medium">{supBookings.length === 0 ? "No trips yet." : "No trips match your filters."}</p>
-                  </div>
-                ) : (
-                  filteredBookings.map(booking => {
-                    const driver = booking.driverId ? drivers.find(d => d.id === booking.driverId) : null;
-                    const driverName = driver?.name ?? null;
-                    const vehicle = driver?.vehicle ?? null;
-                    const vehicleReg = driver?.vehicleReg ?? null;
-                    const d = new Date(booking.createdAt);
-                    const day = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
-                    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
-
-                    return (
-                      <div
-                        key={booking.id}
-                        className="grid grid-cols-[100px_2fr_150px_1.3fr_1.3fr_110px_90px] items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
-                        onClick={() => setSelectedBooking(booking)}
-                      >
-                        {/* TRIP ID & TYPE */}
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="font-extrabold text-[#111827] text-[13px]">{booking.bookingRef ?? "—"}</span>
-                          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
-                            {booking.type}
-                          </span>
-                        </div>
-
-                        {/* ROUTE */}
-                        <div className="flex flex-col min-w-0 pr-4 gap-px">
-                          <span className="font-semibold text-[13px] text-slate-800 leading-tight truncate">
-                            {booking.pickupLocation.split(",")[0]}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <div className="w-14 h-[2px] rounded-full" style={{ background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
-                            <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
-                          </div>
-                          <span className="text-[12px] text-gray-500 truncate">
-                            {booking.dropLocation.split(",")[0]}
-                          </span>
-                        </div>
-
-                        {/* COMPANY */}
-                        <div className="flex flex-col items-start gap-1">
-                          {booking.bookingSource ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-semibold truncate max-w-[130px]">
-                              {booking.bookingSource}
-                            </span>
-                          ) : (
-                            <span className="text-[13px] text-slate-300 font-medium italic">—</span>
-                          )}
-                        </div>
-
-                        {/* VEHICLE */}
-                        <div className="flex flex-col gap-px">
-                          {vehicle ? (
-                            <>
-                              <span className="text-[13px] font-medium text-slate-600 truncate">{vehicle}</span>
-                              {vehicleReg && <span className="text-[11px] font-semibold text-slate-500 truncate">{vehicleReg}</span>}
-                            </>
-                          ) : (
-                            <span className="text-[13px] text-slate-300 font-medium italic">—</span>
-                          )}
-                        </div>
-
-                        {/* DRIVER */}
-                        <div className="flex flex-col gap-px">
-                          {driverName ? (
-                            <span className="text-[13px] font-medium text-slate-600 truncate">{driverName}</span>
-                          ) : (
-                            <span className="text-[13px] text-slate-300 font-medium italic">Awaiting</span>
-                          )}
-                        </div>
-
-                        {/* STATUS */}
-                        <div>
-                          <StatusBadge status={booking.status} />
-                        </div>
-
-                        {/* CREATED AT */}
-                        <div className="flex flex-col text-left">
-                          <span className="text-[13px] font-medium text-slate-700">{day}</span>
-                          <span className="text-[11px] text-slate-400 font-medium mt-0.5">{time}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-          </div>
+          <TripsTable
+            items={filteredBookings}
+            visibleCols={tripsVisibleCols}
+            renderers={tripsRenderers}
+            tableKey={SUPERVISOR_TRIPS_TABLE_KEY}
+            isLoading={isLoading}
+            prefsLoading={tripsPrefsLoading}
+            onRowClick={setSelectedBooking}
+            emptyMessage={supBookings.length === 0 ? "No trips yet." : "No trips match your filters."}
+          />
         </div>
         );
       })()}
@@ -833,73 +766,71 @@ export default function SupervisorDetailPage() {
                   ))}
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-                  {/* Assigned Companies */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Assigned Companies</label>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <Input
-                        placeholder="Type company name and press Enter"
-                        value={addCompanyInput}
-                        onChange={e => setAddCompanyInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCompany(); } }}
-                        style={{ fontFamily: font }}
-                      />
-                      <button
-                        type="button"
-                        onClick={addCompany}
-                        style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-                      >
-                        <Plus className="h-4 w-4" style={{ color: "#64748B" }} />
-                      </button>
-                    </div>
-                    {editForm.companies && editForm.companies.length > 0 ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                        {editForm.companies.map((c) => (
-                          <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, border: "1px solid #E2E8F0", borderRadius: 12, background: "#F8FAFC" }}>
-                            <span style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 6, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8 }}>
-                              {c.name}
-                              <button
-                                type="button"
-                                onClick={() => removeCompany(c.name)}
-                                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.2)", border: "none", cursor: "pointer" }}
-                              >
-                                <X className="h-2 w-2" style={{ color: "#fff" }} />
-                              </button>
-                            </span>
+                {/* Assigned Companies — full width row */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#334155", fontFamily: font }}>Assigned Companies</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Input
+                      placeholder="Type company name and press Enter"
+                      value={addCompanyInput}
+                      onChange={e => setAddCompanyInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addCompany(); } }}
+                      style={{ fontFamily: font }}
+                    />
+                    <button
+                      type="button"
+                      onClick={addCompany}
+                      style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #E2E8F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                    >
+                      <Plus className="h-4 w-4" style={{ color: "#64748B" }} />
+                    </button>
+                  </div>
+                  {editForm.companies && editForm.companies.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+                      {editForm.companies.map((c) => (
+                        <div key={c.name} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, border: "1px solid #E2E8F0", borderRadius: 12, background: "#F8FAFC" }}>
+                          <span style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 6, background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8 }}>
+                            {c.name}
+                            <button
+                              type="button"
+                              onClick={() => removeCompany(c.name)}
+                              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: 4, background: "rgba(255,255,255,0.2)", border: "none", cursor: "pointer" }}
+                            >
+                              <X className="h-2 w-2" style={{ color: "#fff" }} />
+                            </button>
+                          </span>
+                          <Input
+                            placeholder={`Street address for ${c.name} (optional)`}
+                            value={c.address ?? ""}
+                            onChange={e => updateCompanyField(c.name, "address", e.target.value)}
+                            style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                          />
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
                             <Input
-                              placeholder={`Street address for ${c.name} (optional)`}
-                              value={c.address ?? ""}
-                              onChange={e => updateCompanyField(c.name, "address", e.target.value)}
+                              placeholder="City"
+                              value={c.city ?? ""}
+                              onChange={e => updateCompanyField(c.name, "city", e.target.value)}
                               style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
                             />
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
-                              <Input
-                                placeholder="City"
-                                value={c.city ?? ""}
-                                onChange={e => updateCompanyField(c.name, "city", e.target.value)}
-                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
-                              />
-                              <Input
-                                placeholder="State"
-                                value={c.state ?? ""}
-                                onChange={e => updateCompanyField(c.name, "state", e.target.value)}
-                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
-                              />
-                              <Input
-                                placeholder="Pincode"
-                                value={c.pincode ?? ""}
-                                onChange={e => updateCompanyField(c.name, "pincode", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                                style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
-                              />
-                            </div>
+                            <Input
+                              placeholder="State"
+                              value={c.state ?? ""}
+                              onChange={e => updateCompanyField(c.name, "state", e.target.value)}
+                              style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                            />
+                            <Input
+                              placeholder="Pincode"
+                              value={c.pincode ?? ""}
+                              onChange={e => updateCompanyField(c.name, "pincode", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              style={{ fontFamily: font, height: 34, fontSize: 12.5, background: "#fff" }}
+                            />
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ fontSize: 12, color: "#94A3B8" }}>No companies assigned yet.</p>
-                    )}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12, color: "#94A3B8" }}>No companies assigned yet.</p>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 24, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>

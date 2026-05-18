@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Users, UserCheck, UserX, Search, Plus, Pencil, Trash2,
   X, ChevronLeft, BookOpen, Map, BarChart2, FileText,
   CheckCircle2, Shield, Check, Mail, Phone, Calendar,
-  Clock, AlertCircle, Filter, Eye, EyeOff,
+  Clock, AlertCircle, Filter, Eye, EyeOff, UserCircle,
 } from "lucide-react";
+import { VendorProfileSettings  } from "@/modules/profile/VendorProfileSettings";
+import { VendorSecuritySettings } from "@/modules/profile/VendorSecuritySettings";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input }  from "@/components/ui/input";
@@ -526,6 +529,24 @@ export default function VendorSettingsPage() {
   const [deleting,       setDeleting]       = useState(false);
   const [deleteDialog,   setDeleteDialog]   = useState<{ open: boolean; member: TeamMemberShape | null }>({ open: false, member: null });
 
+  // ─── Tabs (Profile / Team Members / Account & Security) ──
+  type TabKey = "profile" | "team" | "security";
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam     = searchParams.get("tab");
+  const initialTab: TabKey =
+    tabParam === "profile"  ? "profile"  :
+    tabParam === "security" ? "security" : "team";
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+
+  function switchTab(tab: TabKey) {
+    setActiveTab(tab);
+    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    if (tab === "team") sp.delete("tab"); else sp.set("tab", tab);
+    const qs = sp.toString();
+    router.replace(qs ? `/dashboard/settings?${qs}` : "/dashboard/settings");
+  }
+
   function addToast(message: string, error = false) {
     const id = Date.now();
     setToasts(ts => [...ts, { id, message, error }]);
@@ -639,6 +660,48 @@ export default function VendorSettingsPage() {
   return (
     <div style={{ fontFamily: FONT }} className="space-y-5">
 
+      {/* Settings page header */}
+      <div>
+        <h1 className="text-lg font-semibold text-slate-800">Settings</h1>
+        <p className="text-sm text-slate-500">Manage your profile, account & team members.</p>
+      </div>
+
+      {/* Left-rail layout: vertical pill rail + right content card */}
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
+
+        {/* ── Left rail ── */}
+        <nav className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col gap-1 md:sticky md:top-4">
+          {([
+            { key: "profile",  label: "Profile",            icon: UserCircle },
+            { key: "team",     label: "Team Members",       icon: Users      },
+            { key: "security", label: "Account & Security", icon: Shield     },
+          ] as const).map(({ key, label, icon: Icon }) => {
+            const active = activeTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => switchTab(key)}
+                className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-colors ${
+                  active
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* ── Right content ── */}
+        <div className="space-y-5 min-w-0">
+
+      {activeTab === "profile" && <VendorProfileSettings />}
+
+      {activeTab === "security" && <VendorSecuritySettings />}
+
+      {activeTab === "team" && <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -752,9 +815,14 @@ export default function VendorSettingsPage() {
         )}
       </div>
 
-      {/* Detail sidebar */}
+      </>}
+
+        </div>
+      </div>
+
+      {/* Detail sidebar (rendered always; visibility controlled by `member` prop) */}
       <DetailSidebar
-        member={selectedMember}
+        member={activeTab === "team" ? selectedMember : null}
         onClose={() => setSelectedMember(null)}
         onEdit={m => { setSelectedMember(null); openEdit(m); }}
         onToggleActive={toggleActive}

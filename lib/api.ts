@@ -175,6 +175,56 @@ export const vendorsApi = {
   myWallet: () =>
     apiFetch<{ success: true; data: VendorWalletSnapshot }>("/api/vendor/vendors/me/wallet"),
 
+  // The current vendor's own profile — same shape as the superadmin vendor
+  // detail, so the vendor Profile page can render with the same building blocks.
+  me: () =>
+    apiFetch<{ success: true; data: VendorDetailApiItem }>("/api/vendor/vendors/me"),
+
+  // Self-service profile update — vendor_admin only on the backend.
+  // status is intentionally not exposed; that remains superadmin-controlled.
+  updateMe: (payload: {
+    name?:          string;
+    contactPerson?: string;
+    email?:         string;
+    phone?:         string;
+    city?:          string;
+    address?:       string;
+    pan?:           string;
+    gst?:           string;
+  }) =>
+    apiFetch<{ success: true; data: VendorDetailApiItem }>("/api/vendor/vendors/me", {
+      method: "PUT",
+      body:   JSON.stringify(payload),
+    }),
+
+  // vendor_admin changes its own login password. Validates currentPassword
+  // against the stored bcrypt hash on the server before writing the new one.
+  updateMyPassword: (currentPassword: string, newPassword: string) =>
+    apiFetch<{ success: true }>("/api/vendor/vendors/me/password", {
+      method: "POST",
+      body:   JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  // Self-service document upload (PAN_CARD or GST_CERTIFICATE).
+  uploadMyDocument: async (
+    docType:   "PAN_CARD" | "GST_CERTIFICATE",
+    docNumber: string | undefined,
+    file:      File | undefined,
+  ) => {
+    const fd = new FormData();
+    fd.append("doc_type", docType);
+    if (docNumber) fd.append("doc_number", docNumber);
+    if (file)      fd.append("file", file);
+    return apiUpload<{ success: true; data: VendorDocument }>(
+      "/api/vendor/vendors/me/documents/upload",
+      fd,
+    );
+  },
+
+  // List current vendor's uploaded documents.
+  myDocuments: () =>
+    apiFetch<{ success: true; data: VendorDocument[] }>("/api/vendor/vendors/me/documents"),
+
   wallet: {
     createOrder: (amount: number) =>
       apiFetch<{ success: true; data: { order_id: string; amount: number; currency: string; key_id: string } }>(
