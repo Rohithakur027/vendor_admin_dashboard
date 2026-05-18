@@ -420,7 +420,7 @@ export default function SuperAdminVendorsPage() {
                     </span>
                     <div>
                       <button onClick={() => router.push(`/superadmin/vendors/review/${v.id}`)} style={{ fontSize:12, fontWeight:700, color:"#2563EB", background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
-                        Review →
+                        Review
                       </button>
                     </div>
                   </div>

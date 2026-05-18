@@ -5,8 +5,13 @@ import { vendorSignupApi, vendorsApi } from "@/lib/api";
 import {
   Eye, EyeOff, AlertCircle, CheckCircle2,
   ArrowLeft, ArrowRight, Loader2, Check,
-  Upload, FileText, X,
+  Upload, FileText, X, Mail, Phone,
 } from "lucide-react";
+
+// Placeholder contact info shown on the signup confirmation screen.
+// TODO: move to env / settings once finalised.
+const SUPPORT_EMAIL = "contact@skvoyages.in";
+const SUPPORT_PHONE = "+91 99999 99999";
 
 type Step = 1 | 2 | 3;
 
@@ -103,33 +108,27 @@ export default function VendorSignupPage() {
     try {
       const res = await vendorSignupApi.signup({ name, city, contactPerson, email, phone, password });
 
-      const authUser = {
-        id:            res.user.id,
-        email:         res.user.email,
-        full_name:     res.user.full_name,
-        role:          "vendor" as const,
-        vendor_id:     res.user.vendor_id,
-        vendor_name:   res.user.vendor_name,
-        supervisor_id: res.user.supervisor_id,
-      };
-      sessionStorage.setItem("auth_token", res.token);
-      sessionStorage.setItem("auth_user", JSON.stringify(authUser));
-
-      // Attempt document uploads silently – can be done from vendor profile later if this fails
+      // Attempt document uploads silently — uses the freshly issued token from
+      // the signup response. We don't write that token to sessionStorage on
+      // purpose: the post-signup UX is a "request received" screen, not an
+      // automatic login. The vendor signs in normally after their request is
+      // approved by the SK Travels team.
       const vendorId = res.user.vendor_id;
-      if (vendorId) {
+      if (vendorId && (panNum || panFile || gstNum || gstFile)) {
         try {
+          // Briefly stash the token so apiUpload picks it up via getToken().
+          sessionStorage.setItem("auth_token", res.token);
           if (panNum || panFile) {
             await vendorsApi.uploadDocument(vendorId, "PAN_CARD", panNum || undefined, panFile || undefined);
           }
           if (gstNum || gstFile) {
             await vendorsApi.uploadDocument(vendorId, "GST_CERTIFICATE", gstNum || undefined, gstFile || undefined);
           }
-        } catch { /* silently ignore – documents can be uploaded from vendor profile */ }
+        } catch { /* silently ignore — documents can be uploaded later from vendor profile */ }
+        finally { sessionStorage.removeItem("auth_token"); }
       }
 
       setSuccess(true);
-      setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
     } catch (err) {
       setApiError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally { setLoading(false); }
@@ -220,6 +219,63 @@ export default function VendorSignupPage() {
       <div style={{ flex: 1, height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", padding: "24px 48px", overflow: "auto" }}>
         <div style={{ width: "100%", maxWidth: 400 }}>
 
+          {success ? (
+            <div style={{ textAlign: "center", padding: "8px 0" }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 18px",
+              }}>
+                <CheckCircle2 style={{ width: 32, height: 32, color: "#16a34a" }} />
+              </div>
+              <h2 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
+                We&apos;ve got your request!
+              </h2>
+              <p style={{ fontSize: 13.5, color: "#64748b", marginTop: 10, lineHeight: 1.6 }}>
+                Thanks for signing up, <strong style={{ color: "#0f172a" }}>{contactPerson || name}</strong>. Our team will
+                review your details and get back to you shortly. In the meantime, feel free to reach out to us:
+              </p>
+
+              <div style={{
+                marginTop: 20, padding: "16px 18px", border: "1px solid #e2e8f0", borderRadius: 12,
+                background: "#f8fafc", display: "flex", flexDirection: "column", gap: 12,
+              }}>
+                <a href={`mailto:${SUPPORT_EMAIL}`} style={{
+                  display: "flex", alignItems: "center", gap: 10, textDecoration: "none",
+                }}>
+                  <span style={{
+                    width: 32, height: 32, borderRadius: 8, background: "#eff6ff",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <Mail style={{ width: 15, height: 15, color: BLUE }} />
+                  </span>
+                  <div style={{ textAlign: "left", minWidth: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</p>
+                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a", marginTop: 2 }}>{SUPPORT_EMAIL}</p>
+                  </div>
+                </a>
+                <a href={`tel:${SUPPORT_PHONE.replace(/\s/g, "")}`} style={{
+                  display: "flex", alignItems: "center", gap: 10, textDecoration: "none",
+                }}>
+                  <span style={{
+                    width: 32, height: 32, borderRadius: 8, background: "#eff6ff",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <Phone style={{ width: 15, height: 15, color: BLUE }} />
+                  </span>
+                  <div style={{ textAlign: "left", minWidth: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Phone</p>
+                    <p style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a", marginTop: 2 }}>{SUPPORT_PHONE}</p>
+                  </div>
+                </a>
+              </div>
+
+              <a href="/login" className="signup-btn" style={{ marginTop: 22, textDecoration: "none" }}>
+                Back to sign in <ArrowRight style={{ width: 16, height: 16 }} />
+              </a>
+            </div>
+          ) : (
+          <>
           {/* Back to login */}
           <a href="/login" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: "#64748b", fontWeight: 600, textDecoration: "none", marginBottom: 24 }}
             onMouseEnter={e => (e.currentTarget.style.color = BLUE)}
@@ -451,21 +507,14 @@ export default function VendorSignupPage() {
                   </div>
                 )}
 
-                {success && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 9, padding: "10px 12px" }}>
-                    <CheckCircle2 style={{ width: 15, height: 15, color: "#16a34a", flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: "#15803d", fontWeight: 600 }}>Account created! Redirecting to dashboard…</span>
-                  </div>
-                )}
-
                 <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                   <button type="button" onClick={() => setStep(2)} disabled={loading}
                     style={{ flex: "0 0 auto", padding: "11px 16px", borderRadius: 10, border: "1.5px solid #e2e8f0", background: "#fff", color: "#475569", fontSize: 14, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", fontFamily: FONT, display: "flex", alignItems: "center", gap: 6, opacity: loading ? 0.5 : 1 }}>
                     <ArrowLeft style={{ width: 15, height: 15 }} /> Back
                   </button>
-                  <button type="submit" className="signup-btn" disabled={loading || success} style={{ flex: 1 }}>
+                  <button type="submit" className="signup-btn" disabled={loading} style={{ flex: 1 }}>
                     {loading && <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} />}
-                    {success ? "Redirecting…" : loading ? "Creating account…" : "Create Account"}
+                    {loading ? "Submitting request…" : "Submit Request"}
                   </button>
                 </div>
               </>
@@ -480,6 +529,8 @@ export default function VendorSignupPage() {
               Sign in
             </a>
           </p>
+          </>
+          )}
         </div>
       </div>
     </div>

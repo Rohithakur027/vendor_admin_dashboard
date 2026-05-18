@@ -6,9 +6,10 @@ export type TableKey =
   // Vendor admin
   | "activeTrips" | "scheduledTrips" | "pastTrips"
   | "supervisors" | "drivers"        | "invoices"
+  | "supervisorRecentTrips"
   // Super admin
   | "vendors"     | "allDrivers"     | "driverOnboarding"
-  | "driverTrips";
+  | "driverTrips" | "vendorTripsAdmin";
 
 export type Role = "vendor_admin" | "superadmin";
 
@@ -110,6 +111,13 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
     defaults: ["name", "phone", "status", "supervisor", "totalTrips", "lastSeen"],
   },
 
+  supervisorRecentTrips: {
+    key: "supervisorRecentTrips", role: "vendor_admin",
+    title: "Supervisor Recent Trips", blurb: "Trips list on the supervisor profile page",
+    columns: TRIP_COLUMNS,
+    defaults: ["tripId", "route", "supervisorCompany", "vehicle", "driver", "status", "createdAt"],
+  },
+
   invoices: {
     key: "invoices", role: "vendor_admin",
     title: "Invoices", blurb: "Generated invoices and their status",
@@ -195,6 +203,13 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
     ],
     defaults: ["tripId", "route", "supervisorCompany", "fare", "status", "createdAt"],
   },
+
+  vendorTripsAdmin: {
+    key: "vendorTripsAdmin", role: "superadmin",
+    title: "Vendor Trips (Admin)", blurb: "Trips list shown on the superadmin vendor detail page",
+    columns: TRIP_COLUMNS,
+    defaults: ["tripId", "route", "supervisorCompany", "vehicle", "driver", "fare", "status", "createdAt"],
+  },
 };
 
 export function tablesForRole(role: Role | string | undefined | null): TableSpec[] {
@@ -206,6 +221,7 @@ export function tablesForRole(role: Role | string | undefined | null): TableSpec
       TABLE_SPECS.supervisors,
       TABLE_SPECS.drivers,
       TABLE_SPECS.invoices,
+      TABLE_SPECS.supervisorRecentTrips,
     ];
   }
   if (role === "superadmin") {
@@ -214,6 +230,7 @@ export function tablesForRole(role: Role | string | undefined | null): TableSpec
       TABLE_SPECS.allDrivers,
       TABLE_SPECS.driverOnboarding,
       TABLE_SPECS.driverTrips,
+      TABLE_SPECS.vendorTripsAdmin,
     ];
   }
   return [];

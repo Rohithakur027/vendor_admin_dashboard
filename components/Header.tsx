@@ -26,9 +26,9 @@ export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void })
   const { logout, user } = useAuth();
   const title = pageTitles[pathname] ?? "Dashboard";
   const vendorName  = user?.vendor_name?.trim() || "Vendor";
-  const displayName = user?.role === "vendor_member"
-    ? (user?.full_name?.trim() || vendorName)
-    : vendorName;
+  const isMember    = user?.role === "vendor_member";
+  const displayName = isMember ? (user?.full_name?.trim() || vendorName) : vendorName;
+  const roleLabel   = isMember ? (user?.role_label?.trim() || "Team Member") : "Vendor";
 
   return (
     <header className="h-14 border-b bg-white flex items-center justify-between px-4 md:px-6 shrink-0">
@@ -46,7 +46,10 @@ export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void })
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-          <span className="text-sm font-medium">{displayName}</span>
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-sm font-semibold">{displayName}</span>
+            <span className="text-xs text-slate-500">{roleLabel}</span>
+          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem className="gap-2">

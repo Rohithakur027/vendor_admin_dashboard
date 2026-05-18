@@ -36,6 +36,8 @@ type NavItem = {
   subItems?: SubItem[];
   // null = always shown; otherwise hidden for vendor_member without this permission.
   permission?: keyof typeof PERMISSION_KEYS | null;
+  // true = hidden from vendor_member entirely (e.g. team management).
+  adminOnly?: boolean;
 };
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -54,6 +56,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   },
   { label: "Invoicing", href: "/dashboard/accounts/invoicing", icon: FileText,  permission: "INVOICING_MONITORING" },
   { label: "Reports",   href: "/dashboard/reports",            icon: BarChart2, permission: "REPORT_MONITORING" },
+  { label: "Settings",  href: "/dashboard/settings",           icon: Settings,  permission: null, adminOnly: true },
 ];
 
 function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -88,6 +91,7 @@ export function Sidebar({
   const navItems = useMemo<NavItem[]>(() => {
     if (!isMember) return ALL_NAV_ITEMS;
     return ALL_NAV_ITEMS.filter(item => {
+      if (item.adminOnly) return false;
       if (item.permission == null) return true;
       return hasModuleAccess(user?.permissions, PERMISSION_KEYS[item.permission]);
     });
@@ -147,7 +151,14 @@ export function Sidebar({
       {/* Nav */}
       <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
         {navItems.map(({ label, href, icon: Icon, subItems }) => {
-          const active = subItems ? pathname.startsWith(href) : pathname === href;
+          // Settings has a sibling /dashboard/profile route that should also
+          // show as active; everything else is exact-match unless it has sub-items.
+          const isSettings = href === "/dashboard/settings";
+          const active = subItems
+            ? pathname.startsWith(href)
+            : isSettings
+              ? pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/profile")
+              : pathname === href;
 
           if (subItems) {
             const isExpanded = !!expanded[href];
@@ -244,29 +255,6 @@ export function Sidebar({
           );
         })}
       </nav>
-
-      {/* Settings — pinned just above the user profile; admins only */}
-      {!isMember && (
-        <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
-          {(() => {
-            const settingsActive = pathname.startsWith("/dashboard/settings");
-            const linkClass = cn(
-              "flex items-center gap-3 rounded-lg text-sm transition-colors",
-              isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
-              settingsActive
-                ? "bg-blue-50/70 text-blue-600 font-medium"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            );
-            const link = (
-              <Link href="/dashboard/settings" onClick={onLinkClick} className={linkClass}>
-                <Settings className="h-4 w-4 shrink-0" />
-                {!isCollapsed && "Settings"}
-              </Link>
-            );
-            return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
-          })()}
-        </div>
-      )}
 
       {/* Sign out — pinned above the user profile, red accent */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>

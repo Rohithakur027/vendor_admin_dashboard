@@ -10,6 +10,7 @@ export interface Vendor {
   phone: string;
   city: string;
   pan?: string;
+  gst?: string;
   status: "Active" | "Inactive";
   joinedAt: string;
   totalDrivers: number;
@@ -19,6 +20,7 @@ export interface Vendor {
   secondaryPOCs?: { name: string; email: string; phone: string }[];
   wallet_balance?: number;
   is_verified?: boolean;
+  verification_note?: string | null;
   address?: string;
 }
 
