@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { LocationHistoryPoint } from "@/lib/api";
+import { superadminApi, type LocationHistoryPoint } from "@/lib/api";
 
 // Mapbox loaded lazily to avoid SSR issues
 let mapboxgl: typeof import("mapbox-gl") | null = null;
@@ -12,12 +12,16 @@ async function loadMapbox() {
   return mapboxgl;
 }
 
+type HistoryRange = { from: string; to: string } | { hours: number };
+
 interface Props {
-  driverId:   string;
-  driverName: string;
-  hours?:     number;
-  /** Override the API base path. Defaults to /api/superadmin/drivers */
-  apiBase?:   string;
+  driverId:    string;
+  driverName:  string;
+  hours?:      number;
+  /** When set, overrides the internal 6h/12h/24h controls and fetches this exact range. */
+  range?:      { from: string; to: string } | null;
+  /** Override the default fetch (superadmin API). Vendor pages pass their own fetcher. */
+  fetchPoints?: (driverId: string, range: HistoryRange) => Promise<LocationHistoryPoint[]>;
 }
 
 interface HistoryState {
@@ -35,7 +39,12 @@ function formatSpeed(s: number | null) {
   return `${Math.round(s)} km/h`;
 }
 
-export function DriverHistoryMap({ driverId, driverName, hours = 12, apiBase = "/api/superadmin/drivers" }: Props) {
+async function defaultFetchPoints(driverId: string, range: HistoryRange): Promise<LocationHistoryPoint[]> {
+  const res = await superadminApi.drivers.locationHistory(driverId, range);
+  return res.data?.history ?? [];
+}
+
+export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rangeProp, fetchPoints = defaultFetchPoints }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef          = useRef<import("mapbox-gl").Map | null>(null);
   const markerRef       = useRef<import("mapbox-gl").Marker | null>(null);
@@ -56,18 +65,13 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, apiBase = "
     setScrubIdx(0);
     setIsPlaying(false);
     try {
-      const token_ = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-      const res = await fetch(
-        `${apiBase}/${driverId}/location-history?hours=${hoursFilter}`,
-        { headers: { ...(token_ ? { Authorization: `Bearer ${token_}` } : {}) } },
-      );
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Failed to load history");
-      setState({ loading: false, error: null, points: body.data?.history ?? [] });
+      const range: HistoryRange = rangeProp ?? { hours: hoursFilter };
+      const points = await fetchPoints(driverId, range);
+      setState({ loading: false, error: null, points });
     } catch (err) {
       setState({ loading: false, error: (err as Error).message, points: [] });
     }
-  }, [driverId, apiBase, hoursFilter]);
+  }, [driverId, hoursFilter, rangeProp, fetchPoints]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
@@ -209,22 +213,24 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, apiBase = "
 
       {/* Controls row */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {[6, 12, 24].map((h) => (
-            <button
-              key={h}
-              onClick={() => setHoursFilter(h)}
-              style={{
-                padding: "5px 14px", borderRadius: 20, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
-                background: hoursFilter === h ? "#2563EB" : "#F1F5F9",
-                color:      hoursFilter === h ? "#fff"    : "#64748B",
-                border:     hoursFilter === h ? "none"    : "1px solid #E2E8F0",
-              }}
-            >
-              {h}h
-            </button>
-          ))}
-        </div>
+        {!rangeProp && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {[6, 12, 24].map((h) => (
+              <button
+                key={h}
+                onClick={() => setHoursFilter(h)}
+                style={{
+                  padding: "5px 14px", borderRadius: 20, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+                  background: hoursFilter === h ? "#2563EB" : "#F1F5F9",
+                  color:      hoursFilter === h ? "#fff"    : "#64748B",
+                  border:     hoursFilter === h ? "none"    : "1px solid #E2E8F0",
+                }}
+              >
+                {h}h
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={fetchHistory}
@@ -247,7 +253,7 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, apiBase = "
         )}
 
         <span style={{ marginLeft: "auto", fontSize: 12, color: "#94A3B8", fontWeight: 500 }}>
-          {loading ? "Loading…" : `${points.length} point${points.length !== 1 ? "s" : ""} · last ${hoursFilter}h`}
+          {loading ? "Loading…" : `${points.length} point${points.length !== 1 ? "s" : ""}${rangeProp ? "" : ` · last ${hoursFilter}h`}`}
         </span>
       </div>
 
@@ -270,7 +276,11 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, apiBase = "
             )}
             {!loading && error && <p style={{ fontSize: 13, color: "#EF4444" }}>{error}</p>}
             {!loading && !error && points.length === 0 && (
-              <p style={{ fontSize: 13, color: "#94A3B8" }}>No location history found for the last {hoursFilter}h.</p>
+              <p style={{ fontSize: 13, color: "#94A3B8" }}>
+                {rangeProp
+                  ? "No location history found for the selected range."
+                  : `No location history found for the last ${hoursFilter}h.`}
+              </p>
             )}
           </div>
         )}

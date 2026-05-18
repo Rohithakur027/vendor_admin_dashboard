@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { superadminApi, type DriverApiItem } from "@/lib/api";
 import { useDriverStatusFeed, type DriverStatusEvent } from "@/lib/useDriverStatusFeed";
@@ -14,6 +14,11 @@ import {
   FilterPill,
   FilterTrigger,
 } from "@/components/FilterPanel";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
 
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
@@ -26,17 +31,9 @@ const CARD: React.CSSProperties = {
 };
 
 function StatCard({
-  label,
-  value,
-  icon: Icon,
-  sub,
-  loading,
+  label, value, icon: Icon, sub, loading,
 }: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  sub?: string;
-  loading?: boolean;
+  label: string; value: number | string; icon: React.ElementType; sub?: string; loading?: boolean;
 }) {
   return (
     <div style={{ ...CARD, padding: "20px 22px" }}>
@@ -82,8 +79,91 @@ function fmtPhone(phone: string) {
   return phone;
 }
 
+function fmtJoined(iso: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function renderCell(key: string, d: DriverApiItem) {
+  switch (key) {
+    case "name":
+      return (
+        <div className="flex flex-col min-w-0">
+          <span className="font-extrabold text-[#111827] text-[13.5px] truncate leading-snug">{d.name}</span>
+          <span className="text-[11px] text-slate-400 font-medium mt-0.5">{d.driverRef ?? d.id.slice(0, 8)}</span>
+        </div>
+      );
+    case "phone":
+      return <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>;
+    case "email":
+      return <span className="text-[13px] text-slate-600 font-medium truncate">{d.email ?? "—"}</span>;
+    case "status":
+      return (
+        <div className="flex flex-col gap-1 items-start">
+          <StatusBadge status={d.status} size="sm" />
+          {d.isVerified && (
+            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
+              ✓ Verified
+            </span>
+          )}
+        </div>
+      );
+    case "zone":
+      return <span className="text-[13px] text-slate-600 font-medium">{d.zone ?? "—"}</span>;
+    case "vehicle": {
+      const v = d.vehicle;
+      return v ? (
+        <div className="flex flex-col gap-px min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[13px] font-medium text-slate-600 truncate">{v.plateNumber}</span>
+          </div>
+          <span className="text-[11px] font-semibold text-slate-500 truncate">{v.model ?? "Unknown Model"}</span>
+          {v.type && <span className="text-[10px] text-slate-400">{v.type}</span>}
+        </div>
+      ) : <span className="text-[13px] text-slate-300 italic">—</span>;
+    }
+    case "lastSeen":
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[13px] font-medium text-slate-700">{formatDateStrings(d.lastActiveAt).day}</span>
+          <span className="text-[11px] text-slate-400 font-medium">{formatDateStrings(d.lastActiveAt).time}</span>
+        </div>
+      );
+    case "totalTrips":
+      return <span className="text-[13px] font-semibold text-slate-700">{d.totalTrips}</span>;
+    case "documents":
+      return (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[12px] font-semibold text-slate-700">
+            {d.documents.verified}<span className="text-slate-400 font-normal">/{d.documents.total}</span>
+          </span>
+          <span className="text-[10.5px] text-slate-400">verified</span>
+        </div>
+      );
+    case "createdAt":
+      return <span className="text-[13px] text-slate-600 font-medium">{fmtJoined(d.createdAt)}</span>;
+    default:
+      return <span className="text-[13px] text-slate-400">—</span>;
+  }
+}
+
 export default function SuperAdminDriversPage() {
   const router = useRouter();
+
+  const TABLE_KEY = "allDrivers" as const;
+  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
+  const spec = getTableSpec(TABLE_KEY);
+
+  const gridTemplate = useMemo(
+    () => visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" "),
+    [visibleCols, spec.columns],
+  );
+  const minTableWidth = useMemo(
+    () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 56,
+    [visibleCols, spec.columns],
+  );
 
   const [drivers,      setDrivers]      = useState<DriverApiItem[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -101,7 +181,6 @@ export default function SuperAdminDriversPage() {
       const res = await superadminApi.drivers.list({
         limit:  200,
         status: statusFilter !== "All" ? statusFilter : undefined,
-        search: search.trim() || undefined,
       });
       setDrivers(res.data);
     } catch (err) {
@@ -109,17 +188,10 @@ export default function SuperAdminDriversPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search]);
+  }, [statusFilter]);
 
-  useEffect(() => {
-    const t = setTimeout(fetchDrivers, search ? 350 : 0);
-    return () => clearTimeout(t);
-  }, [fetchDrivers, search]);
+  useEffect(() => { fetchDrivers(); }, [fetchDrivers]);
 
-  // Live status updates — patch the matching row in place. If the changed
-  // driver is filtered out by the current status filter, drop them from the
-  // list; if a hidden driver flips into the current filter, fall back to a
-  // re-fetch so they appear with full fields populated.
   const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
     setDrivers((prev) => {
       const idx = prev.findIndex((d) => d.id === ev.driver_id);
@@ -131,12 +203,7 @@ export default function SuperAdminDriversPage() {
         return prev.filter((_, i) => i !== idx);
       }
       const next = prev.slice();
-      next[idx] = {
-        ...next[idx],
-        isOnline:   ev.is_online,
-        status:     ev.status,
-        lastSeenAt: ev.last_seen_at,
-      };
+      next[idx] = { ...next[idx], isOnline: ev.is_online, status: ev.status, lastSeenAt: ev.last_seen_at };
       return next;
     });
   }, [statusFilter, fetchDrivers]);
@@ -147,21 +214,52 @@ export default function SuperAdminDriversPage() {
   const availableCt = drivers.filter(d => d.status === "Available").length;
   const offlineCt   = drivers.filter(d => d.status === "Offline").length;
 
+  const filteredDrivers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return drivers;
+    return drivers.filter(d =>
+      d.name.toLowerCase().includes(q) ||
+      d.phone.includes(q) ||
+      (d.driverRef ?? "").toLowerCase().includes(q) ||
+      (d.email ?? "").toLowerCase().includes(q) ||
+      (d.zone ?? "").toLowerCase().includes(q) ||
+      (d.vehicle?.plateNumber ?? "").toLowerCase().includes(q) ||
+      (d.vehicle?.model ?? "").toLowerCase().includes(q)
+    );
+  }, [drivers, search]);
+
+  function handleExport() {
+    const rows = filteredDrivers.map(d => ({
+      "Driver Name":   d.name,
+      "Driver ID":     d.driverRef ?? "",
+      "Phone":         d.phone,
+      "Email":         d.email ?? "",
+      "Zone":          d.zone ?? "",
+      "Vehicle Plate": d.vehicle?.plateNumber ?? "",
+      "Vehicle Model": d.vehicle?.model ?? "",
+      "Vehicle Type":  d.vehicle?.type ?? "",
+      "Status":        d.status,
+      "Verified":      d.isVerified ? "Yes" : "No",
+      "Total Trips":   d.totalTrips,
+      "Docs Verified": `${d.documents.verified}/${d.documents.total}`,
+      "Last Active":   d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : "",
+      "Joined On":     fmtJoined(d.createdAt),
+    }));
+    exportToCsv("drivers.csv", rows);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
       <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
       `}</style>
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
-        <StatCard loading={loading} label="Total Drivers" value={totalCt} icon={Users} />
-        <StatCard loading={loading} label="On Trip" value={onTripCt} icon={Navigation} />
-        <StatCard loading={loading} label="Available" value={availableCt} icon={CircleCheck} />
-        <StatCard loading={loading} label="Offline" value={offlineCt} icon={WifiOff} />
+        <StatCard loading={loading} label="Total Drivers"  value={totalCt}     icon={Users}       />
+        <StatCard loading={loading} label="On Trip"        value={onTripCt}    icon={Navigation}  />
+        <StatCard loading={loading} label="Available"      value={availableCt} icon={CircleCheck} />
+        <StatCard loading={loading} label="Offline"        value={offlineCt}   icon={WifiOff}     />
       </div>
 
       {/* ── Toolbar ── */}
@@ -169,12 +267,11 @@ export default function SuperAdminDriversPage() {
         <SearchBar
           value={search}
           onChange={setSearch}
-          placeholder="Search by name or phone…"
+          placeholder="Search by name, phone, email, vehicle…"
         />
 
         <div className="relative shrink-0">
           <FilterTrigger onClick={() => setFilterOpen(v => !v)} activeCount={activeFilterCount} />
-
           <FilterPanel
             open={filterOpen}
             onClose={() => setFilterOpen(false)}
@@ -188,109 +285,71 @@ export default function SuperAdminDriversPage() {
             </FilterSection>
           </FilterPanel>
         </div>
+
+        <ColumnsPopover
+          tableKey={TABLE_KEY}
+          visible={visibleCols}
+          totalCount={colTotal}
+          onToggle={toggleCol}
+          onReset={resetCols}
+        />
+
+        <div className="ml-auto">
+          <ExportButton onClick={handleExport} disabled={filteredDrivers.length === 0} />
+        </div>
       </div>
 
       {/* ── Table ── */}
-      {(() => {
-        const COLS = "grid-cols-[minmax(0,2.5fr)_minmax(0,1.5fr)_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.4fr)]";
-        const ROW  = `grid ${COLS} items-center gap-8 px-7 py-4`;
-        return (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="w-full overflow-x-auto">
+          <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
 
             {/* Header */}
-            <div className={`grid ${COLS} items-center gap-8 px-7 py-3.5 border-b border-slate-100 bg-slate-50/50`}>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">DRIVER</div>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">PHONE</div>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider">VEHICLE</div>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-center">STATUS</div>
-              <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider text-right">LAST ACTIVE</div>
+            <div style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "10px 28px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+              {visibleCols.map(key => {
+                const col = spec.columns.find(c => c.key === key);
+                return (
+                  <div key={key} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                    {col?.label ?? key}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Body */}
             <div className="flex flex-col divide-y divide-slate-100">
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className={ROW}>
-                    <div className="space-y-1.5">
-                      <Skeleton className="h-3.5 w-3/5" />
-                      <Skeleton className="h-3 w-2/5" />
-                    </div>
-                    <Skeleton className="h-3.5 w-32" />
-                    <div className="space-y-1.5">
-                      <Skeleton className="h-3.5 w-24" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                    <div className="flex justify-center"><Skeleton className="h-6 w-20 rounded-full" /></div>
-                    <div className="flex justify-end"><Skeleton className="h-8 w-24" /></div>
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "14px 28px" }}>
+                    {visibleCols.map(k => <Skeleton key={k} className="h-3.5 w-3/4" />)}
                   </div>
                 ))
               ) : error ? (
                 <div className="py-12 text-center text-sm text-red-500">{error}</div>
-              ) : drivers.length === 0 ? (
+              ) : filteredDrivers.length === 0 ? (
                 <div className="py-12 text-center">
                   <p className="text-sm font-medium text-slate-500">No drivers found.</p>
                 </div>
               ) : (
-                drivers.map((d) => {
-                  const vehicles = (d as any).vehicles || (d.vehicle ? [d.vehicle] : []);
-                  const mainVehicle = vehicles[0];
-
-                  return (
-                    <div
-                      key={d.id}
-                      onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
-                      className={`${ROW} hover:bg-slate-50 transition-colors cursor-pointer`}
-                    >
-                      {/* Driver — widest, left */}
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-extrabold text-[#111827] text-[13.5px] truncate leading-snug">{d.name}</span>
-                        <span className="text-[11px] text-slate-400 font-medium mt-0.5">{d.driverRef ?? d.id}</span>
-                      </div>
-
-                      {/* Phone — left */}
-                      <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(d.phone)}</span>
-
-                      {/* Vehicle */}
-                      <div className="flex flex-col gap-px min-w-0">
-                        {mainVehicle ? (
-                          <>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[13px] font-medium text-slate-600 truncate">
-                                {mainVehicle.plateNumber ?? mainVehicle.plate ?? "N/A"}
-                              </span>
-                              {vehicles.length > 1 && (
-                                <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-bold ring-1 ring-inset ring-blue-100/50 whitespace-nowrap">
-                                  +{vehicles.length - 1}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[11px] font-semibold text-slate-500 truncate">
-                              {mainVehicle.model || "Unknown Model"}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-[13px] text-slate-300 font-medium italic">—</span>
-                        )}
-                      </div>
-
-                      {/* Status — centered */}
-                      <div className="flex justify-center">
-                        <StatusBadge status={d.status} size="sm" />
-                      </div>
-
-                      {/* Last Active — right-flush */}
-                      <div className="flex flex-col text-right items-end justify-center gap-0.5 whitespace-nowrap">
-                        <span className="text-[13px] font-medium text-slate-700">{formatDateStrings(d.lastActiveAt).day}</span>
-                        <span className="text-[11px] text-slate-400 font-medium">{formatDateStrings(d.lastActiveAt).time}</span>
-                      </div>
-                    </div>
-                  );
-                })
+                filteredDrivers.map(d => (
+                  <div
+                    key={d.id}
+                    onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
+                    style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "13px 28px", alignItems: "center", cursor: "pointer", transition: "background 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    {visibleCols.map(key => (
+                      <div key={key}>{renderCell(key, d)}</div>
+                    ))}
+                  </div>
+                ))
               )}
             </div>
+
           </div>
-        );
-      })()}
+        </div>
+      </div>
     </div>
   );
 }

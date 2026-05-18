@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@cyntler/react-doc-viewer": "^1.17.1",
     "@prisma/client": "^6.19.3",
     "@types/mapbox-gl": "^3.4.1",
     "class-variance-authority": "^0.7.1",

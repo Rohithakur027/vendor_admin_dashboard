@@ -79,7 +79,7 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
   }, [form.email, credEmailTouched]);
 
   // ── field helpers ──
-  function field(key: keyof SupervisorFormData, value: string | number | string[]) {
+  function field<K extends keyof SupervisorFormData>(key: K, value: SupervisorFormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }));
     if (errors[key as keyof FormErrors])         setErrors(prev => ({ ...prev, [key]: undefined }));
     if (apiErrorFields[key as keyof FormErrors]) setApiErrorFields(prev => ({ ...prev, [key]: undefined }));
@@ -143,8 +143,22 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
 
   function handleGenerate() { field("password", generatePassword()); setShowPassword(true); setSent(false); }
   function handleCopy()     { if (!form.password) return; navigator.clipboard.writeText(form.password); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-  function addCompany()     { const t = companyInput.trim(); if (t && !form.companies.includes(t)) field("companies", [...form.companies, t]); setCompanyInput(""); }
-  function removeCompany(c: string) { field("companies", form.companies.filter(x => x !== c)); }
+  function addCompany()     {
+    const t = companyInput.trim();
+    if (!t) { setCompanyInput(""); return; }
+    if (form.companies.some(c => c.name.toLowerCase() === t.toLowerCase())) {
+      setCompanyInput("");
+      return;
+    }
+    field("companies", [...form.companies, { name: t, address: null, city: null, state: null, pincode: null }]);
+    setCompanyInput("");
+  }
+  function removeCompany(name: string) {
+    field("companies", form.companies.filter(c => c.name !== name));
+  }
+  function updateCompanyField(name: string, key: "address" | "city" | "state" | "pincode", value: string) {
+    field("companies", form.companies.map(c => c.name === name ? { ...c, [key]: value || null } : c));
+  }
 
   // ── submit button visual ──
   const btnConfig = {
@@ -242,15 +256,51 @@ export function SupervisorDrawer({ open, onClose, onSubmit, editData }: Supervis
                     </button>
                   </div>
                   {form.companies.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {form.companies.map(c => (
-                        <span key={c} className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-[12px] font-semibold px-2.5 py-1.5 rounded-lg">
-                          {c}
-                          <button type="button" onClick={() => removeCompany(c)} className="flex items-center justify-center h-3 w-3 rounded bg-blue-500 hover:bg-blue-400 transition-colors">
-                            <X className="h-2 w-2 text-white" />
-                          </button>
-                        </span>
-                      ))}
+                    <div className="space-y-2">
+                      {form.companies.map(c => {
+                        const hasAnyAddr = c.address || c.city || c.state || c.pincode;
+                        return (
+                          <div key={c.name} className="rounded-xl border border-slate-200 bg-slate-50/40 p-2.5 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1.5 bg-blue-600 text-white text-[12px] font-semibold px-2.5 py-1.5 rounded-lg max-w-full">
+                                <span className="truncate">{c.name}</span>
+                                <button type="button" onClick={() => removeCompany(c.name)} className="flex items-center justify-center h-3 w-3 rounded bg-blue-500 hover:bg-blue-400 transition-colors shrink-0">
+                                  <X className="h-2 w-2 text-white" />
+                                </button>
+                              </span>
+                            </div>
+                            <Input
+                              placeholder={`Street address for ${c.name} (optional)`}
+                              value={c.address ?? ""}
+                              onChange={e => updateCompanyField(c.name, "address", e.target.value)}
+                              className="h-[34px] rounded-lg border-slate-200 bg-white text-[12.5px]"
+                            />
+                            <div className="grid grid-cols-3 gap-2">
+                              <Input
+                                placeholder="City"
+                                value={c.city ?? ""}
+                                onChange={e => updateCompanyField(c.name, "city", e.target.value)}
+                                className="h-[34px] rounded-lg border-slate-200 bg-white text-[12.5px]"
+                              />
+                              <Input
+                                placeholder="State"
+                                value={c.state ?? ""}
+                                onChange={e => updateCompanyField(c.name, "state", e.target.value)}
+                                className="h-[34px] rounded-lg border-slate-200 bg-white text-[12.5px]"
+                              />
+                              <Input
+                                placeholder="Pincode"
+                                value={c.pincode ?? ""}
+                                onChange={e => updateCompanyField(c.name, "pincode", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                                className="h-[34px] rounded-lg border-slate-200 bg-white text-[12.5px]"
+                              />
+                            </div>
+                            {!hasAnyAddr && (
+                              <p className="text-[11px] text-slate-400">You can add this later from the supervisor's profile.</p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-[12px] text-slate-400">No companies assigned yet.</p>

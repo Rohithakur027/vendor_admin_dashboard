@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
+import { ExportButton } from "@/components/ExportButton";
 
 const A    = "#2563EB";
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -347,7 +348,7 @@ export default function InvoicingPage() {
       "Company":        inv.companyName,
       "Period From":    inv.periodFrom,
       "Period To":      inv.periodTo,
-      "Amount (₹)":    inv.amount,
+      "Amount":         inv.amount,
       "Status":         effectiveStatus(inv),
       "Issued At":      fmtDate(inv.issuedAt),
       "Due Date":       fmtDate(inv.dueDate),
@@ -417,19 +418,12 @@ export default function InvoicingPage() {
               : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
             <ColumnsPopover tableKey="invoices" visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
             {!loading && invoices.length > 0 && (
-              <button
-                onClick={handleExportCsv}
-                style={{ display:"flex", alignItems:"center", gap:6, fontSize:12.5, fontWeight:600, color:"#64748B",
-                  background:"none", border:"1px solid #E8EEF4", borderRadius:8, padding:"5px 12px",
-                  cursor:"pointer", fontFamily:FONT }}
-              >
-                <Download className="h-3 w-3"/> Export CSV
-              </button>
+              <ExportButton onClick={handleExportCsv} />
             )}
           </div>
         </div>
         <div style={{ overflowX:"auto" }}>
-          <div style={{ minWidth: minTableWidth }}>
+          <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
             <div style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
               padding:"10px 20px", borderBottom:"1px solid #F1F5F9", background:"#FAFBFC" }}>
               {prefsLoading

@@ -6,11 +6,14 @@ import {
   type GeneralBookingEnquiry,
   type SpecialBookingInquiry,
 } from "@/lib/api";
-import { MessageSquare, Inbox } from "lucide-react";
+import { MessageSquare, Inbox, ArrowRight } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
 
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
+const BLUE = "#2563eb";
 
 type Tab = "general" | "special";
 
@@ -37,29 +40,62 @@ function fmtPhone(phone: string) {
   return phone;
 }
 
+const STATUS_PILL: Record<string, { bg: string; color: string; dot: string; border: string }> = {
+  pending:         { bg: "#fefce8", color: "#854d0e", dot: "#eab308",  border: "#fef08a" },
+  driver_assigned: { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6",  border: "#bfdbfe" },
+  completed:       { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e",  border: "#bbf7d0" },
+  cancelled:       { bg: "#fef2f2", color: "#b91c1c", dot: "#ef4444",  border: "#fecaca" },
+  New:             { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6",  border: "#bfdbfe" },
+  "In Review":     { bg: "#fefce8", color: "#854d0e", dot: "#eab308",  border: "#fef08a" },
+  Resolved:        { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e",  border: "#bbf7d0" },
+  Closed:          { bg: "#f8fafc", color: "#475569", dot: "#94a3b8",  border: "#e2e8f0" },
+};
+
 function StatusPill({ status }: { status: string | null }) {
   const s = (status ?? "—").toString();
-  const tone: Record<string, { bg: string; color: string }> = {
-    pending:         { bg: "#FEF3C7", color: "#92400E" },
-    driver_assigned: { bg: "#DBEAFE", color: "#1E40AF" },
-    completed:       { bg: "#DCFCE7", color: "#166534" },
-    cancelled:       { bg: "#FEE2E2", color: "#991B1B" },
-    New:             { bg: "#DBEAFE", color: "#1E40AF" },
-    "In Review":     { bg: "#FEF3C7", color: "#92400E" },
-    Resolved:        { bg: "#DCFCE7", color: "#166534" },
-    Closed:          { bg: "#E2E8F0", color: "#475569" },
-  };
-  const t = tone[s] ?? { bg: "#E2E8F0", color: "#475569" };
+  const key = Object.keys(STATUS_PILL).find(k => k.toLowerCase() === s.toLowerCase()) ?? s;
+  const t = STATUS_PILL[key] ?? { bg: "#f8fafc", color: "#475569", dot: "#94a3b8", border: "#e2e8f0" };
   return (
     <span style={{
-      display: "inline-block", padding: "3px 10px", borderRadius: 999,
-      background: t.bg, color: t.color, fontSize: 11, fontWeight: 700,
-      textTransform: "capitalize", letterSpacing: 0.2,
+      display: "inline-flex", alignItems: "center", gap: 5, width: "fit-content",
+      background: t.bg, color: t.color, border: `1px solid ${t.border}`,
+      borderRadius: 20, fontSize: 11, fontWeight: 700, padding: "3px 10px", whiteSpace: "nowrap",
     }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.dot, flexShrink: 0 }} />
       {s.replace(/_/g, " ")}
     </span>
   );
 }
+
+function RouteCell({ from, to }: { from: string; to: string }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {from.split(",")[0]}
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, margin: "3px 0" }}>
+        <div style={{ width: 40, height: 2, background: "linear-gradient(to right,#a5b4fc,#2563eb)", borderRadius: 2 }} />
+        <ArrowRight style={{ width: 10, height: 10, color: BLUE }} />
+      </div>
+      <p style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {to.split(",")[0]}
+      </p>
+    </div>
+  );
+}
+
+function PersonCell({ name, email, phone }: { name: string; email: string; phone: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      <span style={{ fontSize: 11.5, color: "#64748b", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</span>
+      <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>{fmtPhone(phone)}</span>
+    </div>
+  );
+}
+
+const GENERAL_COLS = "minmax(0,1.6fr) minmax(0,2.2fr) 150px 110px 150px";
+const SPECIAL_COLS = "minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,2.2fr) 150px";
 
 export default function BookingEnquiriesPage() {
   const [tab, setTab] = useState<Tab>("general");
@@ -97,6 +133,32 @@ export default function BookingEnquiriesPage() {
         .finally(() => setLoading(false));
     }
   }, [tab, search]);
+
+  function handleExportGeneral() {
+    exportToCsv("general-bookings.csv", general.map(b => ({
+      "Customer Name":  b.customerName,
+      "Email":          b.customerEmail,
+      "Phone":          b.customerMobile,
+      "Pickup Address":      b.pickupLocation,
+      "Destination Address": b.destination,
+      "Vehicle Type":   b.vehicleType ?? "",
+      "Booking Type":   b.isScheduled ? "Scheduled" : "Instant",
+      "Passengers":     b.passengers,
+      "Created":        fmtDate(b.createdAt),
+    })));
+  }
+
+  function handleExportSpecial() {
+    exportToCsv("special-inquiries.csv", special.map(s => ({
+      "First Name":  s.firstName,
+      "Last Name":   s.lastName,
+      "Email":       s.email,
+      "Phone":       s.phone,
+      "Company":     s.companyName,
+      "Message":     s.message,
+      "Created":     fmtDate(s.createdAt),
+    })));
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
@@ -147,15 +209,10 @@ export default function BookingEnquiriesPage() {
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
-                padding: "9px 16px",
-                fontSize: 13,
-                fontWeight: 700,
-                fontFamily: FONT,
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: active ? "#2563EB" : "#64748B",
-                borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
+                padding: "9px 16px", fontSize: 13, fontWeight: 700, fontFamily: FONT,
+                background: "transparent", border: "none", cursor: "pointer",
+                color: active ? BLUE : "#64748B",
+                borderBottom: active ? `2px solid ${BLUE}` : "2px solid transparent",
                 marginBottom: -1,
               }}
             >
@@ -165,7 +222,7 @@ export default function BookingEnquiriesPage() {
         })}
       </div>
 
-      {/* Search */}
+      {/* Search + Export */}
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <SearchBar
           value={searchInput}
@@ -174,106 +231,123 @@ export default function BookingEnquiriesPage() {
             ? "Search by customer name, email, phone, or location…"
             : "Search by name, company, email, or phone…"}
         />
+        <div style={{ marginLeft: "auto" }}>
+          {tab === "general"
+            ? <ExportButton onClick={handleExportGeneral} disabled={general.length === 0} />
+            : <ExportButton onClick={handleExportSpecial} disabled={special.length === 0} />
+          }
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-        <div className="w-full overflow-x-auto">
-          {tab === "general" ? (
-            <div className="min-w-[1100px]">
-              <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,2.2fr)_140px_120px_140px_140px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                {["CUSTOMER", "TRIP", "TYPE", "PASSENGERS", "STATUS", "CREATED"].map(h => (
-                  <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
+      <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.04)", overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+
+          {/* ── GENERAL BOOKINGS ── */}
+          {tab === "general" && (
+            <div style={{ minWidth: 1100 }}>
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: GENERAL_COLS, gap: 16, padding: "10px 24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                {["CUSTOMER", "ROUTE", "TYPE", "PASSENGERS", "CREATED"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</div>
                 ))}
               </div>
-              <div className="flex flex-col divide-y divide-slate-100">
+              {/* Rows */}
+              <div>
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,2.2fr)_140px_120px_140px_140px] items-center gap-6 px-6 py-3.5">
-                      <Skeleton className="h-3.5 w-40" />
-                      <Skeleton className="h-3.5 w-56" />
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: GENERAL_COLS, gap: 16, padding: "14px 24px", borderBottom: "1px solid #f8fafc" }}>
+                      <Skeleton className="h-3.5 w-36" />
+                      <Skeleton className="h-3.5 w-48" />
                       <Skeleton className="h-3.5 w-20" />
                       <Skeleton className="h-3.5 w-10" />
-                      <Skeleton className="h-6 w-20 rounded-full" />
                       <Skeleton className="h-3.5 w-24" />
                     </div>
                   ))
                 ) : general.length === 0 ? (
-                  <div className="py-16 text-center">
-                    <p className="text-sm font-medium text-slate-500">
-                      {search ? "No bookings match your search." : "No general booking enquiries found."}
-                    </p>
+                  <div style={{ padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    {search ? "No bookings match your search." : "No general booking enquiries found."}
                   </div>
                 ) : (
-                  general.map(b => (
-                    <div key={b.id} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,2.2fr)_140px_120px_140px_140px] items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-extrabold text-[#111827] text-[13px] truncate">{b.customerName}</span>
-                        <span className="text-[11.5px] text-slate-500 font-medium truncate">{b.customerEmail}</span>
-                        <span className="text-[11px] text-slate-400 font-medium">{fmtPhone(b.customerMobile)}</span>
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[12.5px] text-slate-700 font-semibold truncate" title={b.pickupLocation}>
-                          ↑ {b.pickupLocation}
+                  general.map((b, i) => (
+                    <div key={b.id} style={{
+                      display: "grid", gridTemplateColumns: GENERAL_COLS, gap: 16,
+                      padding: "12px 24px", alignItems: "center",
+                      borderBottom: i < general.length - 1 ? "1px solid #f8fafc" : "none",
+                      transition: "background 0.15s",
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <PersonCell name={b.customerName} email={b.customerEmail} phone={b.customerMobile} />
+                      <RouteCell from={b.pickupLocation} to={b.destination} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {b.vehicleType && (
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{b.vehicleType}</span>
+                        )}
+                        <span style={{ fontSize: 10, fontWeight: 700, background: "#eef2ff", color: "#4f46e5", padding: "2px 7px", borderRadius: 6, display: "inline-block", width: "fit-content" }}>
+                          {b.isScheduled ? "Scheduled" : "Instant"}
                         </span>
-                        <span className="text-[12.5px] text-slate-700 font-semibold truncate" title={b.destination}>
-                          ↓ {b.destination}
-                        </span>
                       </div>
-                      <span className="text-[12.5px] text-slate-600 font-medium">
-                        {b.isScheduled ? "Scheduled" : "Instant"}
-                        {b.vehicleType ? ` · ${b.vehicleType}` : ""}
-                      </span>
-                      <span className="text-[13px] text-slate-600 font-medium">{b.passengers}</span>
-                      <div><StatusPill status={b.status} /></div>
-                      <span className="text-[12px] text-slate-500 font-medium">{fmtDate(b.createdAt)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="min-w-[1100px]">
-              <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,2.4fr)_120px_140px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                {["NAME", "COMPANY", "MESSAGE", "STATUS", "CREATED"].map(h => (
-                  <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
-                ))}
-              </div>
-              <div className="flex flex-col divide-y divide-slate-100">
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,2.4fr)_120px_140px] items-center gap-6 px-6 py-3.5">
-                      <Skeleton className="h-3.5 w-40" />
-                      <Skeleton className="h-3.5 w-32" />
-                      <Skeleton className="h-3.5 w-72" />
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                      <Skeleton className="h-3.5 w-24" />
-                    </div>
-                  ))
-                ) : special.length === 0 ? (
-                  <div className="py-16 text-center">
-                    <p className="text-sm font-medium text-slate-500">
-                      {search ? "No inquiries match your search." : "No special booking inquiries found."}
-                    </p>
-                  </div>
-                ) : (
-                  special.map(s => (
-                    <div key={s.id} className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,2.4fr)_120px_140px] items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-extrabold text-[#111827] text-[13px] truncate">{s.firstName} {s.lastName}</span>
-                        <span className="text-[11.5px] text-slate-500 font-medium truncate">{s.email}</span>
-                        <span className="text-[11px] text-slate-400 font-medium">{fmtPhone(s.phone)}</span>
-                      </div>
-                      <span className="text-[13px] text-slate-700 font-semibold truncate" title={s.companyName}>{s.companyName}</span>
-                      <span className="text-[12.5px] text-slate-600 leading-snug line-clamp-2" title={s.message}>{s.message}</span>
-                      <div><StatusPill status={s.status} /></div>
-                      <span className="text-[12px] text-slate-500 font-medium">{fmtDate(s.createdAt)}</span>
+                      <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{b.passengers}</span>
+                      <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>{fmtDate(b.createdAt)}</span>
                     </div>
                   ))
                 )}
               </div>
             </div>
           )}
+
+          {/* ── SPECIAL INQUIRIES ── */}
+          {tab === "special" && (
+            <div style={{ minWidth: 1000 }}>
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: SPECIAL_COLS, gap: 16, padding: "10px 24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                {["NAME", "COMPANY", "MESSAGE", "CREATED"].map(h => (
+                  <div key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</div>
+                ))}
+              </div>
+              {/* Rows */}
+              <div>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} style={{ display: "grid", gridTemplateColumns: SPECIAL_COLS, gap: 16, padding: "14px 24px", borderBottom: "1px solid #f8fafc" }}>
+                      <Skeleton className="h-3.5 w-36" />
+                      <Skeleton className="h-3.5 w-28" />
+                      <Skeleton className="h-3.5 w-64" />
+                      <Skeleton className="h-3.5 w-24" />
+                    </div>
+                  ))
+                ) : special.length === 0 ? (
+                  <div style={{ padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    {search ? "No inquiries match your search." : "No special booking inquiries found."}
+                  </div>
+                ) : (
+                  special.map((s, i) => (
+                    <div key={s.id} style={{
+                      display: "grid", gridTemplateColumns: SPECIAL_COLS, gap: 16,
+                      padding: "12px 24px", alignItems: "center",
+                      borderBottom: i < special.length - 1 ? "1px solid #f8fafc" : "none",
+                      transition: "background 0.15s",
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <PersonCell name={`${s.firstName} ${s.lastName}`} email={s.email} phone={s.phone} />
+                      <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.companyName}>
+                        {s.companyName}
+                      </span>
+                      <span style={{ fontSize: 12.5, color: "#64748b", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }} title={s.message}>
+                        {s.message}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>{fmtDate(s.createdAt)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

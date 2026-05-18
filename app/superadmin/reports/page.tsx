@@ -16,6 +16,8 @@ import { Route } from "lucide-react";
 import { SvgBarChart as SharedSvgBarChart, SvgDonut as SharedSvgDonut } from "@/modules/reports/charts";
 import { DateRangePicker as SharedDateRangePicker } from "@/modules/reports/DateRangePicker";
 import { ReportSkeleton as SharedReportSkeleton } from "@/modules/reports/primitives";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
 
 const A    = "#2563EB";
 const FONT = "var(--font-plus-jakarta-sans),'Plus Jakarta Sans',sans-serif";
@@ -421,11 +423,8 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
       {/* ── Wallet Passbook ─────────────────────────────────────── */}
       {tab === "Wallet Passbook" && (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
-            <div style={{ fontSize:13.5, fontWeight:700, color:"#0F172A" }}>
-              Wallet Passbook
-              {!walletLoading && <span style={{ fontSize:12, fontWeight:500, color:"#94A3B8", marginLeft:8 }}>{walletData.length} transactions</span>}
-            </div>
+          <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            {/* Calendar — left */}
             <div style={{ position:"relative", display:"inline-block" }}>
               <button onClick={() => setCalOpen(v => !v)}
                 style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"7px 14px", background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:13, color:"#475569", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
@@ -434,7 +433,7 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
               {calOpen && (
-                <div style={{ position:"absolute", top:"100%", right:0, width:290, height:0, zIndex:200 }}>
+                <div style={{ position:"absolute", top:"100%", left:0, width:290, height:0, zIndex:200 }}>
                   <div style={{ position:"relative", width:"100%", height:"100%" }}>
                     <SharedDateRangePicker from={dateFrom} to={dateTo}
                       onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
@@ -442,6 +441,24 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
                   </div>
                 </div>
               )}
+            </div>
+            {/* Title */}
+            <div style={{ fontSize:13.5, fontWeight:700, color:"#0F172A" }}>
+              {!walletLoading && <span style={{ fontSize:12, fontWeight:500, color:"#94A3B8" }}>{walletData.length} transactions</span>}
+            </div>
+            {/* Export — right */}
+            <div style={{ marginLeft:"auto" }}>
+              <ExportButton
+                disabled={walletData.length === 0}
+                onClick={() => exportToCsv("wallet-passbook.csv", walletData.map(t => ({
+                  "Date & Time":   fmtDateTime(t.createdAt),
+                  "Type":          txDisplayType(t.type),
+                  "Supervisor":    t.supervisorName ?? "",
+                  "Amount":        (t.type === "CREDIT" ? "+" : "-") + Math.abs(t.amount),
+                  "Balance After": t.balanceAfter ?? "",
+                  "Note":          t.note ?? "",
+                })))}
+              />
             </div>
           </div>
           {walletLoading ? <SharedReportSkeleton hideHeader statCount={3}/> : (
@@ -478,11 +495,8 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
       {/* ── Trips ────────────────────────────────────────────────── */}
       {tab === "Trips" && (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
-            <div style={{ fontSize:13.5, fontWeight:700, color:"#0F172A" }}>
-              Trips
-              {!bookingsLoading && <span style={{ fontSize:12, fontWeight:500, color:"#94A3B8", marginLeft:8 }}>{bookingsData.length} trips</span>}
-            </div>
+          <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+            {/* Calendar — left */}
             <div style={{ position:"relative", display:"inline-block" }}>
               <button onClick={() => setCalOpen(v => !v)}
                 style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"7px 14px", background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:13, color:"#475569", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
@@ -491,7 +505,7 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
               {calOpen && (
-                <div style={{ position:"absolute", top:"100%", right:0, width:290, height:0, zIndex:200 }}>
+                <div style={{ position:"absolute", top:"100%", left:0, width:290, height:0, zIndex:200 }}>
                   <div style={{ position:"relative", width:"100%", height:"100%" }}>
                     <SharedDateRangePicker from={dateFrom} to={dateTo}
                       onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
@@ -499,6 +513,27 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
                   </div>
                 </div>
               )}
+            </div>
+            {/* Title */}
+            <div style={{ fontSize:13.5, fontWeight:700, color:"#0F172A" }}>
+              {!bookingsLoading && <span style={{ fontSize:12, fontWeight:500, color:"#94A3B8" }}>{bookingsData.length} trips</span>}
+            </div>
+            {/* Export — right */}
+            <div style={{ marginLeft:"auto" }}>
+              <ExportButton
+                disabled={bookingsData.length === 0}
+                onClick={() => exportToCsv("trips.csv", bookingsData.map(b => ({
+                  "Trip ID":       b.bookingRef ?? b.id,
+                  "Type":          b.type,
+                  "Pickup":        b.pickupLocation,
+                  "Drop":          b.dropLocation,
+                  "Supervisor":    b.supervisorName ?? "",
+                  "Vehicle Reg":   b.vehicleReg ?? "",
+                  "Vehicle Model": b.vehicleModel ?? "",
+                  "Status":        b.status,
+                  "Created At":    fmtDateTime(b.createdAt),
+                })))}
+              />
             </div>
           </div>
           {bookingsLoading ? <SharedReportSkeleton hideHeader statCount={3}/> : (

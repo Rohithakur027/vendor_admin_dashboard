@@ -19,7 +19,7 @@ const pageTitles: Record<string, string> = {
 
 export function SuperAdminHeader({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const title = pageTitles[pathname] ?? "Super Admin";
 
   return (
@@ -38,7 +38,14 @@ export function SuperAdminHeader({ onMobileMenuClick }: { onMobileMenuClick: () 
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-          <span className="text-sm font-medium">Super Admin</span>
+          <div className="flex flex-col items-end leading-tight">
+            <span className="text-sm font-semibold">{user?.full_name ?? "Super Admin"}</span>
+            <span className="text-xs text-slate-500">
+              {user?.role === "superadmin_member"
+                ? (user?.role_label?.trim() || "Team Member")
+                : "Super Admin"}
+            </span>
+          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem className="gap-2">

@@ -52,15 +52,15 @@ export default function DriversPage() {
 
   function handleExport() {
     const rows = filtered.map((d) => ({
-      "Driver Ref":  d.driverRef ?? d.id,
-      "Name":        d.name,
-      "Phone":       d.phone,
-      "Status":      d.status,
-      "Supervisor":  d.assignedSupervisorName ?? "",
-      "Vehicle":     d.vehicle ?? "",
-      "Vehicle Reg": d.vehicleReg ?? "",
-      "Total Trips": d.totalTrips,
-      "Last Active": new Date(d.lastActive).toLocaleString("en-IN"),
+      "Driver ID":                   d.driverRef ?? d.id,
+      "Name":                        d.name,
+      "Phone":                       d.phone,
+      "Status":                      d.status,
+      "Supervisor":                  d.assignedSupervisorName ?? "",
+      "Vehicle":                     d.vehicle ?? "",
+      "Vehicle Registration Number": d.vehicleReg ?? "",
+      "Total Trips":                 d.totalTrips,
+      "Last Active":                 d.lastActive ? new Date(d.lastActive).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase() : "",
     }));
     exportToCsv("drivers", rows);
   }

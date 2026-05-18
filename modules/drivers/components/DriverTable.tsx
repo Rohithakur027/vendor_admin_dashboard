@@ -105,7 +105,7 @@ export function DriverTable({ drivers, splitAt, loading, visibleCols, gridTempla
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
       <div className="w-full overflow-x-auto">
-        <div style={{ minWidth: minTableWidth }}>
+        <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
           {/* Header */}
           <div
             className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"

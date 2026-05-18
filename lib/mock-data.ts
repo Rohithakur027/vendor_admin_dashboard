@@ -9,6 +9,7 @@ export interface Vendor {
   email: string;
   phone: string;
   city: string;
+  pan?: string;
   status: "Active" | "Inactive";
   joinedAt: string;
   totalDrivers: number;
@@ -17,6 +18,8 @@ export interface Vendor {
   totalBookingsAllTime: number;
   secondaryPOCs?: { name: string; email: string; phone: string }[];
   wallet_balance?: number;
+  is_verified?: boolean;
+  address?: string;
 }
 
 export const mockVendors: Vendor[] = [
@@ -101,7 +104,7 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: true,
     createdAt: "2024-01-15",
     walletUsed: 11200,
-    companies: ["Infosys"],
+    companies: [{ name: "Infosys", address: null, city: null, state: null, pincode: null }],
     dailyHistory: [
       { date: "2026-04-24", amount: 850,  bookings: 4 },
       { date: "2026-04-23", amount: 1200, bookings: 6 },
@@ -133,7 +136,7 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: true,
     createdAt: "2024-02-20",
     walletUsed: 4500,
-    companies: ["Flipkart"],
+    companies: [{ name: "Flipkart", address: null, city: null, state: null, pincode: null }],
     dailyHistory: [
       { date: "2026-04-24", amount: 420, bookings: 5 },
       { date: "2026-04-23", amount: 580, bookings: 7 },
@@ -165,7 +168,10 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: false,
     createdAt: "2024-03-10",
     walletUsed: 0,
-    companies: ["TCS", "HCL Technologies"],
+    companies: [
+      { name: "TCS", address: null, city: null, state: null, pincode: null },
+      { name: "HCL Technologies", address: null, city: null, state: null, pincode: null },
+    ],
     dailyHistory: [],
   },
   {
@@ -181,7 +187,11 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: true,
     createdAt: "2024-01-28",
     walletUsed: 18750,
-    companies: ["Swiggy", "Razorpay", "Zerodha"],
+    companies: [
+      { name: "Swiggy", address: null, city: null, state: null, pincode: null },
+      { name: "Razorpay", address: null, city: null, state: null, pincode: null },
+      { name: "Zerodha", address: null, city: null, state: null, pincode: null },
+    ],
     dailyHistory: [
       { date: "2026-04-24", amount: 1800, bookings: 12 },
       { date: "2026-04-23", amount: 2200, bookings: 15 },
@@ -213,7 +223,7 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: false,
     createdAt: "2024-04-05",
     walletUsed: 3200,
-    companies: ["Tech Mahindra"],
+    companies: [{ name: "Tech Mahindra", address: null, city: null, state: null, pincode: null }],
     dailyHistory: [
       { date: "2026-04-24", amount: 200, bookings: 0 },
       { date: "2026-04-23", amount: 350, bookings: 0 },
@@ -245,7 +255,10 @@ export const mockSupervisors: Supervisor[] = [
     isOnline: false,
     createdAt: "2024-02-14",
     walletUsed: 6800,
-    companies: ["Biocon", "Mphasis"],
+    companies: [
+      { name: "Biocon", address: null, city: null, state: null, pincode: null },
+      { name: "Mphasis", address: null, city: null, state: null, pincode: null },
+    ],
     dailyHistory: [
       { date: "2026-04-24", amount: 720, bookings: 3  },
       { date: "2026-04-23", amount: 890, bookings: 5  },

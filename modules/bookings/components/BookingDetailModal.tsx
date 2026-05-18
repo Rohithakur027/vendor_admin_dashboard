@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { CarFront } from "lucide-react";
 import dynamic from "next/dynamic";
 import {
   Drawer,
@@ -92,32 +93,73 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
   const DetailsContent = () => (
     <>
       {/* ── Route ── */}
-      <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+      {(() => {
+        const stops = booking?.stops ?? [];
+        const hasStops = stops.length > 0;
+
+        // Helper: split "Main Street, Area, City" into main + sub parts
+        function splitAddr(addr: string) {
+          const parts = addr.split(",").map(p => p.trim()).filter(Boolean);
+          return { main: parts[0] ?? addr, sub: parts.slice(1).join(", ") };
+        }
+
+        const pickup = splitAddr(booking?.pickupLocation ?? "");
+        const drop   = splitAddr(booking?.dropLocation   ?? "");
+
+        return (
+        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
         <SLabel>Route</SLabel>
-        <div style={{ display: "flex", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 3 }}>
-            <div style={{ width: 9, height: 9, borderRadius: "50%", background: "#0F172A", flexShrink: 0 }} />
-            <div style={{ width: 1.5, flex: 1, minHeight: 26, background: "#D1D5DB", margin: "4px 0" }} />
-            <div style={{ width: 9, height: 9, borderRadius: 2, background: "#0F172A", flexShrink: 0 }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", marginBottom: 2 }}>Pickup</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{booking?.pickupLocation}</div>
-              <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
-                {booking?.createdAt && new Date(booking.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </div>
+
+        {/* Continuous vertical track + markers */}
+        <div>
+          {/* ── Pickup ── */}
+          <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+            <div style={{ width: 10, flexShrink: 0, position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #0F172A", background: "#fff", marginTop: 4, zIndex: 1 }} />
+              <div style={{ position: "absolute", top: 14, bottom: -4, width: 2, background: "#D1D5DB", zIndex: 0 }} />
             </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", marginBottom: 2 }}>Drop</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{booking?.dropLocation}</div>
+            <div style={{ flex: 1, paddingBottom: 14 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{pickup.main}</div>
+              {pickup.sub && <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2, lineHeight: 1.4 }}>{pickup.sub}</div>}
+            </div>
+          </div>
+
+          {/* ── Stops (always visible) ── */}
+          {hasStops && stops.map((s, i) => {
+            const sa = splitAddr(s.address);
+            return (
+              <div key={s.id} style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+                <div style={{ width: 10, flexShrink: 0, position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", border: "1.5px solid #94A3B8", background: "#fff", marginTop: 5, zIndex: 1 }} />
+                  <div style={{ position: "absolute", top: 13, bottom: -4, width: 2, background: "#D1D5DB", zIndex: 0 }} />
+                </div>
+                <div style={{ flex: 1, paddingBottom: 14 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+                    Stop {i + 1}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", lineHeight: 1.3 }}>{sa.main}</div>
+                  {sa.sub && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{sa.sub}</div>}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* ── Drop ── */}
+          <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
+            <div style={{ width: 10, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#0F172A", marginTop: 4, zIndex: 1 }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{drop.main}</div>
+              {drop.sub && <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2, lineHeight: 1.4 }}>{drop.sub}</div>}
             </div>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
           {[
-            { label: "Created",    value: booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString([], { day: "numeric", month: "short" }) : "—" },
+            { label: "Created",    value: booking?.createdAt ? new Date(booking.createdAt).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—" },
+            ...(booking?.status === "Completed" ? [{ label: "Completed", value: booking?.completedAt ? new Date(booking.completedAt).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—" }] : []),
             { label: "Type",       value: booking?.type ?? "—" },
             { label: "Fare",       value: booking?.fare ? `₹${booking.fare}` : "—" },
             { label: "Passengers", value: booking?.passengers != null ? `${booking.passengers}` : "—" },
@@ -128,7 +170,9 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             </div>
           ))}
         </div>
-      </div>
+        </div>
+        );
+      })()}
 
       {/* ── Scheduled date/time (Scheduled bookings only) ── */}
       {booking?.type === "Scheduled" && booking.scheduledTime && (
@@ -158,11 +202,13 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>Driver</div>
           {booking?.driverName ? (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 7 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
                 {booking.driverName}
               </div>
-              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, borderRadius: 8, background: "#F1F5F9", border: "1.5px solid #E2E8F0" }}>
-                <Phone size={13} color="#64748B" />
+              <div style={{ display: "flex", alignItems: "center", height: 26 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, background: "#F1F5F9", border: "1px solid #E2E8F0", flexShrink: 0 }}>
+                  <Phone size={12} color="#64748B" />
+                </div>
               </div>
             </div>
           ) : (
@@ -177,9 +223,11 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
                 {booking.supervisorName}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <Phone size={11} color="#94A3B8" />
-                <span style={{ fontSize: 11.5, color: "#64748B", fontWeight: 600 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, height: 26 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, background: "#F1F5F9", border: "1px solid #E2E8F0", flexShrink: 0 }}>
+                  <Phone size={12} color="#64748B" />
+                </div>
+                <span style={{ fontSize: 11.5, color: "#475569", fontWeight: 600 }}>
                   {supervisor?.phone ?? "—"}
                 </span>
               </div>
@@ -214,13 +262,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
                 <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", letterSpacing: 2.5, fontVariantNumeric: "tabular-nums" }}>{driver.vehicleReg}</div>
               </div>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                  <rect x="2" y="6" width="16" height="10" rx="2.5" stroke="#fff" strokeWidth="1.4" opacity="0.8"/>
-                  <path d="M6 6V5a4 4 0 018 0v1" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" opacity="0.8"/>
-                  <circle cx="7" cy="11" r="1" fill="#fff" opacity="0.7"/>
-                  <circle cx="13" cy="11" r="1" fill="#fff" opacity="0.7"/>
-                  <path d="M8 11h4" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" opacity="0.7"/>
-                </svg>
+                <CarFront size={18} color="#fff" strokeWidth={1.8} opacity={0.8} />
               </div>
             </div>
           )}

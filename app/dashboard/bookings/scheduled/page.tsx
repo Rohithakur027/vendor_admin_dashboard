@@ -8,13 +8,13 @@ import { CalendarClock, ArrowRight } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
-import { DateRangePicker } from "@/modules/reports/DateRangePicker";
-import { toIsoDate } from "@/modules/reports/primitives";
 import { ExportButton } from "@/components/ExportButton";
 import { exportToCsv } from "@/lib/exportCsv";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
+import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
+import { toIsoDate } from "@/modules/reports/primitives";
 
 const TABLE_KEY = "scheduledTrips" as const;
 const EM_DASH = "—";
@@ -49,7 +49,7 @@ function MockSeparator() {
 
 function buildRenderers(
   supervisorName: (id: string | null | undefined) => string,
-  driverFor: (b: Booking) => { name: string | null; vehicle: string | null; vehicleReg: string | null; phone: string | null },
+  driverFor: (b: Booking) => { name: string | null; vehicle: string | null; vehicleReg: string | null; vehicleType: string | null; phone: string | null },
 ) {
   return {
     tripId: {
@@ -105,10 +105,11 @@ function buildRenderers(
           <div className="flex flex-col gap-px min-w-0">
             <span className="text-[13px] font-medium text-slate-600 truncate">{d.vehicleReg || d.vehicle}</span>
             {d.vehicleReg && d.vehicle && <span className="text-[11px] font-semibold text-slate-500 truncate">{d.vehicle}</span>}
+            {d.vehicleType && <span className="text-[11px] font-medium text-slate-500 truncate">{d.vehicleType}</span>}
           </div>
         );
       },
-      skeleton: () => (<div className="space-y-1.5"><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3 w-16" /></div>),
+      skeleton: () => (<div className="space-y-1.5"><Skeleton className="h-3.5 w-24" /><Skeleton className="h-3 w-16" /><Skeleton className="h-2.5 w-12" /></div>),
       csv:      (b: Booking) => { const d = driverFor(b); return [d.vehicleReg, d.vehicle].filter(Boolean).join(" · "); },
     },
     driver: {
@@ -253,6 +254,32 @@ function buildRenderers(
       skeleton: () => <Skeleton className="h-3.5 w-16" />,
       csv:      (b: Booking) => (b as Booking & { invoiceId?: string | null }).invoiceId ?? "",
     },
+    pickupLatLng: {
+      header:   () => "PICKUP LAT/LNG",
+      body:     (b: Booking) => b.pickupLat != null && b.pickupLng != null
+        ? (
+          <div className="flex flex-col gap-px font-mono tabular-nums">
+            <span className="text-[12px] text-slate-700">{b.pickupLat.toFixed(6)}</span>
+            <span className="text-[11px] text-slate-400">{b.pickupLng.toFixed(6)}</span>
+          </div>
+        )
+        : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>,
+      skeleton: () => (<div className="space-y-1"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-20" /></div>),
+      csv:      (b: Booking) => b.pickupLat != null && b.pickupLng != null ? `${b.pickupLat},${b.pickupLng}` : "",
+    },
+    dropLatLng: {
+      header:   () => "DROP LAT/LNG",
+      body:     (b: Booking) => b.dropLat != null && b.dropLng != null
+        ? (
+          <div className="flex flex-col gap-px font-mono tabular-nums">
+            <span className="text-[12px] text-slate-700">{b.dropLat.toFixed(6)}</span>
+            <span className="text-[11px] text-slate-400">{b.dropLng.toFixed(6)}</span>
+          </div>
+        )
+        : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>,
+      skeleton: () => (<div className="space-y-1"><Skeleton className="h-3 w-20" /><Skeleton className="h-3 w-20" /></div>),
+      csv:      (b: Booking) => b.dropLat != null && b.dropLng != null ? `${b.dropLat},${b.dropLng}` : "",
+    },
   } as const;
 }
 
@@ -263,9 +290,9 @@ export default function ScheduledBookingsPage() {
 
   const [search, setSearch] = useState("");
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [dateFrom, setDateFrom] = useState(() => toIsoDate(new Date()));
-  const [dateTo,   setDateTo]   = useState(() => { const d = new Date(); d.setDate(d.getDate() + 29); return toIsoDate(d); });
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [period,   setPeriod]   = useState<TripPeriod>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
 
   const scheduledActive = bookings.filter(
     (b) => b.type === "Scheduled" && (b.status === "Pending" || b.status === "Ongoing")
@@ -273,11 +300,20 @@ export default function ScheduledBookingsPage() {
   const pendingCount = scheduledActive.filter((b) => !b.driverId).length;
   const ongoingCount = scheduledActive.filter((b) => !!b.driverId).length;
 
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfToday   = new Date(startOfToday.getTime() + 86400_000);
   const filtered = scheduledActive
     .filter((b) => {
-      const sched = b.scheduledTime ? toIsoDate(new Date(b.scheduledTime)) : "";
-      const matchDate = !sched || (sched >= dateFrom && sched <= dateTo);
-      if (!matchDate) return false;
+      if (period === "custom" && b.scheduledTime) {
+        const d = toIsoDate(new Date(b.scheduledTime));
+        if (!d || d < dateFrom || d > dateTo) return false;
+      } else if (period !== "all" && b.scheduledTime) {
+        const d = new Date(b.scheduledTime);
+        if (period === "today"  && (d < startOfToday || d >= endOfToday)) return false;
+        if (period === "7days"  && (d < startOfToday || d > new Date(now.getTime() + 7  * 86400_000))) return false;
+        if (period === "30days" && (d < startOfToday || d > new Date(now.getTime() + 30 * 86400_000))) return false;
+      }
 
       const q = search.toLowerCase();
       if (!q) return true;
@@ -319,10 +355,11 @@ export default function ScheduledBookingsPage() {
       b  => {
         const driver = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
         return {
-          name:       driver?.name ?? null,
-          vehicle:    driver?.vehicle ?? null,
-          vehicleReg: driver?.vehicleReg ?? null,
-          phone:      b.driverPhone ?? driver?.phone ?? null,
+          name:        driver?.name ?? null,
+          vehicle:     driver?.vehicle ?? null,
+          vehicleReg:  driver?.vehicleReg ?? null,
+          vehicleType: driver?.vehicleType ?? null,
+          phone:       b.driverPhone ?? driver?.phone ?? null,
         };
       },
     ),
@@ -379,28 +416,14 @@ export default function ScheduledBookingsPage() {
         <div className="flex gap-3 items-center flex-wrap">
           <SearchBar value={search} onChange={setSearch} placeholder="Search by ID, route, name, vehicle, company..." />
 
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setShowDatePicker(v => !v)}
-              className="inline-flex items-center gap-2 h-[42px] px-4 bg-white border-[1.5px] border-slate-200 rounded-xl text-[13px] text-slate-600 font-medium hover:border-slate-300 transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round">
-                <rect x="3" y="5" width="18" height="16" rx="2" />
-                <path d="M3 9h18M8 3v4M16 3v4" />
-              </svg>
-              {`${new Date(dateFrom).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} — ${new Date(dateTo).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`}
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 4l3 3 3-3" stroke="#94A3B8" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            </button>
-            {showDatePicker && (
-              <DateRangePicker
-                from={dateFrom} to={dateTo} direction="future"
-                onApply={(f, t) => { setDateFrom(f); setDateTo(t); }}
-                onClose={() => setShowDatePicker(false)}
-              />
-            )}
-          </div>
+          <TripDateFilter
+            period={period}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onChangePeriod={setPeriod}
+            onApplyCustom={(f, t) => { setDateFrom(f); setDateTo(t); }}
+            direction="future"
+          />
 
           <ColumnsPopover tableKey={TABLE_KEY} visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
           <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" />
@@ -408,7 +431,7 @@ export default function ScheduledBookingsPage() {
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
           <div className="w-full overflow-x-auto">
-            <div style={{ minWidth: minTableWidth }}>
+            <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
               {/* Header */}
               <div
                 className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
@@ -436,7 +459,7 @@ export default function ScheduledBookingsPage() {
               <div className="flex flex-col divide-y divide-slate-100">
                 {(isLoading || prefsLoading) ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid items-center gap-4 px-6 py-3.5" style={{ gridTemplateColumns: gridTemplate }}>
+                    <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: gridTemplate }}>
                       {visibleCols.map((k, j) => {
                         const r = (renderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
                         const stickyStyle = j === 0
@@ -456,14 +479,14 @@ export default function ScheduledBookingsPage() {
                     <Fragment key={booking.id}>
                       {idx === splitAt && <MockSeparator />}
                       <div
-                        className="grid items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer group"
+                        className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors cursor-pointer group"
                         style={{ gridTemplateColumns: gridTemplate }}
                         onClick={() => setSelectedBooking(booking)}
                       >
                         {visibleCols.map((k, j) => {
                           const r = (renderers as Record<string, { body: (b: Booking) => React.ReactNode }>)[k];
                           const stickyStyle = j === 0
-                            ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 }
+                            ? { position: "sticky" as const, left: 0, background: "inherit", zIndex: 1 }
                             : undefined;
                           return (
                             <div key={k} style={stickyStyle} className="min-w-0">

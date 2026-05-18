@@ -17,12 +17,12 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       router.replace("/login");
       return;
     }
-    if (user && user.role !== "superadmin") {
+    if (user && user.role !== "superadmin" && user.role !== "superadmin_member") {
       router.replace("/dashboard");
     }
   }, [isAuthenticated, isLoading, user, router]);
 
-  if (isLoading || !isAuthenticated || (user && user.role !== "superadmin")) return null;
+  if (isLoading || !isAuthenticated || (user && user.role !== "superadmin" && user.role !== "superadmin_member")) return null;
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "#f1f5f9" }}>

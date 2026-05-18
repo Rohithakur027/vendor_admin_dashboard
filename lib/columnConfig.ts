@@ -7,7 +7,8 @@ export type TableKey =
   | "activeTrips" | "scheduledTrips" | "pastTrips"
   | "supervisors" | "drivers"        | "invoices"
   // Super admin
-  | "vendors"     | "allDrivers"     | "driverOnboarding";
+  | "vendors"     | "allDrivers"     | "driverOnboarding"
+  | "driverTrips";
 
 export type Role = "vendor_admin" | "superadmin";
 
@@ -50,6 +51,8 @@ const TRIP_COLUMNS: ColumnDef[] = [
   { key: "escort",            label: "Escort",               dbFields: "escort_required + escort_pickup",  minWidth: 140 },
   { key: "notes",             label: "Notes",                dbFields: "notes",                            minWidth: 160 },
   { key: "invoice",           label: "Invoice",              dbFields: "invoice_id",                       minWidth: 130 },
+  { key: "pickupLatLng",      label: "Pickup Lat/Lng",       dbFields: "pickup_lat + pickup_lng",          minWidth: 140 },
+  { key: "dropLatLng",        label: "Drop Lat/Lng",         dbFields: "drop_lat + drop_lng",              minWidth: 140 },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -79,7 +82,6 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
     key: "supervisors", role: "vendor_admin",
     title: "Supervisors", blurb: "All supervisors under your account",
     columns: [
-      { key: "ref",        label: "Ref",         dbFields: "supervisor_ref",          minWidth: 110 },
       { key: "name",       label: "Name",        dbFields: "name",                    minWidth: 150 },
       { key: "email",      label: "Email",       dbFields: "email",                   minWidth: 180 },
       { key: "phone",      label: "Phone",       dbFields: "phone",                   minWidth: 130 },
@@ -89,7 +91,7 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "walletUsed", label: "Wallet Used", dbFields: "wallet_used",             minWidth: 120 },
       { key: "createdAt",  label: "Joined On",   dbFields: "created_at (IST)",        minWidth: 140 },
     ],
-    defaults: ["ref", "name", "email", "phone", "zone", "status"],
+    defaults: ["name", "email", "phone", "zone", "status"],
   },
 
   drivers: {
@@ -131,29 +133,37 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
     key: "vendors", role: "superadmin",
     title: "Vendors", blurb: "All vendor companies on the platform",
     columns: [
-      { key: "name",      label: "Vendor Name", dbFields: "name",                                 minWidth: 160 },
-      { key: "city",      label: "City",        dbFields: "city",                                 minWidth: 120 },
-      { key: "status",    label: "Status",      dbFields: "status badge",                         minWidth: 120 },
-      { key: "wallet",    label: "Wallet",      dbFields: "wallet_balance + wallet_alert_threshold", minWidth: 150 },
-      { key: "pan",       label: "PAN Card",    dbFields: "pan_card_number",                      minWidth: 140 },
-      { key: "createdAt", label: "Joined On",   dbFields: "created_at (IST)",                     minWidth: 140 },
+      { key: "name",          label: "Vendor Name",    dbFields: "name",                    minWidth: 160 },
+      { key: "city",          label: "City",           dbFields: "city",                    minWidth: 120 },
+      { key: "email",         label: "Email",          dbFields: "email",                   minWidth: 180 },
+      { key: "phone",         label: "Phone",          dbFields: "phone",                   minWidth: 140 },
+      { key: "contactPerson", label: "Contact Person", dbFields: "contact_person",          minWidth: 150 },
+      { key: "status",        label: "Status",         dbFields: "status badge",            minWidth: 110 },
+      { key: "wallet",        label: "Wallet Balance", dbFields: "wallet_balance",          minWidth: 140 },
+      { key: "pan",           label: "PAN Card",       dbFields: "pan_card_number",         minWidth: 150 },
+      { key: "gst",           label: "GST Number",     dbFields: "gst_number",              minWidth: 160 },
+      { key: "address",       label: "Address",        dbFields: "address",                 minWidth: 200 },
+      { key: "createdAt",     label: "Joined On",      dbFields: "created_at (IST)",        minWidth: 130 },
     ],
-    defaults: ["name", "city", "status", "createdAt"],
+    defaults: ["name", "email", "phone", "contactPerson", "status", "createdAt"],
   },
 
   allDrivers: {
     key: "allDrivers", role: "superadmin",
     title: "All Drivers", blurb: "Every driver across all vendors",
     columns: [
-      { key: "name",       label: "Driver",      dbFields: "name",                            minWidth: 150 },
-      { key: "phone",      label: "Phone",       dbFields: "phone",                           minWidth: 130 },
-      { key: "zone",       label: "Zone",        dbFields: "zone",                            minWidth: 120 },
-      { key: "status",     label: "Status",      dbFields: "status + is_online + is_verified",minWidth: 130 },
-      { key: "lastSeen",   label: "Last Active", dbFields: "last_seen_at (IST)",              minWidth: 140 },
-      { key: "totalTrips", label: "Total Trips", dbFields: "total_trips",                     minWidth: 110 },
-      { key: "createdAt",  label: "Joined On",   dbFields: "created_at (IST)",                minWidth: 140 },
+      { key: "name",       label: "Driver",       dbFields: "name + driver_ref",               minWidth: 180 },
+      { key: "phone",      label: "Phone",        dbFields: "phone",                           minWidth: 140 },
+      { key: "email",      label: "Email",        dbFields: "email",                           minWidth: 200 },
+      { key: "status",     label: "Status",       dbFields: "status + is_online + is_verified",minWidth: 140 },
+      { key: "zone",       label: "Zone",         dbFields: "zone",                            minWidth: 120 },
+      { key: "vehicle",    label: "Vehicle",      dbFields: "plate_number + model + type",     minWidth: 180 },
+      { key: "lastSeen",   label: "Last Active",  dbFields: "last_active_at (IST)",            minWidth: 150 },
+      { key: "totalTrips", label: "Total Trips",  dbFields: "total_trips",                     minWidth: 120 },
+      { key: "documents",  label: "Documents",    dbFields: "docs.total + docs.verified",      minWidth: 130 },
+      { key: "createdAt",  label: "Joined On",    dbFields: "created_at (IST)",                minWidth: 140 },
     ],
-    defaults: ["name", "phone", "status", "lastSeen"],
+    defaults: ["name", "phone", "vehicle", "status", "lastSeen", "createdAt"],
   },
 
   driverOnboarding: {
@@ -170,6 +180,20 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "address",   label: "Address",       dbFields: "address",                    minWidth: 180 },
     ],
     defaults: ["name", "phone", "createdAt", "status"],
+  },
+
+  driverTrips: {
+    key: "driverTrips", role: "superadmin",
+    title: "Driver Recent Trips", blurb: "Trips completed by this driver",
+    columns: [
+      { key: "tripId",            label: "Trip ID & Type",       dbFields: "trip_ref + type badge",           minWidth: 130 },
+      { key: "route",             label: "Route",                dbFields: "pickup_address → drop_address",   minWidth: 200 },
+      { key: "supervisorCompany", label: "Vendor",               dbFields: "supervisor name + company badge", minWidth: 160 },
+      { key: "fare",              label: "Fare",                 dbFields: "fare",                            minWidth: 100 },
+      { key: "status",            label: "Status",               dbFields: "status badge",                    minWidth: 110 },
+      { key: "createdAt",         label: "Created At",           dbFields: "created_at (IST)",                minWidth: 140 },
+    ],
+    defaults: ["tripId", "route", "supervisorCompany", "fare", "status", "createdAt"],
   },
 };
 
@@ -189,6 +213,7 @@ export function tablesForRole(role: Role | string | undefined | null): TableSpec
       TABLE_SPECS.vendors,
       TABLE_SPECS.allDrivers,
       TABLE_SPECS.driverOnboarding,
+      TABLE_SPECS.driverTrips,
     ];
   }
   return [];

@@ -13,9 +13,19 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
+  LogOut,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { PERMISSION_KEYS, hasModuleAccess } from "@/lib/permissions";
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 type SubItem = { label: string; href: string };
 
@@ -24,23 +34,26 @@ type NavItem = {
   href: string;
   icon: React.ElementType;
   subItems?: SubItem[];
+  // null = always shown; otherwise hidden for vendor_member without this permission.
+  permission?: keyof typeof PERMISSION_KEYS | null;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard",   href: "/dashboard",               icon: LayoutGrid },
-  { label: "Supervisors", href: "/dashboard/supervisors",    icon: User },
+const ALL_NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard",   href: "/dashboard",               icon: LayoutGrid, permission: null },
+  { label: "Supervisors", href: "/dashboard/supervisors",    icon: User,       permission: "SUPERVISOR_MANAGEMENT" },
   {
     label: "Trips",
     href: "/dashboard/bookings",
     icon: Route,
+    permission: "TRIP_MANAGEMENT",
     subItems: [
       { label: "Active Trips",    href: "/dashboard/bookings/active" },
       { label: "Past Trips",      href: "/dashboard/bookings/past" },
       { label: "Scheduled Trips", href: "/dashboard/bookings/scheduled" },
     ],
   },
-  { label: "Invoicing", href: "/dashboard/accounts/invoicing", icon: FileText },
-  { label: "Reports",   href: "/dashboard/reports",            icon: BarChart2 },
+  { label: "Invoicing", href: "/dashboard/accounts/invoicing", icon: FileText,  permission: "INVOICING_MONITORING" },
+  { label: "Reports",   href: "/dashboard/reports",            icon: BarChart2, permission: "REPORT_MONITORING" },
 ];
 
 function NavTooltip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -65,12 +78,27 @@ export function Sidebar({
   onMobileOpenChange: (open: boolean) => void;
 }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const vendorName  = user?.vendor_name?.trim() || "Vendor";
+  const displayName = user?.full_name?.trim() || vendorName;
+  const isMember    = user?.role === "vendor_member";
+  const roleLabel   = isMember ? (user?.role_label?.trim() || "Team Member") : "Admin";
+  const initials    = getInitials(isMember ? displayName : vendorName);
+
+  const navItems = useMemo<NavItem[]>(() => {
+    if (!isMember) return ALL_NAV_ITEMS;
+    return ALL_NAV_ITEMS.filter(item => {
+      if (item.permission == null) return true;
+      return hasModuleAccess(user?.permissions, PERMISSION_KEYS[item.permission]);
+    });
+  }, [isMember, user?.permissions]);
+
   const [collapsed, setCollapsed] = useState(false);
   const [tabletExpanded, setTabletExpanded] = useState(false);
   const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
-    navItems.forEach(item => {
+    ALL_NAV_ITEMS.forEach(item => {
       if (item.subItems) init[item.href] = pathname.startsWith(item.href);
     });
     return init;
@@ -109,7 +137,7 @@ export function Sidebar({
               <Truck className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-none">SK Travels</p>
+              <p className="font-bold text-sm leading-none truncate">{vendorName}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Vendor Dashboard</p>
             </div>
           </div>
@@ -217,24 +245,43 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Settings — pinned just above the user profile */}
+      {/* Settings — pinned just above the user profile; admins only */}
+      {!isMember && (
+        <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
+          {(() => {
+            const settingsActive = pathname.startsWith("/dashboard/settings");
+            const linkClass = cn(
+              "flex items-center gap-3 rounded-lg text-sm transition-colors",
+              isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
+              settingsActive
+                ? "bg-blue-50/70 text-blue-600 font-medium"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            );
+            const link = (
+              <Link href="/dashboard/settings" onClick={onLinkClick} className={linkClass}>
+                <Settings className="h-4 w-4 shrink-0" />
+                {!isCollapsed && "Settings"}
+              </Link>
+            );
+            return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
+          })()}
+        </div>
+      )}
+
+      {/* Sign out — pinned above the user profile, red accent */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
         {(() => {
-          const settingsActive = pathname.startsWith("/dashboard/settings");
-          const linkClass = cn(
-            "flex items-center gap-3 rounded-lg text-sm transition-colors",
-            isCollapsed ? "px-0 py-2.5 justify-center" : "px-3 py-2.5",
-            settingsActive
-              ? "bg-blue-50/70 text-blue-600 font-medium"
-              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+          const btnClass = cn(
+            "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors text-red-600 hover:bg-red-50 hover:text-red-700",
+            isCollapsed ? "px-0 py-2.5 justify-center w-full" : "px-3 py-2.5 w-full"
           );
-          const link = (
-            <Link href="/dashboard/settings" onClick={onLinkClick} className={linkClass}>
-              <Settings className="h-4 w-4 shrink-0" />
-              {!isCollapsed && "Settings"}
-            </Link>
+          const btn = (
+            <button onClick={logout} className={btnClass}>
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!isCollapsed && "Sign out"}
+            </button>
           );
-          return isCollapsed ? <NavTooltip label="Settings">{link}</NavTooltip> : link;
+          return isCollapsed ? <NavTooltip label="Sign out">{btn}</NavTooltip> : btn;
         })()}
       </div>
 
@@ -242,16 +289,16 @@ export function Sidebar({
       <div className={cn("border-t shrink-0", isCollapsed ? "px-3 py-4 flex justify-center" : "px-4 py-4")}>
         {isCollapsed ? (
           <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-            SK
+            {initials}
           </div>
         ) : (
           <div className="flex items-center gap-3 min-w-0">
             <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-              SK
+              {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800 leading-none truncate">SK Travels</p>
-              <p className="text-xs text-slate-400 mt-0.5">Admin</p>
+              <p className="text-sm font-bold text-slate-800 leading-none truncate">{isMember ? displayName : vendorName}</p>
+              <p className="text-xs text-slate-400 mt-0.5 truncate">{roleLabel}</p>
             </div>
           </div>
         )}

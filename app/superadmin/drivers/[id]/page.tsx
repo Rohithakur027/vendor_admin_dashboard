@@ -1,19 +1,34 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { superadminApi, type DriverApiItem, type DriverTripsResponse } from "@/lib/api";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { superadminApi, driverOnboardingApi, type DriverApiItem, type DriverTripItem, type DriverTripsResponse, type OnboardingDoc } from "@/lib/api";
 import { DriverHistoryMap } from "@/components/DriverHistoryMap";
 import type { Driver, DriverStatus } from "@/modules/drivers/types";
+import dynamic from "next/dynamic";
+import { detectFileType } from "@/components/document-viewer/useDocumentViewer";
 import {
   ArrowLeft, Phone, Car, TrendingUp, IndianRupee, User,
-  ArrowRight, Clock, CheckCircle2,
+  ArrowRight, Clock, CheckCircle2, Calendar,
   AlertCircle, Circle, ShieldBan, Trash2, TriangleAlert,
   ChevronLeft, ChevronRight, Route,
 } from "lucide-react";
 import { STATUS_STYLES } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SearchBar } from "@/components/SearchBar";
+import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
+import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
+import { ExportButton } from "@/components/ExportButton";
+import { exportToCsv } from "@/lib/exportCsv";
+
+const TRIPS_TABLE_KEY = "driverTrips" as const;
+
+const DocumentViewer = dynamic(
+  () => import("@/components/document-viewer/DocumentViewer").then(m => ({ default: m.DocumentViewer })),
+  { ssr: false }
+);
 
 // ── constants ────────────────────────────────────────────────────────────────
 const ACCENT = "#2563EB";
@@ -43,6 +58,11 @@ function fmtDateTime(iso: string) {
   );
 }
 
+function shortAddr(addr: string): string {
+  const parts = addr.split(",").map(p => p.trim()).filter(Boolean);
+  return parts.slice(0, 2).join(", ");
+}
+
 // ── API → Driver shape ────────────────────────────────────────────────────────
 
 function apiToDriver(d: DriverApiItem): Driver {
@@ -64,39 +84,6 @@ function apiToDriver(d: DriverApiItem): Driver {
   };
 }
 
-// ── documents mock ────────────────────────────────────────────────────────────
-type DocStatus = "Verified" | "Pending" | "Not Uploaded";
-interface DocItem { id: string; name: string; number: string; status: DocStatus; uploadedAt: string | null; expiryDate: string | null; }
-
-const DOC_SETS: Record<string, DocItem[]> = {
-  "drv-001": [
-    { id: "dl",      name: "Driving License",          number: "KA-01-20180042", status: "Verified",     uploadedAt: "2024-01-12", expiryDate: "2028-01-11" },
-    { id: "rc",      name: "Vehicle Registration (RC)", number: "KA 05 MH 1234", status: "Verified",     uploadedAt: "2024-01-12", expiryDate: "2034-03-20" },
-    { id: "aadhaar", name: "Aadhaar Card",              number: "XXXX XXXX 3421", status: "Verified",     uploadedAt: "2024-01-10", expiryDate: null },
-    { id: "pan",     name: "PAN Card",                  number: "ABCDE1234F",     status: "Verified",     uploadedAt: "2024-01-10", expiryDate: null },
-  ],
-  "drv-002": [
-    { id: "dl",      name: "Driving License",          number: "KA-02-20190088", status: "Verified",     uploadedAt: "2024-02-05", expiryDate: "2029-02-04" },
-    { id: "rc",      name: "Vehicle Registration (RC)", number: "KA 03 AB 5678", status: "Verified",     uploadedAt: "2024-02-05", expiryDate: "2033-07-15" },
-    { id: "aadhaar", name: "Aadhaar Card",              number: "XXXX XXXX 7812", status: "Pending",      uploadedAt: "2024-02-06", expiryDate: null },
-    { id: "pan",     name: "PAN Card",                  number: "—",             status: "Not Uploaded", uploadedAt: null,         expiryDate: null },
-  ],
-};
-
-function getDocuments(driverId: string): DocItem[] {
-  return DOC_SETS[driverId] ?? [
-    { id: "dl",      name: "Driving License",          number: "—", status: "Not Uploaded", uploadedAt: null, expiryDate: null },
-    { id: "rc",      name: "Vehicle Registration (RC)", number: "—", status: "Not Uploaded", uploadedAt: null, expiryDate: null },
-    { id: "aadhaar", name: "Aadhaar Card",              number: "—", status: "Pending",      uploadedAt: null, expiryDate: null },
-    { id: "pan",     name: "PAN Card",                  number: "—", status: "Not Uploaded", uploadedAt: null, expiryDate: null },
-  ];
-}
-
-const DOC_STATUS_CFG: Record<DocStatus, { icon: React.ElementType; color: string; bg: string; border: string; label: string }> = {
-  "Verified":     { icon: CheckCircle2, color: "#15803D", bg: "#DCFCE7", border: "#BBF7D0", label: "Verified" },
-  "Pending":      { icon: Clock,        color: "#B45309", bg: "#FEF3C7", border: "#FDE68A", label: "Under Review" },
-  "Not Uploaded": { icon: AlertCircle,  color: "#94A3B8", bg: "#F1F5F9", border: "#E2E8F0", label: "Not Uploaded" },
-};
 
 // ── calendar date picker ──────────────────────────────────────────────────────
 const CAL_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -356,6 +343,7 @@ export default function SuperAdminDriverProfilePage() {
   const [tripsData,    setTripsData]    = useState<DriverTripsResponse | null>(null);
   const [tripsLoading, setTripsLoading] = useState(false);
   const tripsLoadedRef = useRef(false);
+  const docsLoadedRef  = useRef(false);
   const [activeTab,    setActiveTab]    = useState("overview");
   const [isBlocked,    setIsBlocked]    = useState(false);
   const [blockConfirm, setBlockConfirm] = useState(false);
@@ -365,6 +353,39 @@ export default function SuperAdminDriverProfilePage() {
   const [expiryEdits,  setExpiryEdits]  = useState<Record<string, string>>({});
   const [docSubTab,    setDocSubTab]    = useState<"driver" | "vehicle">("driver");
   const [tripsSearch,  setTripsSearch]  = useState("");
+  const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
+  const [filterOpen,      setFilterOpen]      = useState(false);
+  const [tripStatus,      setTripStatus]      = useState("");
+  const [tripType,        setTripType]        = useState("");
+  const [draftTripStatus, setDraftTripStatus] = useState("");
+  const [draftTripType,   setDraftTripType]   = useState("");
+  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: totalColCount, loading: prefsLoading } = useColumnPreferences(TRIPS_TABLE_KEY);
+  const tripsSpec = getTableSpec(TRIPS_TABLE_KEY);
+  const [onboardingId, setOnboardingId] = useState<string | null>(null);
+  const [onboardingDocs, setOnboardingDocs] = useState<{ driver: OnboardingDoc[]; vehicle: OnboardingDoc[] } | null>(null);
+  const [docsLoading,  setDocsLoading]  = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [docError,     setDocError]     = useState<string | null>(null);
+  const [viewingDoc,   setViewingDoc]   = useState<{ file_url: string; name: string; doc_type: string } | null>(null);
+
+  // Location History date/time range
+  const toDateStr = (d: Date) => {
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, "0");
+    const dd   = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  const todayStr     = toDateStr(new Date());
+  const yesterdayStr = toDateStr(new Date(Date.now() - 86400000));
+  const [histDate,      setHistDate]      = useState<string>(todayStr);
+  const [histStartTime, setHistStartTime] = useState<string>("00:00");
+  const [histEndTime,   setHistEndTime]   = useState<string>("23:59");
+  const [histApplied,   setHistApplied]   = useState<{ from: string; to: string }>(() => ({
+    from: `${toDateStr(new Date())}T00:00:00`,
+    to:   `${toDateStr(new Date())}T23:59:59`,
+  }));
+  const histRange = histApplied;
+  const fileInputRefs  = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -385,6 +406,119 @@ export default function SuperAdminDriverProfilePage() {
       .catch(() => setTripsData(null))
       .finally(() => setTripsLoading(false));
   }, [id, activeTab]);
+
+  useEffect(() => {
+    if (!id || activeTab !== "documents" || docsLoadedRef.current) return;
+    docsLoadedRef.current = true;
+    setDocsLoading(true);
+    superadminApi.drivers.onboardingDocs(id)
+      .then(res => {
+        setOnboardingId(res.data.onboardingId);
+        setOnboardingDocs(res.data.documents);
+      })
+      .catch(() => { setOnboardingId(null); setOnboardingDocs(null); })
+      .finally(() => setDocsLoading(false));
+  }, [id, activeTab]);
+
+  // ── All useMemo hooks must come before early returns (Rules of Hooks) ────────
+  const activeFilterCount = (tripStatus ? 1 : 0) + (tripType ? 1 : 0);
+
+  const filteredTrips = useMemo(() => {
+    const allTrips = tripsData?.trips ?? [];
+    const q = tripsSearch.trim().toLowerCase();
+    return allTrips.filter(b => {
+      if (tripStatus && b.status !== tripStatus) return false;
+      if (tripType   && b.type   !== tripType)   return false;
+      if (!q) return true;
+      const ref = (b.tripRef ?? b.id).toLowerCase();
+      return (
+        ref.includes(q) ||
+        b.pickupLocation.toLowerCase().includes(q) ||
+        b.dropLocation.toLowerCase().includes(q) ||
+        (b.supervisorName ?? "").toLowerCase().includes(q) ||
+        (b.companyName    ?? "").toLowerCase().includes(q) ||
+        (b.type           ?? "").toLowerCase().includes(q) ||
+        (b.status         ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [tripsData, tripsSearch, tripStatus, tripType]);
+
+  const tripRenderers = useMemo(() => ({
+    tripId: {
+      header:   () => "TRIP ID & TYPE",
+      body:     (b: DriverTripItem) => (
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <span className="font-extrabold text-[#111827] text-[13px] truncate">{b.tripRef ?? b.id}</span>
+          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
+            {b.type ?? "—"}
+          </span>
+        </div>
+      ),
+      skeleton: () => (<div className="space-y-2"><Skeleton className="h-3.5 w-16" /><Skeleton className="h-4 w-12 rounded" /></div>),
+      csv:      (b: DriverTripItem) => `${b.tripRef ?? b.id}${b.type ? ` · ${b.type}` : ""}`,
+    },
+    route: {
+      header:   () => "ROUTE",
+      body:     (b: DriverTripItem) => (
+        <div className="flex flex-col min-w-0 pr-4 gap-px">
+          <span className="font-semibold text-[13px] text-slate-800 leading-tight truncate">{b.pickupLocation.split(",")[0]}</span>
+          <div className="flex items-center gap-1">
+            <div className="w-14 h-[2px] rounded-full" style={{ background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
+            <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
+          </div>
+          <span className="text-[12px] text-gray-500 truncate">{b.dropLocation.split(",")[0]}</span>
+        </div>
+      ),
+      skeleton: () => (<div className="space-y-1.5 pr-4"><Skeleton className="h-3.5 w-3/4" /><Skeleton className="h-3 w-2/3" /></div>),
+      csv:      (b: DriverTripItem) => `${b.pickupLocation} → ${b.dropLocation}`,
+    },
+    supervisorCompany: {
+      header:   () => "VENDOR",
+      body:     (b: DriverTripItem) => b.companyName
+        ? <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 border border-slate-300 text-[11px] font-semibold truncate max-w-[130px]">{b.companyName}</span>
+        : <span className="text-[13px] text-slate-300 italic">—</span>,
+      skeleton: () => <Skeleton className="h-5 w-20 rounded-md" />,
+      csv:      (b: DriverTripItem) => b.companyName ?? "",
+    },
+    fare: {
+      header:   () => "FARE",
+      body:     (b: DriverTripItem) => b.fare != null
+        ? <span className="text-[13px] font-bold text-slate-800 tabular-nums">₹{Number(b.fare).toLocaleString("en-IN")}</span>
+        : <span className="text-[13px] text-slate-300 italic">—</span>,
+      skeleton: () => <Skeleton className="h-3.5 w-16" />,
+      csv:      (b: DriverTripItem) => b.fare ?? "",
+    },
+    status: {
+      header:   () => "STATUS",
+      body:     (b: DriverTripItem) => <TripStatusBadge status={b.status ?? "Pending"} />,
+      skeleton: () => <Skeleton className="h-6 w-20 rounded-full" />,
+      csv:      (b: DriverTripItem) => b.status ?? "",
+    },
+    createdAt: {
+      header:   () => "CREATED AT",
+      body:     (b: DriverTripItem) => {
+        const d = new Date(b.createdAt);
+        return (
+          <div className="flex flex-col">
+            <span className="text-[13px] font-medium text-slate-700">{d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" })}</span>
+            <span className="text-[11px] text-slate-400 mt-0.5">{d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase()}</span>
+          </div>
+        );
+      },
+      skeleton: () => (<div className="space-y-1"><Skeleton className="h-3.5 w-14" /><Skeleton className="h-3 w-12" /></div>),
+      csv:      (b: DriverTripItem) => new Date(b.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }),
+    },
+  }), []);
+
+  const tripsGridTemplate = useMemo(
+    () => visibleCols.map(k => { const c = tripsSpec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px, 1fr)` : "1fr"; }).join(" "),
+    [visibleCols, tripsSpec.columns],
+  );
+  const tripsMinWidth = useMemo(
+    () => visibleCols.reduce((s, k) => s + (tripsSpec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 48,
+    [visibleCols, tripsSpec.columns],
+  );
+  // ─────────────────────────────────────────────────────────────────────────────
 
   if (driverLoading) {
     const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
@@ -492,14 +626,35 @@ export default function SuperAdminDriverProfilePage() {
   // en-CA → YYYY-MM-DD in the browser's local timezone (IST for the user).
   const today          = new Date().toLocaleDateString("en-CA");
   const localDate      = (iso: string) => new Date(iso).toLocaleDateString("en-CA");
-  const todayBookings  = driverBookings.filter(b => b.createdAt && localDate(b.createdAt) === today);
-  const todayEarned    = todayBookings.reduce((s, b) => s + (b.fare ?? 0), 0);
-  const todayAvg       = todayBookings.length > 0 ? Math.round(todayEarned / todayBookings.length) : 0;
+  const todayBookings   = driverBookings.filter(b => b.createdAt && localDate(b.createdAt) === today);
+  const todayEarned     = todayBookings.reduce((s, b) => s + (b.fare ?? 0), 0);
+  const todayAvg        = todayBookings.length > 0 ? Math.round(todayEarned / todayBookings.length) : 0;
+  const todayCompleted  = todayBookings.filter(b => b.status === "Completed").length;
 
   const weekDays   = tripsData?.weekDays.map(d => ({
     ...d,
     label: new Date(d.date).toLocaleDateString("en-IN", { weekday: "short" }),
   })) ?? [];
+
+  function handleTripsExport() {
+    const rows = filteredTrips.map(b => {
+      const out: Record<string, string | number> = {};
+      for (const k of visibleCols) {
+        const col = tripsSpec.columns.find(c => c.key === k);
+        if (!col) continue;
+        if (k === "route") {
+          out["Pickup Address"]      = b.pickupLocation;
+          out["Destination Address"] = b.dropLocation;
+          out["Trip Type"]           = b.type ?? "";
+          continue;
+        }
+        const r = (tripRenderers as Record<string, { csv: (b: DriverTripItem) => string | number }>)[k];
+        out[col.label] = r ? r.csv(b) : "";
+      }
+      return out;
+    });
+    exportToCsv(`driver-trips-${driver?.name.replace(/\s+/g, "-").toLowerCase() ?? "export"}`, rows);
+  }
 
   const TABS = [
     { value: "overview",  label: "Overview" },
@@ -602,33 +757,65 @@ export default function SuperAdminDriverProfilePage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             <StatCard label="Total Trips"    value={driver.totalTrips}                                 icon={Route}        iconBg="#F1F5F9" iconColor="#64748B" />
             <StatCard label="Today's Trips"  value={todayBookings.length}                              icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#64748B" />
-            <StatCard label="Today's Earned" value={`₹${todayEarned.toLocaleString("en-IN")}`}        icon={IndianRupee}  iconBg="#F1F5F9" iconColor="#64748B" />
+            <StatCard label="Total Earned"   value={`₹${totalEarned.toLocaleString("en-IN")}`}        icon={IndianRupee}  iconBg="#F1F5F9" iconColor="#64748B" />
             <StatCard label="Today's Avg"    value={`₹${todayAvg.toLocaleString("en-IN")}`}           icon={TrendingUp}   iconBg="#F1F5F9" iconColor="#64748B" />
           </div>
 
           {/* Earnings card (blue) + right column */}
           <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16, alignItems: "start" }}>
 
-            {/* Blue earnings card — compact, left side stays white below it */}
-            <div style={{
-              background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)",
-              borderRadius: 18, padding: "20px 22px 18px",
-              display: "flex", flexDirection: "column", gap: 10,
-              position: "relative", overflow: "hidden",
-            }}>
-              <div style={{ position: "absolute", top: -24, right: -24, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,0.07)" }} />
-              <div style={{ position: "absolute", bottom: -28, right: 24, width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
-              <p style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.7)", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>
-                Trip Earnings
-              </p>
-              <p style={{ fontSize: 34, fontWeight: 800, color: "#fff", lineHeight: 1, letterSpacing: -1 }}>
-                ₹{totalEarned.toLocaleString("en-IN")}
-              </p>
-              <div style={{ display: "flex", gap: 14, fontSize: 12, color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
-                <span>{driverBookings.length} trips · {completedTrips.length} completed</span>
-                <span>·</span>
-                <span>Avg ₹{avgEarning.toLocaleString("en-IN")} / trip</span>
+            {/* Left column: today's earnings + additional vehicle */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+              {/* Blue earnings card */}
+              <div style={{
+                background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)",
+                borderRadius: 18, padding: "20px 22px 18px",
+                display: "flex", flexDirection: "column", gap: 10,
+                position: "relative", overflow: "hidden",
+              }}>
+                <div style={{ position: "absolute", top: -24, right: -24, width: 110, height: 110, borderRadius: "50%", background: "rgba(255,255,255,0.07)" }} />
+                <div style={{ position: "absolute", bottom: -28, right: 24, width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
+                <p style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.7)", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>
+                  Today&apos;s Earnings
+                </p>
+                <p style={{ fontSize: 34, fontWeight: 800, color: "#fff", lineHeight: 1, letterSpacing: -1 }}>
+                  ₹{todayEarned.toLocaleString("en-IN")}
+                </p>
+                </div>
+
+              {/* Additional Vehicle card */}
+              <div style={CARD_STYLE}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 9, padding: 7 }}>
+                      <Car className="h-4 w-4" style={{ color: "#0F172A" }} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Additional Vehicle</p>
+                      <p style={{ fontSize: 11, color: "#94A3B8" }}>Assigned vehicle details</p>
+                    </div>
+                  </div>
+                </div>
+                {driver.vehicle || driver.vehicleReg || driver.vehicleType || driver.vehicleColor ? (
+                  <div style={{ padding: "0 18px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                    {[
+                      { label: "Type",         value: driver.vehicleType  ?? "—" },
+                      { label: "Model",        value: driver.vehicle      ?? "—" },
+                      { label: "Vehicle Registration Number", value: driver.vehicleReg ?? "—" },
+                      { label: "Color",        value: driver.vehicleColor ?? "—" },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: "#94A3B8", fontWeight: 500 }}>{label}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic", padding: "0 18px 16px" }}>No vehicle assigned.</p>
+                )}
               </div>
+
             </div>
 
             {/* Right column */}
@@ -670,88 +857,127 @@ export default function SuperAdminDriverProfilePage() {
 
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "trips" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <SearchBar
-            value={tripsSearch}
-            onChange={setTripsSearch}
-            placeholder="Search by trip ID, route, supervisor, company, type, status..."
-          />
-          <div style={CARD_STYLE}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.6fr 0.5fr 0.7fr", columnGap: 20, padding: "12px 24px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", borderRadius: "14px 14px 0 0" }}>
-            {["ROUTE", "SUPERVISOR", "TYPE", "FARE", "STATUS"].map(h => (
-              <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
-            ))}
-          </div>
-          {(() => {
-            if (tripsLoading) {
-              return (
-                <div>
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.6fr 0.5fr 0.7fr", columnGap: 20, padding: "14px 24px", borderBottom: i < 3 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        <Skeleton className="h-3.5 w-3/4" />
-                        <Skeleton className="h-3 w-2/3" />
-                        <Skeleton className="h-3 w-1/3" />
-                      </div>
-                      <Skeleton className="h-3.5 w-2/3" />
-                      <Skeleton className="h-5 w-16 rounded" />
-                      <Skeleton className="h-3.5 w-12" />
-                      <Skeleton className="h-5 w-20 rounded-full" />
-                    </div>
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex gap-3 items-center flex-wrap">
+            <SearchBar
+              value={tripsSearch}
+              onChange={setTripsSearch}
+              placeholder="Search by trip ID, route, supervisor, company, type, status..."
+            />
+
+            <div className="relative">
+              <FilterTrigger
+                onClick={() => {
+                  if (!filterOpen) { setDraftTripStatus(tripStatus); setDraftTripType(tripType); }
+                  setFilterOpen(v => !v);
+                }}
+                activeCount={activeFilterCount}
+              />
+              <FilterPanel
+                open={filterOpen}
+                onClose={() => setFilterOpen(false)}
+                activeCount={activeFilterCount}
+                onClearAll={() => { setDraftTripStatus(""); setDraftTripType(""); }}
+                onApply={() => { setTripStatus(draftTripStatus); setTripType(draftTripType); setFilterOpen(false); }}
+                onCancel={() => setFilterOpen(false)}
+              >
+                <FilterSection label="Status">
+                  {["Completed", "Ongoing", "Cancelled", "Pending"].map(s => (
+                    <FilterPill key={s} label={s} active={draftTripStatus === s} onClick={() => setDraftTripStatus(p => p === s ? "" : s)} />
                   ))}
-                </div>
-              );
-            }
-            const q = tripsSearch.trim().toLowerCase();
-            const trips = q
-              ? driverBookings.filter(b => {
-                  const ref = (b.tripRef ?? b.id).toLowerCase();
-                  return (
-                    ref.includes(q) ||
-                    b.pickupLocation.toLowerCase().includes(q) ||
-                    b.dropLocation.toLowerCase().includes(q) ||
-                    (b.supervisorName ?? "").toLowerCase().includes(q) ||
-                    (b.companyName    ?? "").toLowerCase().includes(q) ||
-                    (b.type           ?? "").toLowerCase().includes(q) ||
-                    (b.status         ?? "").toLowerCase().includes(q)
-                  );
-                })
-              : driverBookings;
-            return trips.length === 0 ? (
-              <p style={{ textAlign: "center" as const, padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>
-                {q ? "No trips match your search." : "No trips yet."}
-              </p>
-            ) : (
-            <div>
-              {trips.map((b, idx) => (
-                <div
-                  key={b.tripRef ?? b.id}
-                  style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.6fr 0.5fr 0.7fr", columnGap: 20, padding: "14px 24px", borderBottom: idx < trips.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <div>
-                    <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{b.pickupLocation}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 3, margin: "3px 0" }}>
-                      <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
-                      <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
-                    </div>
-                    <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{b.dropLocation}</p>
-                    <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>{fmtDate(b.createdAt)}</p>
-                  </div>
-                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{b.supervisorName ?? "—"}</span>
-                  <span style={{ background: b.type === "Instant" ? "#DBEAFE" : "#FEF3C7", color: b.type === "Instant" ? "#1D4ED8" : "#B45309", fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 5, display: "inline-block" }}>
-                    {b.type ?? "—"}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>
-                    {b.fare ? `₹${b.fare.toLocaleString()}` : <span style={{ color: "#CBD5E1" }}>—</span>}
-                  </span>
-                  <TripStatusBadge status={b.status ?? "Pending"} />
-                </div>
-              ))}
+                </FilterSection>
+                <FilterSection label="Trip Type">
+                  {["Instant", "Scheduled"].map(t => (
+                    <FilterPill key={t} label={t} active={draftTripType === t} onClick={() => setDraftTripType(p => p === t ? "" : t)} />
+                  ))}
+                </FilterSection>
+              </FilterPanel>
             </div>
-          );
-          })()}
+
+            <ColumnsPopover
+              tableKey={TRIPS_TABLE_KEY}
+              visible={visibleCols}
+              totalCount={totalColCount}
+              onToggle={toggleCol}
+              onReset={resetCols}
+            />
+
+            <ExportButton
+              onClick={handleTripsExport}
+              disabled={tripsLoading || filteredTrips.length === 0}
+              className="ml-auto"
+            />
+          </div>
+
+          {/* Table */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="w-full overflow-x-auto">
+              <div style={{ minWidth: tripsMinWidth }}>
+                {/* Header */}
+                <div
+                  className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
+                  style={{ gridTemplateColumns: tripsGridTemplate }}
+                >
+                  {prefsLoading
+                    ? Array.from({ length: visibleCols.length }).map((_, i) => (
+                        <Skeleton key={i} className={`h-3 ${i === 0 ? "w-24" : "w-16"}`} />
+                      ))
+                    : visibleCols.map((k, i) => {
+                        const col = tripsSpec.columns.find(c => c.key === k);
+                        if (!col) return null;
+                        return (
+                          <div
+                            key={k}
+                            className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate"
+                            style={i === 0 ? { position: "sticky" as const, left: 0, background: "rgb(248 250 252 / 0.95)", zIndex: 3 } : undefined}
+                          >
+                            {col.label}
+                          </div>
+                        );
+                      })}
+                </div>
+
+                {/* Body */}
+                <div className="flex flex-col divide-y divide-slate-100">
+                  {(tripsLoading || prefsLoading) ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="grid items-center gap-4 px-6 py-3.5" style={{ gridTemplateColumns: tripsGridTemplate }}>
+                        {visibleCols.map((k, j) => {
+                          const r = (tripRenderers as Record<string, { skeleton: () => React.JSX.Element }>)[k];
+                          return (
+                            <div key={k} className="min-w-0" style={j === 0 ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 } : undefined}>
+                              {r?.skeleton() ?? <Skeleton className="h-3.5 w-14" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))
+                  ) : filteredTrips.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-[13px]">
+                      {tripsSearch.trim() || tripStatus || tripType ? "No trips match your filters." : "No trips yet."}
+                    </div>
+                  ) : (
+                    filteredTrips.map(b => (
+                      <div
+                        key={b.tripRef ?? b.id}
+                        className="grid items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors"
+                        style={{ gridTemplateColumns: tripsGridTemplate }}
+                      >
+                        {visibleCols.map((k, j) => {
+                          const r = (tripRenderers as Record<string, { body: (b: DriverTripItem) => React.ReactNode }>)[k];
+                          return (
+                            <div key={k} className="min-w-0" style={j === 0 ? { position: "sticky" as const, left: 0, background: "white", zIndex: 1 } : undefined}>
+                              {r ? r.body(b) : <span className="text-[13px] text-slate-300 italic">—</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -797,61 +1023,220 @@ export default function SuperAdminDriverProfilePage() {
       )}
 
       {/* ══ TAB: LOCATION HISTORY ══ */}
-      {activeTab === "history" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.04)", padding: "20px 24px" }}>
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Location History</p>
-              <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>GPS route replay for {driver.name}</p>
+      {activeTab === "history" && (() => {
+        const isDirty =
+          histApplied.from !== `${histDate}T${histStartTime}:00` ||
+          histApplied.to   !== `${histDate}T${histEndTime}:59`;
+        const rangeInvalid = histStartTime >= histEndTime;
+        const formatDateLong = (s: string) => {
+          if (!s) return "";
+          const [y, m, d] = s.split("-").map(Number);
+          return new Date(y, m - 1, d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+        };
+        const applyRange = () => {
+          setHistApplied({
+            from: `${histDate}T${histStartTime}:00`,
+            to:   `${histDate}T${histEndTime}:59`,
+          });
+        };
+
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <style>{`
+              .hist-date-card { position: relative; display: inline-flex; }
+              .hist-date-card:hover .hist-date-display { background:#F1F5F9!important; border-color:#CBD5E1!important; }
+              .hist-time-card { position: relative; display: inline-flex; }
+              .hist-time-card:hover .hist-time-display { background:#F1F5F9!important; border-color:#CBD5E1!important; }
+              .hist-time-card:focus-within .hist-time-display { border-color:#2563EB!important; background:#EFF6FF!important; }
+            `}</style>
+
+            <div style={CARD_STYLE}>
+              {/* ── Header ── */}
+              <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" as const }}>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Location History</p>
+                  <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>GPS route replay for {driver.name}</p>
+                </div>
+
+                {/* Preset quick-picks */}
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[{ label: "Today", date: todayStr }, { label: "Yesterday", date: yesterdayStr }].map((p) => {
+                    const active = histDate === p.date;
+                    return (
+                      <button key={p.label} type="button" onClick={() => setHistDate(p.date)}
+                        style={{ fontSize: 12, fontWeight: 700, padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${active ? ACCENT : "#E2E8F0"}`, background: active ? "#EFF6FF" : "#fff", color: active ? ACCENT : "#64748B", cursor: "pointer", transition: "all 0.12s" }}>
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Controls toolbar ── */}
+              <div style={{ padding: "14px 24px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+
+                {/* Date picker */}
+                <div className="hist-date-card">
+                  <div className="hist-date-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 14px", borderRadius: 10, background: "#F8FAFC", border: "1.5px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s", whiteSpace: "nowrap" as const }}>
+                    <Calendar className="h-3.5 w-3.5" style={{ color: ACCENT, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{formatDateLong(histDate)}</span>
+                  </div>
+                  <input type="date" value={histDate} max={todayStr} onChange={(e) => { if (e.target.value) setHistDate(e.target.value); }} aria-label="Pick date" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", padding: 0, margin: 0, background: "transparent" }} />
+                </div>
+
+                <div style={{ width: 1, height: 24, background: "#E8EEF4", flexShrink: 0 }} />
+
+                {/* From time */}
+                <div className="hist-time-card">
+                  <div className="hist-time-display" style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 12px", borderRadius: 10, background: "#F8FAFC", border: "1.5px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s" }}>
+                    <Clock className="h-3.5 w-3.5" style={{ color: "#15803D", flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.5 }}>From</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{histStartTime}</div>
+                    </div>
+                  </div>
+                  <input type="time" value={histStartTime} onChange={(e) => { if (e.target.value) setHistStartTime(e.target.value); }} aria-label="From time" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", padding: 0, margin: 0, background: "transparent" }} />
+                </div>
+
+                <ArrowRight className="h-3.5 w-3.5" style={{ color: "#CBD5E1", flexShrink: 0 }} />
+
+                {/* To time */}
+                <div className="hist-time-card">
+                  <div className="hist-time-display" style={{ display: "inline-flex", alignItems: "center", gap: 7, height: 40, padding: "0 12px", borderRadius: 10, background: "#F8FAFC", border: "1.5px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s" }}>
+                    <Clock className="h-3.5 w-3.5" style={{ color: "#B91C1C", flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.5 }}>To</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{histEndTime}</div>
+                    </div>
+                  </div>
+                  <input type="time" value={histEndTime} onChange={(e) => { if (e.target.value) setHistEndTime(e.target.value); }} aria-label="To time" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer", border: "none", padding: 0, margin: 0, background: "transparent" }} />
+                </div>
+
+                {/* Apply button */}
+                <button type="button" disabled={!isDirty || rangeInvalid} onClick={applyRange}
+                  style={{ height: 40, padding: "0 18px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 13, cursor: (!isDirty || rangeInvalid) ? "not-allowed" : "pointer", transition: "all 0.15s", whiteSpace: "nowrap" as const,
+                    background: rangeInvalid ? "#FEE2E2" : (!isDirty ? "#F1F5F9" : ACCENT),
+                    color:      rangeInvalid ? "#991B1B" : (!isDirty ? "#94A3B8" : "#fff"),
+                    boxShadow:  (!isDirty || rangeInvalid) ? "none" : "0 2px 8px rgba(37,99,235,0.25)",
+                  }}>
+                  {rangeInvalid ? "Invalid range" : (isDirty ? "Apply" : "✓ Applied")}
+                </button>
+              </div>
+
+              {/* ── Map ── */}
+              <div style={{ padding: "20px 24px" }}>
+                <DriverHistoryMap
+                  driverId={id}
+                  driverName={driver.name}
+                  range={histRange}
+                />
+              </div>
             </div>
-            <DriverHistoryMap
-              driverId={id}
-              driverName={driver.name}
-              hours={12}
-              apiBase="/api/superadmin/drivers"
-            />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ══ TAB: DOCUMENTS ══ */}
       {activeTab === "documents" && (() => {
-        const DRIVER_DOCS = [
-          { id: "dl",      name: "Driving License",         status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
-          { id: "aadhaar", name: "Aadhaar Card",             status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
-          { id: "photo",   name: "Profile Photo",            status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
-          { id: "address", name: "Current Address Proof",    status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
-          { id: "medical", name: "Medical Certificate",      status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
-          { id: "police",  name: "Police Verification",      status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
-          { id: "letter",  name: "Undertaking Letter",       status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "drv" },
-          { id: "badge",   name: "Badge",                    status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "drv" },
-        ];
-        const VEHICLE_DOCS = [
-          { id: "rc",      name: "Registration Certificate", status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-          { id: "tax",     name: "Tax Certificate",           status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-          { id: "permit",  name: "Permit",                    status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-          { id: "ins",     name: "Insurance",                 status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-          { id: "fitness", name: "Fitness Certificate",       status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-          { id: "form42",  name: "Form 42",                   status: "Not Submitted", hasExpiry: false, expiryDate: null, prefix: "veh" },
-          { id: "puc",     name: "PUC",                       status: "Not Submitted", hasExpiry: true,  expiryDate: null, prefix: "veh" },
-        ];
+        if (docsLoading) {
+          const SKEL_GRID = "2fr 1.3fr 1.4fr 1.6fr";
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Sub-tabs + status badges */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
+                <Skeleton className="h-10 w-44 rounded-[9px]" />
+                <Skeleton className="h-10 w-44 rounded-[9px]" />
+                <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                  <Skeleton className="h-7 w-24 rounded-full" />
+                  <Skeleton className="h-7 w-24 rounded-full" />
+                  <Skeleton className="h-7 w-24 rounded-full" />
+                </div>
+              </div>
+              {/* Document table */}
+              <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: SKEL_GRID, columnGap: 16, padding: "11px 24px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                  {["DOCUMENT", "STATUS", "EXPIRY DATE", "ACTION"].map(h => (
+                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em", paddingLeft: h === "ACTION" ? 48 : 0 }}>{h}</span>
+                  ))}
+                </div>
+                {[...Array(7)].map((_, i) => (
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: SKEL_GRID, columnGap: 16, padding: "15px 24px", alignItems: "center", borderBottom: i < 6 ? "1px solid #F1F5F9" : "none" }}>
+                    <Skeleton className="h-3.5 w-36" />
+                    <Skeleton className="h-6 w-28 rounded-full" />
+                    <Skeleton className="h-8 w-28 rounded-lg" />
+                    <div style={{ paddingLeft: 48 }}><Skeleton className="h-8 w-20 rounded-lg" /></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
 
-        const activeDocs = docSubTab === "driver" ? DRIVER_DOCS : VEHICLE_DOCS;
-        const dApproved  = DRIVER_DOCS.filter(d => d.status === "Approved").length;
-        const vApproved  = VEHICLE_DOCS.filter(d => d.status === "Approved").length;
-        const approvedCt = activeDocs.filter(d => d.status === "Approved").length;
-        const rejectedCt = activeDocs.filter(d => d.status === "Rejected").length;
-        const pendingCt  = activeDocs.filter(d => d.status === "Pending").length;
+        const driverDocs  = onboardingDocs?.driver  ?? [];
+        const vehicleDocs = onboardingDocs?.vehicle ?? [];
+        const activeDocs  = docSubTab === "driver" ? driverDocs : vehicleDocs;
+        const dApproved   = driverDocs.filter(d => d.status === "Approved").length;
+        const vApproved   = vehicleDocs.filter(d => d.status === "Approved").length;
+        const approvedCt  = activeDocs.filter(d => d.status === "Approved").length;
+        const rejectedCt  = activeDocs.filter(d => d.status === "Rejected").length;
+        const pendingCt   = activeDocs.filter(d => d.status === "Pending").length;
         const GRID = "2fr 1.3fr 1.4fr 1.6fr";
+
+        async function handleUpload(docType: string, file: File) {
+          if (!onboardingId) return;
+          setUploadingDoc(docType);
+          setDocError(null);
+          try {
+            const updated = await driverOnboardingApi.uploadDocumentFile(onboardingId, docType, "front", file);
+            setOnboardingDocs(prev => {
+              if (!prev) return prev;
+              const update = (arr: OnboardingDoc[]) =>
+                arr.map(d => d.doc_type === docType ? updated : d);
+              return { driver: update(prev.driver), vehicle: update(prev.vehicle) };
+            });
+          } catch (e: any) {
+            setDocError(e?.message ?? "Upload failed");
+          } finally {
+            setUploadingDoc(null);
+          }
+        }
+
+        async function handlePatch(docType: string, action: "approve" | "reject") {
+          if (!onboardingId) return;
+          try {
+            const res = await driverOnboardingApi.patchDocument(onboardingId, docType, { action });
+            setOnboardingDocs(prev => {
+              if (!prev) return prev;
+              const update = (arr: OnboardingDoc[]) =>
+                arr.map(d => d.doc_type === docType ? res.data : d);
+              return { driver: update(prev.driver), vehicle: update(prev.vehicle) };
+            });
+          } catch (e: any) {
+            setDocError(e?.message ?? "Action failed");
+          }
+        }
 
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
+            {docError && (
+              <div style={{ background: "#FEE2E2", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 16px", fontSize: 13, color: "#B91C1C", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                {docError}
+                <button onClick={() => setDocError(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#B91C1C", fontSize: 16 }}>✕</button>
+              </div>
+            )}
+
+            {!onboardingId && (
+              <div style={{ background: "#FEF3C7", border: "1px solid #FDE68A", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#92400E" }}>
+                No onboarding record found for this driver. Documents can only be uploaded via the onboarding workflow.
+              </div>
+            )}
+
             {/* Sub-tabs + status badges */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
               {([
-                { value: "driver",  label: "Driver Documents",  approved: dApproved, total: DRIVER_DOCS.length },
-                { value: "vehicle", label: "Vehicle Documents", approved: vApproved, total: VEHICLE_DOCS.length },
+                { value: "driver",  label: "Driver Documents",  approved: dApproved, total: driverDocs.length },
+                { value: "vehicle", label: "Vehicle Documents", approved: vApproved, total: vehicleDocs.length },
               ] as const).map(tab => {
                 const active = docSubTab === tab.value;
                 return (
@@ -887,14 +1272,22 @@ export default function SuperAdminDriverProfilePage() {
                 ))}
               </div>
 
+              {activeDocs.length === 0 && (
+                <div style={{ padding: "32px 24px", textAlign: "center" as const, color: "#94A3B8", fontSize: 13 }}>
+                  No document records found.
+                </div>
+              )}
+
               {activeDocs.map((doc, idx) => {
                 const sc        = STATUS_STYLES[doc.status] ?? STATUS_STYLES["Offline"];
-                const docKey    = `${doc.prefix}-${doc.id}`;
-                const expiry    = expiryEdits[docKey] ?? doc.expiryDate ?? "";
-                const submitted = doc.status !== "Not Submitted" && doc.status !== "Not Uploaded";
+                const docKey    = `${doc.category}-${doc.doc_type}`;
+                const expiry    = expiryEdits[docKey] ?? doc.expiry_date ?? "";
+                const submitted = doc.status !== "Not Submitted";
+                const isUploading = uploadingDoc === doc.doc_type;
+
                 return (
                   <div
-                    key={doc.id}
+                    key={doc.doc_type}
                     style={{ display: "grid", gridTemplateColumns: GRID, columnGap: 16, padding: "15px 24px", alignItems: "center", borderBottom: idx < activeDocs.length - 1 ? "1px solid #F1F5F9" : "none", transition: "background 0.12s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
@@ -907,21 +1300,56 @@ export default function SuperAdminDriverProfilePage() {
                     </span>
 
                     <div onClick={e => e.stopPropagation()}>
-                      <DocDatePicker value={expiry} onChange={v => setExpiryEdits(p => ({ ...p, [docKey]: v }))} hasExpiry={doc.hasExpiry} />
+                      <DocDatePicker value={expiry} onChange={v => setExpiryEdits(p => ({ ...p, [docKey]: v }))} hasExpiry={doc.has_expiry} />
                     </div>
 
-                    <div style={{ paddingLeft: 48 }}>
-                      {!submitted ? (
-                        <span style={{ fontSize: 12.5, color: "#94A3B8", fontStyle: "italic" }}>Awaiting upload</span>
+                    <div style={{ paddingLeft: 48, display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Hidden file input */}
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        style={{ display: "none" }}
+                        ref={el => { fileInputRefs.current[doc.doc_type] = el; }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUpload(doc.doc_type, file);
+                          e.target.value = "";
+                        }}
+                      />
+
+                      {isUploading ? (
+                        <span style={{ fontSize: 12.5, color: "#64748B", fontStyle: "italic" }}>Uploading…</span>
+                      ) : !submitted ? (
+                        onboardingId ? (
+                          <button
+                            onClick={() => fileInputRefs.current[doc.doc_type]?.click()}
+                            style={{ padding: "5px 13px", borderRadius: 7, border: `1.5px solid ${ACCENT}`, background: "#EFF6FF", color: ACCENT, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}
+                          >
+                            Upload
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "#94A3B8", fontStyle: "italic" }}>Awaiting upload</span>
+                        )
                       ) : doc.status === "Approved" ? (
-                        <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject instead</button>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {doc.file_url && (
+                            <button onClick={() => setViewingDoc({ file_url: doc.file_url!, name: doc.name, doc_type: doc.doc_type })} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>View</button>
+                          )}
+                          <button onClick={() => handlePatch(doc.doc_type, "reject")} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject</button>
+                          <button onClick={() => fileInputRefs.current[doc.doc_type]?.click()} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Re-upload</button>
+                        </div>
                       ) : doc.status === "Rejected" ? (
-                        <button style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve instead</button>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => handlePatch(doc.doc_type, "approve")} style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve</button>
+                          <button onClick={() => fileInputRefs.current[doc.doc_type]?.click()} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Re-upload</button>
+                        </div>
                       ) : (
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>View</button>
-                          <button style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve</button>
-                          <button style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject</button>
+                          {doc.file_url && (
+                            <button onClick={() => setViewingDoc({ file_url: doc.file_url!, name: doc.name, doc_type: doc.doc_type })} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>View</button>
+                          )}
+                          <button onClick={() => handlePatch(doc.doc_type, "approve")} style={{ padding: "5px 13px", borderRadius: 7, border: "none", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font }}>Approve</button>
+                          <button onClick={() => handlePatch(doc.doc_type, "reject")} style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}>Reject</button>
                         </div>
                       )}
                     </div>
@@ -1073,6 +1501,23 @@ export default function SuperAdminDriverProfilePage() {
 
         </div>
       )}
+
+      {/* ── Document Viewer Modal ── */}
+      {viewingDoc && (() => {
+        const storedType = detectFileType(viewingDoc.file_url);
+        const apiBase    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+        const viewerUrl  = storedType === "pdf"
+          ? `${apiBase}/api/superadmin/driver-onboarding/${onboardingId}/document/${viewingDoc.doc_type}/download`
+          : viewingDoc.file_url;
+        return (
+          <DocumentViewer
+            url={viewerUrl}
+            fileTypeHint={storedType}
+            fileName={viewingDoc.name}
+            onClose={() => setViewingDoc(null)}
+          />
+        );
+      })()}
 
     </div>
   );

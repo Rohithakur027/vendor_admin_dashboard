@@ -1,14 +1,13 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { SearchBar } from "@/components/SearchBar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Search } from "lucide-react";
+  FilterPanel,
+  FilterSection,
+  FilterPill,
+  FilterTrigger,
+} from "@/components/FilterPanel";
 import type { BookingType, BookingStatus } from "../types";
 import type { Supervisor } from "@/modules/supervisors/types";
 
@@ -24,6 +23,9 @@ interface BookingFiltersProps {
   supervisors: Supervisor[];
 }
 
+const TYPE_OPTIONS: BookingType[] = ["Instant", "Scheduled"];
+const STATUS_OPTIONS: BookingStatus[] = ["Pending", "Ongoing", "Completed", "Cancelled"];
+
 export function BookingFilters({
   search,
   onSearchChange,
@@ -35,53 +37,72 @@ export function BookingFilters({
   onSupervisorChange,
   supervisors,
 }: BookingFiltersProps) {
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const activeCount =
+    (typeFilter !== "All" ? 1 : 0) +
+    (statusFilter !== "All" ? 1 : 0) +
+    (supervisorFilter !== "All" ? 1 : 0);
+
+  function handleClearAll() {
+    onTypeChange("All");
+    onStatusChange("All");
+    onSupervisorChange("All");
+  }
+
   return (
-    <div className="flex flex-wrap gap-3">
-      <div className="relative flex-1 min-w-48">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          autoComplete="off"
-          placeholder="Search by ID or location…"
-          className="pl-9"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+    <div className="flex gap-3 items-center flex-wrap">
+      <SearchBar
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search by ID or location…"
+        className="flex-1 min-w-48"
+      />
+      <div className="relative shrink-0">
+        <FilterTrigger
+          onClick={() => setFilterOpen((v) => !v)}
+          activeCount={activeCount}
         />
+        <FilterPanel
+          open={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          activeCount={activeCount}
+          onClearAll={handleClearAll}
+        >
+          <FilterSection label="Type">
+            {TYPE_OPTIONS.map((t) => (
+              <FilterPill
+                key={t}
+                label={t}
+                active={typeFilter === t}
+                onClick={() => onTypeChange(typeFilter === t ? "All" : t)}
+              />
+            ))}
+          </FilterSection>
+          <FilterSection label="Status">
+            {STATUS_OPTIONS.map((s) => (
+              <FilterPill
+                key={s}
+                label={s}
+                active={statusFilter === s}
+                onClick={() => onStatusChange(statusFilter === s ? "All" : s)}
+              />
+            ))}
+          </FilterSection>
+          {supervisors.length > 0 && (
+            <FilterSection label="Supervisor">
+              {supervisors.map((sv) => (
+                <FilterPill
+                  key={sv.id}
+                  label={sv.name}
+                  active={supervisorFilter === sv.id}
+                  onClick={() => onSupervisorChange(supervisorFilter === sv.id ? "All" : sv.id)}
+                />
+              ))}
+            </FilterSection>
+          )}
+        </FilterPanel>
       </div>
-      <Select value={typeFilter} onValueChange={(v) => onTypeChange(v as BookingType | "All")}>
-        <SelectTrigger className="w-36">
-          <SelectValue placeholder="Type" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Types</SelectItem>
-          <SelectItem value="Instant">Instant</SelectItem>
-          <SelectItem value="Scheduled">Scheduled</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={statusFilter} onValueChange={(v) => onStatusChange(v as BookingStatus | "All")}>
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Statuses</SelectItem>
-          <SelectItem value="Pending">Pending</SelectItem>
-          <SelectItem value="Ongoing">Ongoing</SelectItem>
-          <SelectItem value="Completed">Completed</SelectItem>
-          <SelectItem value="Cancelled">Cancelled</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={supervisorFilter} onValueChange={(v) => onSupervisorChange(v ?? "All")}>
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="Supervisor" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Supervisors</SelectItem>
-          {supervisors.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 }

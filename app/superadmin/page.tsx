@@ -118,7 +118,7 @@ export default function SuperAdminOverviewPage() {
 
       {/* Page title */}
       <div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Platform Overview</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Dashboard</div>
         <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 3, fontWeight: 500 }}>Live summary across all vendors and drivers</div>
       </div>
 
@@ -202,7 +202,7 @@ export default function SuperAdminOverviewPage() {
             <div style={{ minWidth: 480 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 110px 100px", gap: 12, padding: "10px 20px 8px", borderBottom: "1.5px solid #F8FAFC" }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>DRIVER</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>VEHICLE</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>VEHICLE DETAILS</div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" }}>TODAY TRIPS</div>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "right" }}>STATUS</div>
               </div>
@@ -233,6 +233,9 @@ export default function SuperAdminOverviewPage() {
                                 <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{driver.vehicle}</div>
                                 {driver.vehicleModel && (
                                   <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 1 }}>{driver.vehicleModel}</div>
+                                )}
+                                {driver.vehicleType && (
+                                  <div style={{ fontSize: 10, color: "#64748B", fontWeight: 600, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.4 }}>{driver.vehicleType}</div>
                                 )}
                               </div>
                             ) : (

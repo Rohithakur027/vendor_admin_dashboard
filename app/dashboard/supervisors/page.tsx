@@ -76,7 +76,7 @@ export default function SupervisorsPage() {
 
   function handleExport() {
     const rows = filtered.map((s) => ({
-      "Ref":     s.ref ?? "",
+      "Supervisor ID": s.ref ?? "",
       "Name":    s.name,
       "Email":   s.email,
       "Phone":   s.phone,

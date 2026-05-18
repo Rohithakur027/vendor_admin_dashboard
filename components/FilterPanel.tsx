@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { X, GripVertical } from "lucide-react";
 import { TbFilter } from "react-icons/tb";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ interface FilterPanelProps {
   onApply?: () => void;
   onCancel?: () => void;
   children: React.ReactNode;
+  panelClassName?: string;
 }
 
 export function FilterPanel({
@@ -24,51 +25,114 @@ export function FilterPanel({
   onApply,
   onCancel,
   children,
+  panelClassName,
 }: FilterPanelProps) {
   const anchorRef = useRef<HTMLSpanElement>(null);
-  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
+  const panelRef  = useRef<HTMLDivElement>(null);
 
-  const computePos = useCallback(() => {
+  // Initial anchor-relative position (top + right)
+  const [anchorPos, setAnchorPos] = useState<{ top: number; right: number } | null>(null);
+  // Drag-override position (top + left, takes over once user drags)
+  const [dragPos, setDragPos]     = useState<{ top: number; left: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
+
+  const computeAnchorPos = useCallback(() => {
     if (anchorRef.current) {
       const r = anchorRef.current.getBoundingClientRect();
-      setPanelPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
+      setAnchorPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
     }
   }, []);
 
   useEffect(() => {
     if (open) {
-      computePos();
-      window.addEventListener("scroll", computePos, true);
-      window.addEventListener("resize", computePos);
+      setDragPos(null); // reset drag position on each open
+      computeAnchorPos();
+      window.addEventListener("scroll", computeAnchorPos, true);
+      window.addEventListener("resize",  computeAnchorPos);
       return () => {
-        window.removeEventListener("scroll", computePos, true);
-        window.removeEventListener("resize", computePos);
+        window.removeEventListener("scroll", computeAnchorPos, true);
+        window.removeEventListener("resize",  computeAnchorPos);
       };
     } else {
-      setPanelPos(null);
+      setAnchorPos(null);
+      setDragPos(null);
     }
-  }, [open, computePos]);
+  }, [open, computeAnchorPos]);
 
-  const portalContent = open && panelPos
+  // Pointer events + setPointerCapture are far more reliable than mouse
+  // events: they continue firing even if the pointer leaves the header,
+  // and they work uniformly for mouse, touch, and pen.
+  function handleHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    if (!panelRef.current) return;
+
+    const rect = panelRef.current.getBoundingClientRect();
+    dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    setIsDragging(true);
+    // Route every subsequent pointer event to this element — drag survives
+    // fast cursor movement, leaving the header, hovering over iframes, etc.
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  function handleHeaderPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!dragOffsetRef.current || !panelRef.current) return;
+    const panelW = panelRef.current.offsetWidth;
+    const panelH = panelRef.current.offsetHeight;
+    const left = Math.max(0, Math.min(window.innerWidth  - panelW, e.clientX - dragOffsetRef.current.x));
+    const top  = Math.max(0, Math.min(window.innerHeight - panelH, e.clientY - dragOffsetRef.current.y));
+    setDragPos({ top, left });
+  }
+
+  function handleHeaderPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    dragOffsetRef.current = null;
+    setIsDragging(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }
+
+  const portalContent = open && anchorPos
     ? createPortal(
         <>
-          {/* Click-away backdrop */}
+          {/* Click-away backdrop — only when NOT dragging */}
           <div
             style={{ position: "fixed", inset: 0, zIndex: 9998 }}
             onClick={onClose}
           />
-          {/* Panel — rendered into document.body to escape any stacking context */}
+
+          {/* Panel */}
           <div
-            className="w-72 bg-white rounded-2xl shadow-xl border p-5 space-y-4"
+            ref={panelRef}
+            className={cn("bg-white rounded-2xl shadow-xl border flex flex-col", panelClassName ?? "w-72")}
             style={{
               position: "fixed",
-              top: panelPos.top,
-              right: panelPos.right,
               zIndex: 9999,
+              maxHeight: "85vh",
+              ...(dragPos
+                ? { top: dragPos.top, left: dragPos.left }
+                : { top: anchorPos.top, right: anchorPos.right }),
             }}
+            // Stop backdrop click when interacting inside the panel
+            onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            {/* ── Drag handle / header ── */}
+            <div
+              className="flex items-center justify-between px-5 pt-5 pb-4 shrink-0"
+              onPointerDown={handleHeaderPointerDown}
+              onPointerMove={handleHeaderPointerMove}
+              onPointerUp={handleHeaderPointerUp}
+              onPointerCancel={handleHeaderPointerUp}
+              style={{
+                cursor: isDragging ? "grabbing" : "grab",
+                touchAction: "none",  // stop the browser from scroll-stealing the gesture on touch
+                userSelect: "none",
+              }}
+            >
+              <div className="flex items-center gap-2 select-none">
+                <GripVertical className="h-3.5 w-3.5 text-slate-300" />
                 <TbFilter className="h-4 w-4 text-foreground" />
                 <span className="font-semibold text-sm">Filter</span>
                 {activeCount > 0 && (
@@ -94,9 +158,15 @@ export function FilterPanel({
                 </button>
               </div>
             </div>
-            {children}
+
+            {/* ── Scrollable content ── */}
+            <div className="overflow-y-auto flex-1 px-5 pb-2 space-y-4">
+              {children}
+            </div>
+
+            {/* ── Sticky footer ── */}
             {onApply && (
-              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t shrink-0">
                 <button
                   onClick={onCancel ?? onClose}
                   className="px-4 py-1.5 rounded-lg text-xs font-semibold border bg-white text-slate-700 hover:bg-slate-50 transition-colors"
