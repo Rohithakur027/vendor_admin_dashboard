@@ -76,6 +76,36 @@ function makePinEl(label: string, color: string): HTMLDivElement {
   return el
 }
 
+function addTrafficLayers(map: mapboxgl.Map, visible: boolean) {
+  if (!map.getSource('mapbox-traffic')) {
+    map.addSource('mapbox-traffic', {
+      type: 'vector',
+      url: 'mapbox://mapbox.mapbox-traffic-v1',
+    })
+  }
+  if (!map.getLayer('traffic-lines')) {
+    map.addLayer({
+      id: 'traffic-lines',
+      type: 'line',
+      source: 'mapbox-traffic',
+      'source-layer': 'traffic',
+      layout: { visibility: visible ? 'visible' : 'none' },
+      paint: {
+        'line-width': 3,
+        'line-color': [
+          'match',
+          ['get', 'congestion'],
+          'low', '#00E653',
+          'moderate', '#FFD600',
+          'heavy', '#E65100',
+          'severe', '#C50000',
+          '#CBD5E1',
+        ] as mapboxgl.Expression,
+      },
+    })
+  }
+}
+
 export default function LiveTrackingMap({
   booking_id,
   pickup_address,
@@ -99,11 +129,13 @@ export default function LiveTrackingMap({
   const mapLoadedRef = useRef(false)
   const hasLocationRef = useRef(false)
   const isMountedRef = useRef(true)
+  const trafficEnabledRef = useRef(false)
 
   const [state, setState] = useState<TrackState>('initializing')
   const [connectionLost, setConnectionLost] = useState(false)
   const [speed, setSpeed] = useState<number | null>(null)
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
+  const [trafficEnabled, setTrafficEnabled] = useState(false)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -264,6 +296,8 @@ export default function LiveTrackingMap({
         map.easeTo({ center: pCoords, zoom: 14 })
       }
 
+      addTrafficLayers(map, trafficEnabledRef.current)
+
       // Pre-create driver marker (not added until first location arrives)
       const { host, icon } = makeCarEl()
       carIconRef.current = icon
@@ -273,6 +307,11 @@ export default function LiveTrackingMap({
       if (isMountedRef.current && !hasLocationRef.current) {
         setState('no_location')
       }
+    })
+
+    map.on('style.load', () => {
+      if (!mapLoadedRef.current) return
+      addTrafficLayers(map, trafficEnabledRef.current)
     })
 
     return () => {
@@ -304,6 +343,16 @@ export default function LiveTrackingMap({
   }
 
   const showInfo = state === 'live' || state === 'no_location'
+
+  const toggleTraffic = () => {
+    const next = !trafficEnabledRef.current
+    trafficEnabledRef.current = next
+    setTrafficEnabled(next)
+    const map = mapRef.current
+    if (map && mapLoadedRef.current && map.getLayer('traffic-lines')) {
+      map.setLayoutProperty('traffic-lines', 'visibility', next ? 'visible' : 'none')
+    }
+  }
 
   return (
     <div style={{ position: 'relative', height: 360, borderRadius: 12, overflow: 'hidden', background: '#E5E7EB' }}>
@@ -431,6 +480,76 @@ export default function LiveTrackingMap({
               {booking_ref}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Traffic toggle button — top-left, always visible */}
+      <button
+        onClick={toggleTraffic}
+        style={{
+          position: 'absolute',
+          top: connectionLost ? 44 : 10,
+          left: 10,
+          zIndex: 20,
+          background: trafficEnabled ? '#2563EB' : '#ffffff',
+          border: `2px solid ${trafficEnabled ? '#1d4ed8' : '#D1D5DB'}`,
+          borderRadius: 8,
+          padding: '6px 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+          fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
+          fontSize: 12,
+          fontWeight: 700,
+          color: trafficEnabled ? '#ffffff' : '#111827',
+          lineHeight: 1,
+          userSelect: 'none',
+        }}
+        title={trafficEnabled ? 'Hide traffic layer' : 'Show traffic layer'}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="9" y="2" width="6" height="20" rx="3" stroke="currentColor" strokeWidth="2"/>
+          <circle cx="12" cy="7" r="1.8" fill={trafficEnabled ? '#fca5a5' : '#EF4444'}/>
+          <circle cx="12" cy="12" r="1.8" fill={trafficEnabled ? '#fde68a' : '#F59E0B'}/>
+          <circle cx="12" cy="17" r="1.8" fill={trafficEnabled ? '#bbf7d0' : '#22C55E'}/>
+        </svg>
+        Traffic
+        <span style={{
+          fontSize: 9,
+          fontWeight: 800,
+          padding: '1px 5px',
+          borderRadius: 4,
+          background: trafficEnabled ? 'rgba(255,255,255,0.25)' : '#F3F4F6',
+          color: trafficEnabled ? '#ffffff' : '#6B7280',
+          letterSpacing: 0.3,
+        }}>
+          {trafficEnabled ? 'ON' : 'OFF'}
+        </span>
+      </button>
+
+      {/* Traffic legend — bottom-left, visible only when traffic is ON */}
+      {trafficEnabled && (
+        <div style={{
+          position: 'absolute', bottom: 28, left: 10, zIndex: 20,
+          background: '#ffffff', border: '1.5px solid #E5E7EB',
+          borderRadius: 8, padding: '8px 11px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.14)',
+          fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
+        }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>Traffic</div>
+          {[
+            { label: 'Low', color: '#00E653' },
+            { label: 'Moderate', color: '#FFD600' },
+            { label: 'Heavy', color: '#E65100' },
+            { label: 'Severe', color: '#C50000' },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <div style={{ width: 16, height: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
+              <span style={{ fontSize: 10.5, color: '#374151', fontWeight: 600 }}>{label}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>

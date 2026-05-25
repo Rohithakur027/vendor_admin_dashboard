@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { vendorSignupApi, vendorsApi } from "@/lib/api";
+import { vendorSignupApi, vendorsApi, type VendorBillingCycle, type VendorBillingType } from "@/lib/api";
 import {
   Eye, EyeOff, AlertCircle, CheckCircle2,
   ArrowLeft, ArrowRight, Loader2, Check,
@@ -49,7 +49,11 @@ export default function VendorSignupPage() {
   const [password,     setPassword]     = useState("");
   const [confirmPw,    setConfirmPw]    = useState("");
   const [showPw,       setShowPw]       = useState(false);
-  const [step3Errors,  setStep3Errors]  = useState<Partial<Record<"password"|"confirm", string>>>({});
+  const [billingType,    setBillingType]    = useState<VendorBillingType>("PREPAID");
+  const [creditLimit,    setCreditLimit]    = useState("");
+  const [billingCycle,   setBillingCycle]   = useState<VendorBillingCycle>("MONTHLY");
+  const [paymentDueDays, setPaymentDueDays] = useState("7");
+  const [step3Errors,    setStep3Errors]    = useState<Partial<Record<"password"|"confirm"|"billing_type"|"credit_limit"|"billing_cycle"|"payment_due_days", string>>>({});
 
   const [loading,  setLoading]  = useState(false);
   const [apiError, setApiError] = useState("");
@@ -81,6 +85,16 @@ export default function VendorSignupPage() {
 
   function validateStep3() {
     const e: typeof step3Errors = {};
+    if (billingType !== "PREPAID" && billingType !== "POSTPAID") {
+      e.billing_type = "Billing type is required";
+    }
+    if (billingType === "POSTPAID") {
+      const limit = Number(creditLimit);
+      const days = Number(paymentDueDays);
+      if (!creditLimit || !Number.isFinite(limit) || limit <= 0) e.credit_limit = "Credit limit must be greater than 0";
+      if (billingCycle !== "WEEKLY" && billingCycle !== "MONTHLY") e.billing_cycle = "Select a billing cycle";
+      if (!paymentDueDays || !Number.isInteger(days) || days <= 0) e.payment_due_days = "Payment due days must be greater than 0";
+    }
     if (!password)             e.password = "Password is required";
     else if (password.length < 8) e.password = "Password must be at least 8 characters";
     if (!confirmPw)            e.confirm  = "Please confirm your password";
@@ -106,7 +120,20 @@ export default function VendorSignupPage() {
 
     setLoading(true); setApiError("");
     try {
-      const res = await vendorSignupApi.signup({ name, city, contactPerson, email, phone, password });
+      const isPostpaid = billingType === "POSTPAID";
+      const res = await vendorSignupApi.signup({
+        name,
+        city,
+        contactPerson,
+        email,
+        phone,
+        password,
+        billing_type: billingType,
+        credit_limit: isPostpaid ? Number(creditLimit) : 0,
+        outstanding_balance: 0,
+        billing_cycle: isPostpaid ? billingCycle : "MONTHLY",
+        payment_due_days: isPostpaid ? Number(paymentDueDays) : 7,
+      });
 
       // Attempt document uploads silently — uses the freshly issued token from
       // the signup response. We don't write that token to sessionStorage on
@@ -471,6 +498,70 @@ export default function VendorSignupPage() {
                 <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "12px 14px", marginBottom: 2 }}>
                   <p style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Signing up as</p>
                   <p style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginTop: 2 }}>{name} · {email}</p>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, background: "#f8fafc", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <Field label="Billing Type" error={step3Errors.billing_type}>
+                    <select
+                      value={billingType}
+                      onChange={e => {
+                        const next = e.target.value as VendorBillingType;
+                        setBillingType(next);
+                        setStep3Errors(p => ({ ...p, billing_type: undefined, credit_limit: undefined, billing_cycle: undefined, payment_due_days: undefined }));
+                        if (next === "PREPAID") {
+                          setCreditLimit("");
+                          setBillingCycle("MONTHLY");
+                          setPaymentDueDays("7");
+                        }
+                      }}
+                      style={inputStyle(step3Errors.billing_type)}
+                    >
+                      <option value="PREPAID">PREPAID</option>
+                      <option value="POSTPAID">POSTPAID</option>
+                    </select>
+                  </Field>
+
+                  <p style={{ fontSize: 11.5, color: BLUE, fontWeight: 600, background: "#eff6ff", border: "1px solid #dbeafe", borderRadius: 9, padding: "8px 10px", lineHeight: 1.45 }}>
+                    {billingType === "PREPAID"
+                      ? "PREPAID: Trips are allowed only when wallet balance is available."
+                      : "POSTPAID: Trips are billed later and controlled by credit limit."}
+                  </p>
+
+                  {billingType === "POSTPAID" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <Field label="Credit Limit" error={step3Errors.credit_limit}>
+                        <input
+                          type="number"
+                          min={1}
+                          style={inputStyle(step3Errors.credit_limit)}
+                          placeholder="50000"
+                          value={creditLimit}
+                          onChange={e => { setCreditLimit(e.target.value); setStep3Errors(p => ({ ...p, credit_limit: undefined })); }}
+                        />
+                      </Field>
+                      <Field label="Billing Cycle" error={step3Errors.billing_cycle}>
+                        <select
+                          value={billingCycle}
+                          onChange={e => { setBillingCycle(e.target.value as VendorBillingCycle); setStep3Errors(p => ({ ...p, billing_cycle: undefined })); }}
+                          style={inputStyle(step3Errors.billing_cycle)}
+                        >
+                          <option value="WEEKLY">WEEKLY</option>
+                          <option value="MONTHLY">MONTHLY</option>
+                        </select>
+                      </Field>
+                      <Field label="Payment Due Days" error={step3Errors.payment_due_days}>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          style={inputStyle(step3Errors.payment_due_days)}
+                          placeholder="7"
+                          value={paymentDueDays}
+                          onChange={e => { setPaymentDueDays(e.target.value); setStep3Errors(p => ({ ...p, payment_due_days: undefined })); }}
+                        />
+                      </Field>
+                    </div>
+                  )}
                 </div>
 
                 <Field label="Password" error={step3Errors.password}>

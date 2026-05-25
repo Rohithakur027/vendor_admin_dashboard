@@ -128,6 +128,9 @@ export interface VendorDocument {
   updated_at:  string;
 }
 
+export type VendorBillingType = "PREPAID" | "POSTPAID";
+export type VendorBillingCycle = "WEEKLY" | "MONTHLY";
+
 export interface CreateVendorPayload {
   name: string;
   pan?: string;
@@ -140,11 +143,32 @@ export interface CreateVendorPayload {
   secondaryPOCs?: { name: string; email: string; phone: string }[];
   walletAmount?: number;
   sendCredentials?: boolean;
+  billing_type?: VendorBillingType;
+  credit_limit?: number;
+  outstanding_balance?: number;
+  billing_cycle?: VendorBillingCycle;
+  payment_due_days?: number;
 }
 
 export interface VendorDetailApiItem extends Vendor {
   wallet_balance: number;
   secondaryPOCs: { name: string; email: string; phone: string }[];
+}
+
+export interface UpdateVendorPayload {
+  status?: "Active" | "Inactive";
+  name?: string;
+  city?: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  pan?: string;
+  gst?: string;
+  billing_type?: VendorBillingType;
+  credit_limit?: number;
+  outstanding_balance?: number;
+  billing_cycle?: VendorBillingCycle;
+  payment_due_days?: number;
 }
 
 export interface WalletTransaction {
@@ -253,16 +277,7 @@ export const vendorsApi = {
     return apiUpload<{ success: true; data: unknown }>(`/api/superadmin/vendors/${vendorId}/documents/upload`, fd);
   },
 
-  update: (id: string, payload: {
-    status?: "Active" | "Inactive";
-    name?: string;
-    city?: string;
-    contactPerson?: string;
-    phone?: string;
-    email?: string;
-    pan?: string;
-    gst?: string;
-  }) =>
+  update: (id: string, payload: UpdateVendorPayload) =>
     apiFetch<{ success: true; data: VendorDetailApiItem }>(`/api/superadmin/vendors/${id}`, {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -302,6 +317,12 @@ export const vendorsApi = {
   transactions: (id: string) =>
     apiFetch<{ success: true; data: WalletTransaction[] }>(`/api/superadmin/vendors/${id}/transactions`),
 
+  updatePassword: (id: string, password: string) =>
+    apiFetch<{ success: true; message: string }>(`/api/superadmin/vendors/${id}/password`, {
+      method: "POST",
+      body:   JSON.stringify({ password }),
+    }),
+
   trips: (id: string, limit = 100) =>
     apiFetch<{ success: true; data: TripApiItem[] }>(`/api/superadmin/vendors/${id}/trips?limit=${limit}`),
 
@@ -315,6 +336,10 @@ export const vendorsApi = {
         method: "PATCH",
         body: JSON.stringify({ action, note }),
       }),
+    previewLink: (id: string, docType: string) =>
+      apiFetch<{ success: true; data: { url: string; expiresInSeconds: number } }>(
+        `/api/superadmin/vendors/${id}/documents/${docType}/preview-link`,
+      ),
   },
 };
 
@@ -327,6 +352,11 @@ export interface VendorSignupPayload {
   email:         string;
   phone:         string;
   password:      string;
+  billing_type?: VendorBillingType;
+  credit_limit?: number;
+  outstanding_balance?: number;
+  billing_cycle?: VendorBillingCycle;
+  payment_due_days?: number;
 }
 
 export const vendorSignupApi = {
@@ -448,6 +478,13 @@ export interface DriverApiItem {
     model: string | null;
     color: string | null;
     type: string | null;
+    year: number | null;
+    makeYear: number | null;
+    chassisNumber: string | null;
+    engineNumber: string | null;
+    ownerName: string | null;
+    assignedAt: string | null;
+    updatedAt: string | null;
   } | null;
   documents: { total: number; verified: number };
   totalTrips: number;
@@ -544,6 +581,34 @@ export const superadminApi = {
         pagination: { page: number; limit: number; total: number; pages: number };
       }>(`/api/superadmin/booking-enquiries/special${q ? `?${q}` : ""}`);
     },
+
+    listWebsiteBookings: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page)   qs.set("page",   String(params.page));
+      if (params?.limit)  qs.set("limit",  String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return apiFetch<{
+        success: true;
+        data: WebsiteBookingEnquiry[];
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/superadmin/booking-enquiries/website-bookings${q ? `?${q}` : ""}`);
+    },
+
+    listWebsiteEnquiries: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page)   qs.set("page",   String(params.page));
+      if (params?.limit)  qs.set("limit",  String(params.limit));
+      if (params?.status) qs.set("status", params.status);
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return apiFetch<{
+        success: true;
+        data: WebsiteGeneralEnquiry[];
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/superadmin/booking-enquiries/website-enquiries${q ? `?${q}` : ""}`);
+    },
   },
 };
 
@@ -556,6 +621,7 @@ export interface GeneralBookingEnquiry {
   destination:     string;
   distanceKm:      number | null;
   bookingType:     string | null;
+  bookingCategory: string | null;
   vehicleType:     string | null;
   passengers:      number;
   customerName:    string;
@@ -575,6 +641,39 @@ export interface SpecialBookingInquiry {
   message:     string;
   status:      string;
   notes:       string | null;
+  createdAt:   string | null;
+}
+
+export interface WebsiteBookingEnquiry {
+  id:              string;
+  enqRef:          string | null;
+  createdAt:       string | null;
+  isScheduled:     boolean;
+  scheduledAt:     string | null;
+  isReturnTrip:    boolean;
+  returnAt:        string | null;
+  pickupLocation:  string;
+  destination:     string;
+  distanceKm:      number | null;
+  bookingType:     string | null;
+  bookingCategory: string | null;
+  vehicleType:     string | null;
+  passengers:      number;
+  customerName:    string;
+  customerEmail:   string | null;
+  customerMobile:  string;
+  status:          string | null;
+}
+
+export interface WebsiteGeneralEnquiry {
+  id:          string;
+  enqRef:      string | null;
+  name:        string;
+  email:       string | null;
+  mobile:      string;
+  companyName: string | null;
+  message:     string;
+  status:      string | null;
   createdAt:   string | null;
 }
 
@@ -635,6 +734,21 @@ export interface DriverTripItem {
   pickupTime:     string | null;
   supervisorName: string | null;
   companyName:    string | null;
+  vendorName:     string | null;
+  driverName:     string | null;
+  vehicleType:    string | null;
+  scheduledAt:    string | null;
+  completedAt:    string | null;
+  startedAt:      string | null;
+  distanceKm:     number | null;
+  escortRequired: boolean;
+  escortPickup:   string | null;
+  notes:          string | null;
+  invoiceId:      string | null;
+  pickupLat:      number | null;
+  pickupLng:      number | null;
+  dropLat:        number | null;
+  dropLng:        number | null;
 }
 
 export interface DriverTripsResponse {
@@ -814,6 +928,11 @@ export const driverOnboardingApi = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  documentPreviewLink: (id: string, docType: string) =>
+    apiFetch<{ success: true; data: { url: string; expiresInSeconds: number } }>(
+      `/api/superadmin/driver-onboarding/${id}/document/${docType}/preview-link`,
+    ),
 };
 
 // ── Superadmin — Overview ────────────────────────────────────────────────────
@@ -934,6 +1053,11 @@ export const reportsApi = {
     apiFetch<{ success: true; data: CompanyReportData }>(
       `/api/vendor/reports/company/${encodeURIComponent(companyName)}?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
     ),
+
+  getCompanyTrips: (companyName: string, startDate: string, endDate: string) =>
+    apiFetch<{ success: true; data: VendorBookingItem[] }>(
+      `/api/vendor/reports/company/${encodeURIComponent(companyName)}/trips?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+    ),
 };
 
 // ── Superadmin — Vendor Reports ──────────────────────────────────────────────
@@ -944,6 +1068,8 @@ export interface VendorListItem {
   city: string;
   status: string;
   walletBalance: number;
+  contactName:  string | null;
+  contactPhone: string | null;
 }
 
 export interface VendorReportData {
@@ -985,7 +1111,8 @@ export interface VendorWalletTx {
 
 export interface VendorBookingItem {
   id: string;
-  bookingRef: string | null;
+  tripRef?: string | null;
+  bookingRef?: string | null;
   type: string;
   status: string;
   pickupLocation: string;
@@ -1142,6 +1269,70 @@ export const invoicesApi = {
     }),
 };
 
+// ── Superadmin — Vendor Invoices ─────────────────────────────────────────────
+
+export interface SuperadminInvoiceListItem {
+  id:            string;
+  invoiceNumber: string;
+  vendorName:    string;
+  periodFrom:    string;
+  periodTo:      string;
+  amount:        number;
+  status:        InvoiceStatus;
+  issuedAt:      string;
+  dueDate:       string;
+  paidAt:        string | null;
+  tripCount:     number;
+}
+
+export interface SuperadminInvoiceDetail extends SuperadminInvoiceListItem {
+  vendorAddress: string | null;
+  paymentRef:    string | null;
+  notes:         string | null;
+  trips:         InvoiceTripItem[];
+}
+
+export const superadminInvoicesApi = {
+  list: (params?: { page?: number; limit?: number; status?: InvoiceStatus; vendorId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.page)     qs.set("page",      String(params.page));
+    if (params?.limit)    qs.set("limit",     String(params.limit));
+    if (params?.status)   qs.set("status",    params.status);
+    if (params?.vendorId) qs.set("vendor_id", params.vendorId);
+    const q = qs.toString();
+    return apiFetch<{
+      success: true;
+      data: { invoices: SuperadminInvoiceListItem[]; summary: InvoiceSummary };
+      pagination: { page: number; limit: number; total: number };
+    }>(`/api/superadmin/invoices${q ? `?${q}` : ""}`);
+  },
+
+  get: (id: string) =>
+    apiFetch<{ success: true; data: SuperadminInvoiceDetail }>(`/api/superadmin/invoices/${id}`),
+
+  preview: (params: { vendorId: string; periodFrom: string; periodTo: string }) => {
+    const qs = new URLSearchParams({ vendorId: params.vendorId, periodFrom: params.periodFrom, periodTo: params.periodTo });
+    return apiFetch<{ success: true; data: { tripCount: number; total: number; trips: InvoiceTripItem[] } }>(`/api/superadmin/invoices/preview?${qs.toString()}`);
+  },
+
+  create: (payload: { vendorId: string; periodFrom: string; periodTo: string; notes?: string }) =>
+    apiFetch<{ success: true; data: SuperadminInvoiceDetail }>("/api/superadmin/invoices", {
+      method: "POST",
+      body:   JSON.stringify(payload),
+    }),
+
+  markPaid: (id: string, paymentRef?: string) =>
+    apiFetch<{ success: true; data: SuperadminInvoiceListItem }>(`/api/superadmin/invoices/${id}/status`, {
+      method: "PATCH",
+      body:   JSON.stringify({ status: "Paid", paymentRef }),
+    }),
+
+  void: (id: string) =>
+    apiFetch<{ success: true }>(`/api/superadmin/invoices/${id}/void`, {
+      method: "POST",
+    }),
+};
+
 // ── Superadmin — Team Members ────────────────────────────────────────────────
 
 interface ApiTeamMember {
@@ -1275,6 +1466,9 @@ export const vendorTeamApi = {
 };
 
 export const vendorDriversApi = {
+  documents: (id: string) =>
+    apiFetch<{ success: true; data: DriverDocument[] }>(`/api/vendor/drivers/${id}/documents`),
+
   locationHistory: (
     id:    string,
     range: { from: string; to: string } | { hours: number },

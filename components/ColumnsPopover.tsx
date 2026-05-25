@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Columns3, Check } from "lucide-react";
-import { getTableSpec, type TableKey, MIN_VISIBLE_COLUMNS } from "@/lib/columnConfig";
+import { getTableSpec, type TableKey, type ColumnDef, MIN_VISIBLE_COLUMNS } from "@/lib/columnConfig";
 
 interface Props {
   tableKey:   TableKey;
@@ -10,13 +10,16 @@ interface Props {
   totalCount: number;
   onToggle:   (key: string) => void;
   onReset:    () => void;
+  onSelectAll?: () => void;
+  availableColumns?: ColumnDef[];
 }
 
-export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onReset }: Props) {
+export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onReset, onSelectAll, availableColumns }: Props) {
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const spec = getTableSpec(tableKey);
+  const columns = availableColumns ?? spec.columns;
   const visibleSet = new Set(visible);
 
   useEffect(() => {
@@ -64,18 +67,30 @@ export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onRese
 
       {open && (
         <div className="absolute right-0 z-50 mt-2 w-72 max-h-[70vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-3">
             <div>
               <div className="text-[13px] font-bold text-slate-900">{spec.title} columns</div>
               <div className="text-[11px] text-slate-500 mt-0.5">Choose which to display</div>
             </div>
-            <button onClick={onReset} className="text-[11.5px] font-medium text-blue-600 hover:underline">
-              Reset
-            </button>
+            <div className="flex items-center gap-2">
+              {onSelectAll && (
+                <button
+                  type="button"
+                  onClick={onSelectAll}
+                  disabled={visible.length === totalCount}
+                  className="text-[11.5px] font-medium text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  Select all
+                </button>
+              )}
+              <button type="button" onClick={onReset} className="text-[11.5px] font-medium text-blue-600 hover:underline">
+                Reset
+              </button>
+            </div>
           </div>
 
           <ul className="py-1">
-            {spec.columns.map(col => {
+            {[...columns].sort((a, b) => a.label.localeCompare(b.label)).map(col => {
               const on = visibleSet.has(col.key);
               return (
                 <li key={col.key}>

@@ -27,9 +27,11 @@ export default function SupervisorsPage() {
   const [statusFilter, setStatusFilter] = useState<SupervisorStatus | "All">("All");
 
   const filtered = supervisors.filter((s) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase());
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      (s.phone ?? "").toLowerCase().includes(q);
     const matchesStatus = statusFilter === "All" || s.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

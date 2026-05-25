@@ -10,7 +10,7 @@ import { toIsoDate } from "@/modules/reports/primitives";
 import { SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
@@ -114,34 +114,12 @@ export default function PastBookingsPage() {
         const col = spec.columns.find(c => c.key === k);
         if (!col) continue;
 
-        if (k === "tripId") {
-          out["Trip ID"]   = b.bookingRef ?? "";
-          out["Trip Type"] = b.type ?? "";
-          continue;
-        }
-        if (k === "route") {
-          out["Pickup Address"]      = b.pickupLocation;
-          out["Destination Address"] = b.dropLocation;
-          continue;
-        }
-        if (k === "supervisorCompany") {
-          out["Supervisor"] = supervisorName(b.supervisorId);
-          out["Company"]    = b.bookingSource ?? "";
-          continue;
-        }
-        if (k === "vehicle") {
-          const d = driverFor(b);
-          out["Vehicle Reg"]   = d.vehicleReg ?? "";
-          out["Vehicle Model"] = d.vehicle    ?? "";
-          continue;
-        }
-
         const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
         out[col.label] = r ? r.csv(b) : "";
       }
       return out;
     });
-    exportToCsv("past-trips", rows);
+    exportToXlsx("past-trips", rows, "Past Trips");
   }
 
   return (
@@ -179,7 +157,7 @@ export default function PastBookingsPage() {
             onReset={reset}
           />
 
-          <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" />
+          <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" label="Export XLSX" />
         </div>
 
         <TripsTable

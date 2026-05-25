@@ -8,14 +8,11 @@ export function detectFileType(url: string): FileType {
   if (!url) return "unknown";
   const clean = url.toLowerCase().split("?")[0];
   if (clean.endsWith(".pdf") || clean.includes("/raw/upload/")) return "pdf";
-  if (/\.(jpe?g|png)/.test(clean) || (clean.includes("/image/upload/") && !clean.endsWith(".pdf"))) return "image";
+  if (/\.(jpe?g|png|webp)/.test(clean) || (clean.includes("/image/upload/") && !clean.endsWith(".pdf"))) return "image";
   return "unknown";
 }
 
 export function getViewableUrl(url: string): string {
-  // Keep the original Cloudinary URL as-is.
-  // Converting /image/upload/ → /raw/upload/ causes 401 when the file was
-  // uploaded under the image resource type (the common case).
   return url;
 }
 

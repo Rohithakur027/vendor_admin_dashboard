@@ -56,7 +56,7 @@ export function SupervisorFilters({
       <SearchBar
         value={search}
         onChange={onSearchChange}
-        placeholder="Search by name or email…"
+        placeholder="Search by name, email or phone…"
       />
       <div className="relative shrink-0">
         <FilterTrigger

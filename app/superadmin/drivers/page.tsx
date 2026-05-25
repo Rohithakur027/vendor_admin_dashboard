@@ -16,7 +16,7 @@ import {
 } from "@/components/FilterPanel";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
 
@@ -149,11 +149,38 @@ function renderCell(key: string, d: DriverApiItem) {
   }
 }
 
+function exportValue(key: string, d: DriverApiItem) {
+  switch (key) {
+    case "name":
+      return d.name;
+    case "phone":
+      return d.phone;
+    case "email":
+      return d.email ?? "";
+    case "status":
+      return d.status;
+    case "zone":
+      return d.zone ?? "";
+    case "vehicle":
+      return [d.vehicle?.plateNumber, d.vehicle?.model, d.vehicle?.type].filter(Boolean).join(" | ");
+    case "lastSeen":
+      return d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : "";
+    case "totalTrips":
+      return d.totalTrips;
+    case "documents":
+      return `${d.documents.verified}/${d.documents.total}`;
+    case "createdAt":
+      return fmtJoined(d.createdAt);
+    default:
+      return "";
+  }
+}
+
 export default function SuperAdminDriversPage() {
   const router = useRouter();
 
   const TABLE_KEY = "allDrivers" as const;
-  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
+  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, setColumns: setCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
   const spec = getTableSpec(TABLE_KEY);
 
   const gridTemplate = useMemo(
@@ -229,23 +256,15 @@ export default function SuperAdminDriversPage() {
   }, [drivers, search]);
 
   function handleExport() {
-    const rows = filteredDrivers.map(d => ({
-      "Driver Name":   d.name,
-      "Driver ID":     d.driverRef ?? "",
-      "Phone":         d.phone,
-      "Email":         d.email ?? "",
-      "Zone":          d.zone ?? "",
-      "Vehicle Plate": d.vehicle?.plateNumber ?? "",
-      "Vehicle Model": d.vehicle?.model ?? "",
-      "Vehicle Type":  d.vehicle?.type ?? "",
-      "Status":        d.status,
-      "Verified":      d.isVerified ? "Yes" : "No",
-      "Total Trips":   d.totalTrips,
-      "Docs Verified": `${d.documents.verified}/${d.documents.total}`,
-      "Last Active":   d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : "",
-      "Joined On":     fmtJoined(d.createdAt),
-    }));
-    exportToCsv("drivers.csv", rows);
+    const rows = filteredDrivers.map((d) => {
+      const row: Record<string, string | number> = {};
+      for (const key of visibleCols) {
+        const col = spec.columns.find((c) => c.key === key);
+        row[col?.label ?? key] = exportValue(key, d);
+      }
+      return row;
+    });
+    exportToXlsx("drivers", rows, "Drivers");
   }
 
   return (
@@ -292,10 +311,11 @@ export default function SuperAdminDriversPage() {
           totalCount={colTotal}
           onToggle={toggleCol}
           onReset={resetCols}
+          onSelectAll={() => setCols(spec.columns.map((c) => c.key))}
         />
 
         <div className="ml-auto">
-          <ExportButton onClick={handleExport} disabled={filteredDrivers.length === 0} />
+          <ExportButton onClick={handleExport} disabled={filteredDrivers.length === 0} label="Export XLSX" />
         </div>
       </div>
 
@@ -309,7 +329,7 @@ export default function SuperAdminDriversPage() {
               {visibleCols.map(key => {
                 const col = spec.columns.find(c => c.key === key);
                 return (
-                  <div key={key} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                  <div key={key} style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                     {col?.label ?? key}
                   </div>
                 );

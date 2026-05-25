@@ -263,7 +263,7 @@ export const FilterTrigger = React.forwardRef<HTMLButtonElement, FilterTriggerPr
         ref={ref}
         onClick={onClick}
         className={cn(
-          "relative flex items-center gap-2 h-[42px] px-4 rounded-xl border font-semibold text-[13px] shadow-sm transition-colors",
+          "relative inline-flex items-center gap-2 h-[42px] px-4 rounded-xl border text-[12.5px] font-medium transition-colors",
           activeCount > 0
             ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"

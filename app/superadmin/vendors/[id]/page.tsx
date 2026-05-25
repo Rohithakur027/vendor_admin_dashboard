@@ -2,12 +2,13 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { vendorsApi, type VendorDetailApiItem, type TripApiItem, type VendorDocument } from "@/lib/api";
+import { vendorsApi, type VendorBillingCycle, type VendorBillingType, type VendorDetailApiItem, type TripApiItem, type VendorDocument } from "@/lib/api";
 import {
   ArrowLeft, MapPin, Phone, Mail, Users,
   Wallet, ShieldOff, ShieldCheck,
-  CheckCircle2, Loader2, AlertCircle, Route, ArrowRight,
-  IndianRupee, Building2, Upload, FileText,
+  CheckCircle2, Loader2, AlertCircle, ArrowRight,
+  IndianRupee, Building2, Upload, FileText, Eye, EyeOff,
+  CalendarDays,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { detectFileType } from "@/components/document-viewer/useDocumentViewer";
@@ -19,11 +20,13 @@ const DocumentViewer = dynamic(
 import { SearchBar } from "@/components/SearchBar";
 import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
 import { TripsTable } from "@/modules/bookings/components/TripsTable";
-import { buildTripRenderers, formatIST } from "@/modules/bookings/tripRenderers";
+import { buildTripRenderers } from "@/modules/bookings/tripRenderers";
 import type { Booking, BookingStatus, BookingType } from "@/modules/bookings/types";
 import { cn } from "@/lib/utils";
 
@@ -151,11 +154,13 @@ export default function VendorProfilePage() {
   const [trips,        setTrips]        = useState<TripApiItem[]>([]);
   const [tripsLoading, setTripsLoading] = useState(false);
   const [tripSearch,      setTripSearch]      = useState("");
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [tripStatus,      setTripStatus]      = useState("All Status");
   const [tripType,        setTripType]        = useState("All Types");
   const [draftTripStatus, setDraftTripStatus] = useState("All Status");
   const [draftTripType,   setDraftTripType]   = useState("All Types");
   const [tripFilterOpen,  setTripFilterOpen]  = useState(false);
+  const [tripCalendarOpen, setTripCalendarOpen] = useState(false);
   const [tripPeriod,      setTripPeriod]      = useState<"all"|"today"|"last7"|"last30"|"custom">("all");
   const [draftTripPeriod, setDraftTripPeriod] = useState<"all"|"today"|"last7"|"last30"|"custom">("all");
   const [tripDateMode,    setTripDateMode]    = useState<"range"|"single">("range");
@@ -169,22 +174,30 @@ export default function VendorProfilePage() {
   function openTripFilter() {
     setDraftTripStatus(tripStatus);
     setDraftTripType(tripType);
-    setDraftTripPeriod(tripPeriod);
-    setDraftDateMode(tripDateMode);
-    setDraftDateFrom(tripDateFrom);
-    setDraftDateTo(tripDateTo);
     setTripFilterOpen(true);
   }
   function applyTripFilter() {
     setTripStatus(draftTripStatus);
     setTripType(draftTripType);
+    setTripFilterOpen(false);
+  }
+  function cancelTripFilter() { setTripFilterOpen(false); }
+
+  function openTripCalendar() {
+    setDraftTripPeriod(tripPeriod);
+    setDraftDateMode(tripDateMode);
+    setDraftDateFrom(tripDateFrom);
+    setDraftDateTo(tripDateTo);
+    setTripCalendarOpen(true);
+  }
+  function applyTripCalendar() {
     setTripPeriod(draftTripPeriod);
     setTripDateMode(draftDateMode);
     setTripDateFrom(draftDateFrom);
     setTripDateTo(draftDateTo);
-    setTripFilterOpen(false);
+    setTripCalendarOpen(false);
   }
-  function cancelTripFilter() { setTripFilterOpen(false); }
+  function cancelTripCalendar() { setTripCalendarOpen(false); }
 
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -206,6 +219,7 @@ export default function VendorProfilePage() {
   const [toggling, setToggling] = useState(false);
   const [toast,    setToast]    = useState("");
 
+  const [settingsSection,   setSettingsSection]   = useState<"profile" | "security">("profile");
   const [editName,          setEditName]          = useState("");
   const [editCity,          setEditCity]          = useState("");
   const [editContactPerson, setEditContactPerson] = useState("");
@@ -213,8 +227,18 @@ export default function VendorProfilePage() {
   const [editEmail,         setEditEmail]         = useState("");
   const [editPan,           setEditPan]           = useState("");
   const [editGst,           setEditGst]           = useState("");
+  const [editBillingType,   setEditBillingType]   = useState<VendorBillingType>("PREPAID");
+  const [editCreditLimit,   setEditCreditLimit]   = useState("");
+  const [editBillingCycle,  setEditBillingCycle]  = useState<VendorBillingCycle>("MONTHLY");
+  const [editDueDays,       setEditDueDays]       = useState("7");
   const [editSaving,        setEditSaving]        = useState(false);
   const [editErr,           setEditErr]           = useState("");
+
+  const [pwForm,   setPwForm]   = useState({ password: "", confirm: "" });
+  const [pwShow,   setPwShow]   = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSaved,  setPwSaved]  = useState(false);
+  const [pwError,  setPwError]  = useState<string | null>(null);
 
   // Documents tab
   const [docs,        setDocs]        = useState<VendorDocument[]>([]);
@@ -241,6 +265,10 @@ export default function VendorProfilePage() {
         const gstDocVal = docsRes.data.find(d => d.doc_type === "GST_CERTIFICATE")?.doc_number ?? "";
         setEditPan(panDocVal || vRes.data.pan || "");
         setEditGst(gstDocVal);
+        setEditBillingType(vRes.data.billing_type ?? "PREPAID");
+        setEditCreditLimit(String(vRes.data.credit_limit ?? ""));
+        setEditBillingCycle(vRes.data.billing_cycle ?? "MONTHLY");
+        setEditDueDays(String(vRes.data.payment_due_days ?? 7));
       })
       .catch((err) => setFetchError(err instanceof Error ? err.message : "Failed to load vendor"))
       .finally(() => setLoading(false));
@@ -355,6 +383,23 @@ export default function VendorProfilePage() {
   }
 
   async function handleSaveProfile() {
+    const nextBillingType = editBillingType;
+    const nextLimit = Number(editCreditLimit);
+    const nextDueDays = Number(editDueDays);
+    if (nextBillingType === "POSTPAID") {
+      if (!Number.isFinite(nextLimit) || nextLimit <= 0) {
+        setEditErr("Credit limit must be greater than 0 for postpaid vendors.");
+        return;
+      }
+      if (editBillingCycle !== "WEEKLY" && editBillingCycle !== "MONTHLY") {
+        setEditErr("Billing cycle must be WEEKLY or MONTHLY.");
+        return;
+      }
+      if (!Number.isInteger(nextDueDays) || nextDueDays <= 0) {
+        setEditErr("Payment due days must be greater than 0 for postpaid vendors.");
+        return;
+      }
+    }
     setEditSaving(true); setEditErr("");
     try {
       const res = await vendorsApi.update(id, {
@@ -365,6 +410,11 @@ export default function VendorProfilePage() {
         email:         editEmail.trim(),
         pan:           editPan.trim(),
         gst:           editGst.trim(),
+        billing_type:  nextBillingType,
+        credit_limit:  nextBillingType === "POSTPAID" ? nextLimit : 0,
+        ...(nextBillingType === "PREPAID" ? { outstanding_balance: 0 } : {}),
+        billing_cycle: nextBillingType === "POSTPAID" ? editBillingCycle : "MONTHLY",
+        payment_due_days: nextBillingType === "POSTPAID" ? nextDueDays : 7,
       });
       setVendor(res.data);
       // Refresh docs so PAN/GST numbers update in the overview panel
@@ -494,7 +544,7 @@ export default function VendorProfilePage() {
             )}
           </div>
 
-          {/* 4 Stat cards */}
+          {/* Stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             {loading || !vendor ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -509,9 +559,9 @@ export default function VendorProfilePage() {
             ) : (
               <>
                 <StatCard label="Total Supervisors" value={vendor.totalSupervisors ?? 0}     icon={Users} />
-                <StatCard label="Today's Trips"     value={vendor.totalBookingsToday ?? 0}   icon={Route} />
-                <StatCard label="All-Time Trips"    value={vendor.totalBookingsAllTime ?? 0}  icon={Route} />
                 <StatCard label="Wallet Balance"    value={fmtCurrency(vendor.wallet_balance ?? 0)} icon={IndianRupee} />
+                <StatCard label="Billing Type"      value={vendor.billing_type ?? "PREPAID"} icon={Wallet} />
+                <StatCard label="Status"            value={vendor.status ?? "Active"} icon={CheckCircle2} />
               </>
             )}
           </div>
@@ -626,6 +676,11 @@ export default function VendorProfilePage() {
                     { label: "Phone",          value: vendor?.phone,         icon: Phone },
                     { label: "Email",          value: vendor?.email,         icon: Mail },
                     { label: "City",           value: vendor?.city,          icon: MapPin },
+                    { label: "Billing Type",   value: vendor?.billing_type ?? "PREPAID", icon: Wallet },
+                    { label: "Credit Limit",   value: vendor?.billing_type === "POSTPAID" ? fmtCurrency(Number(vendor.credit_limit ?? 0)) : "—", icon: IndianRupee },
+                    { label: "Outstanding",    value: vendor?.billing_type === "POSTPAID" ? fmtCurrency(Number(vendor.outstanding_balance ?? 0)) : "—", icon: IndianRupee },
+                    { label: "Billing Cycle",  value: vendor?.billing_type === "POSTPAID" ? (vendor.billing_cycle ?? "MONTHLY") : "—", icon: FileText },
+                    { label: "Payment Due",    value: vendor?.billing_type === "POSTPAID" ? `${vendor.payment_due_days ?? 7} days` : "—", icon: FileText },
                     { label: "PAN Number",     value: panDoc?.doc_number,    icon: FileText },
                     { label: "GST Number",     value: gstDoc?.doc_number,    icon: FileText },
                   ];
@@ -661,7 +716,17 @@ export default function VendorProfilePage() {
 
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "trips" && (() => {
-        const tripFilterCount = (tripType !== "All Types" ? 1 : 0) + (tripPeriod !== "all" ? 1 : 0);
+        const tripFilterCount = tripType !== "All Types" ? 1 : 0;
+        const tripDateFilterCount = tripPeriod !== "all" ? 1 : 0;
+        const tripDateButtonLabel =
+          tripPeriod === "today" ? "Today" :
+          tripPeriod === "last7" ? "Last 7 Days" :
+          tripPeriod === "last30" ? "Last 30 Days" :
+          tripPeriod === "custom" && tripDateFrom
+            ? tripDateMode === "single" || !tripDateTo
+              ? tripDateFrom.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+              : `${tripDateFrom.toLocaleDateString("en-IN", { day: "numeric", month: "short" })} - ${tripDateTo.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+            : "Date Range";
         const filtered = trips.filter(t => {
           const q = tripSearch.toLowerCase();
           const matchQ =
@@ -707,7 +772,10 @@ export default function VendorProfilePage() {
 
         // Adapt the API rows into Booking shape so the shared TripsTable +
         // tripRenderers can render them identically to Past Trips.
-        const filteredBookings: Booking[] = filtered.map(tripApiItemToBooking);
+        const vendorName = vendor?.name ?? "";
+        const filteredBookings: Booking[] = filtered.map(t =>
+          Object.assign(tripApiItemToBooking(t), { vendorName }),
+        );
         const tripSupervisorMap = new Map(
           filtered.filter(t => t.supervisorId).map(t => [t.supervisorId as string, t.supervisorName ?? ""]),
         );
@@ -750,9 +818,6 @@ export default function VendorProfilePage() {
                   panelClassName="w-80"
                   onClearAll={() => {
                     setDraftTripType("All Types");
-                    setDraftTripPeriod("all");
-                    setDraftDateFrom(null);
-                    setDraftDateTo(null);
                   }}
                 >
                   <FilterSection label="Trip Type">
@@ -760,8 +825,42 @@ export default function VendorProfilePage() {
                       <FilterPill key={t} label={t} active={draftTripType === t} onClick={() => setDraftTripType(t)} />
                     ))}
                   </FilterSection>
+                </FilterPanel>
+              </div>
 
-                  {/* ── Date Filter ── */}
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={openTripCalendar}
+                  aria-label="Open trip date range calendar"
+                  className={cn(
+                    "relative inline-flex items-center gap-2 h-[42px] px-4 rounded-xl border text-[12.5px] font-medium transition-colors",
+                    tripDateFilterCount > 0
+                      ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  <CalendarDays className="h-[15px] w-[15px] shrink-0" />
+                  <span className="max-w-[190px] truncate">{tripDateButtonLabel}</span>
+                  {tripDateFilterCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-[10px] font-bold text-white flex items-center justify-center">
+                      {tripDateFilterCount}
+                    </span>
+                  )}
+                </button>
+                <FilterPanel
+                  open={tripCalendarOpen}
+                  onClose={cancelTripCalendar}
+                  onCancel={cancelTripCalendar}
+                  onApply={applyTripCalendar}
+                  activeCount={tripDateFilterCount}
+                  panelClassName="w-80"
+                  onClearAll={() => {
+                    setDraftTripPeriod("all");
+                    setDraftDateFrom(null);
+                    setDraftDateTo(null);
+                  }}
+                >
                   {(() => {
                     const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
                     const DAY_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
@@ -919,23 +1018,69 @@ export default function VendorProfilePage() {
 
               <ExportButton
                 onClick={() => {
+                  const tripsSpec = getTableSpec(VENDOR_TRIPS_TABLE_KEY);
+                  const rendererExport = tripsRenderers as Record<string, { csv?: (b: Booking) => string | number }>;
+
                   const rows = filteredBookings.map((b) => {
                     const out: Record<string, string | number> = {};
-                    out["Trip ID"]   = b.bookingRef ?? "";
-                    out["Trip Type"] = b.type ?? "";
-                    out["Route"]     = `${b.pickupLocation} → ${b.dropLocation}`;
-                    out["Supervisor"] = b.supervisorName ?? "";
-                    out["Company"]    = b.bookingSource ?? "";
-                    out["Vehicle"]    = [tripDriverMap.get(b.id)?.vehicleReg, tripDriverMap.get(b.id)?.vehicle].filter(Boolean).join(" · ");
-                    out["Driver"]     = b.driverName ?? "";
-                    out["Status"]     = b.status;
-                    out["Fare"]       = b.fare ?? "";
-                    out["Created At"] = formatIST(b.createdAt) ?? "";
+
+                    tripsVisibleCols.forEach((key) => {
+                      const col = tripsSpec.columns.find((c) => c.key === key);
+                      if (!col) return;
+
+                      if (key === "tripId") {
+                        out["Trip ID"]   = b.bookingRef ?? "";
+                        out["Trip Type"] = b.type ?? "";
+                        return;
+                      }
+
+                      if (key === "route") {
+                        out["Pickup Address"] = b.pickupLocation ?? "";
+                        out["Destination Address"] = b.dropLocation ?? "";
+                        return;
+                      }
+
+                      if (key === "supervisorCompany") {
+                        out["Supervisor"] = tripSupervisorMap.get(b.supervisorId) ?? b.supervisorName ?? "";
+                        out["Company"]    = b.bookingSource ?? "";
+                        return;
+                      }
+
+                      if (key === "vehicle") {
+                        const d = tripDriverMap.get(b.id);
+                        out["Vehicle Number"] = d?.vehicleReg ?? "";
+                        out["Vehicle Model"]  = d?.vehicle ?? "";
+                        out["Vehicle Type"]   = d?.vehicleType ?? "";
+                        return;
+                      }
+
+                      if (key === "pickupLatLng") {
+                        out["Pickup Latitude"]  = b.pickupLat ?? "";
+                        out["Pickup Longitude"] = b.pickupLng ?? "";
+                        return;
+                      }
+
+                      if (key === "dropLatLng") {
+                        out["Drop Latitude"]  = b.dropLat ?? "";
+                        out["Drop Longitude"] = b.dropLng ?? "";
+                        return;
+                      }
+
+                      if (key === "escort") {
+                        const escort = b as Booking & { escortRequired?: boolean; escortPickup?: string | null };
+                        out["Escort Required"] = escort.escortRequired ? "Yes" : "";
+                        return;
+                      }
+
+                      out[col.label] = rendererExport[key]?.csv?.(b) ?? "";
+                    });
+
                     return out;
                   });
-                  exportToCsv(`vendor-${id}-trips`, rows);
+                  exportToXlsx(`vendor-${id}-trips`, rows, "Recent Trips");
                 }}
                 disabled={tripsLoading || filteredBookings.length === 0}
+                label="Export XLSX"
                 className="ml-auto"
               />
             </div>
@@ -953,10 +1098,13 @@ export default function VendorProfilePage() {
               isLoading={tripsLoading}
               prefsLoading={tripsPrefsLoading}
               emptyMessage={trips.length === 0 ? "No trips yet." : "No trips match your filters."}
+              onRowClick={setSelectedBooking}
             />
           </div>
         );
       })()}
+
+      <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
 
       {/* ══ TAB: DOCUMENTS ══ */}
       {activeTab === "documents" && (() => {
@@ -1120,83 +1268,232 @@ export default function VendorProfilePage() {
 
       {/* ══ TAB: SETTINGS ══ */}
       {activeTab === "settings" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+        <div style={{ display:"flex", gap:20 }}>
 
-          {/* Edit Profile */}
-          <div style={{ ...CARD, padding:24 }}>
-            <p style={{ fontSize:15, fontWeight:800, color:"#0f172a", marginBottom:4 }}>Edit Profile</p>
-            <p style={{ fontSize:12.5, color:"#94a3b8", marginBottom:20 }}>Update the vendor&apos;s business details.</p>
-
-            {/* Business info */}
-            <p style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Business Info</p>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
+          {/* Left nav */}
+          <div style={{ width:210, flexShrink:0 }}>
+            <div style={{ ...CARD, padding:6 }}>
               {([
-                { label:"Vendor Name", value:editName, setter:setEditName, placeholder:"Company name" },
-                { label:"City",        value:editCity, setter:setEditCity, placeholder:"City" },
-              ] as { label:string; value:string; setter:(v:string)=>void; placeholder:string }[]).map(({ label, value, setter, placeholder }) => (
-                <div key={label} style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                  <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>{label}</label>
-                  <input value={value} onChange={e => setter(e.target.value)} placeholder={placeholder} style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }} onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE} onBlur={e => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"} />
-                </div>
+                { key:"profile",  label:"Profile" },
+                { key:"security", label:"Account & Security" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setSettingsSection(key)}
+                  style={{ width:"100%", display:"block", textAlign:"left", padding:"10px 14px", borderRadius:10, background: settingsSection === key ? "#EFF6FF" : "transparent", color: settingsSection === key ? BLUE : "#64748b", fontWeight: settingsSection === key ? 700 : 500, fontSize:13.5, cursor:"pointer", border:"none", fontFamily:FONT, transition:"background 0.15s" }}
+                >
+                  {label}
+                </button>
               ))}
-            </div>
-
-            {/* Primary contact */}
-            <p style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Primary Contact</p>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
-              {([
-                { label:"Contact Person", value:editContactPerson, setter:setEditContactPerson, placeholder:"Full name" },
-                { label:"Phone",          value:editPhone,         setter:setEditPhone,         placeholder:"+91 XXXXX XXXXX" },
-              ] as { label:string; value:string; setter:(v:string)=>void; placeholder:string }[]).map(({ label, value, setter, placeholder }) => (
-                <div key={label} style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                  <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>{label}</label>
-                  <input value={value} onChange={e => setter(e.target.value)} placeholder={placeholder} style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }} onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE} onBlur={e => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"} />
-                </div>
-              ))}
-              <div style={{ display:"flex", flexDirection:"column", gap:5, gridColumn: "1 / -1" }}>
-                <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Email Address</label>
-                <input value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="email@example.com" style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }} onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE} onBlur={e => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"} />
-              </div>
-            </div>
-
-            {/* Compliance */}
-            <p style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Compliance</p>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginBottom:20 }}>
-              {([
-                { label:"PAN Number", value:editPan, setter:setEditPan, placeholder:"ABCDE1234F" },
-                { label:"GST Number", value:editGst, setter:setEditGst, placeholder:"22AAAAA0000A1Z5" },
-              ] as { label:string; value:string; setter:(v:string)=>void; placeholder:string }[]).map(({ label, value, setter, placeholder }) => (
-                <div key={label} style={{ display:"flex", flexDirection:"column", gap:5 }}>
-                  <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>{label}</label>
-                  <input value={value} onChange={e => setter(e.target.value.toUpperCase())} placeholder={placeholder} style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc", letterSpacing:"0.04em" }} onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE} onBlur={e => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"} />
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display:"flex", alignItems:"center", gap:12, paddingTop:16, borderTop:"1px solid #f1f5f9" }}>
-              <button onClick={handleSaveProfile} disabled={editSaving} style={{ padding:"9px 22px", borderRadius:9, background:BLUE, border:"none", color:"#fff", fontWeight:700, fontSize:13.5, cursor: editSaving ? "wait" : "pointer", opacity: editSaving ? 0.7 : 1, fontFamily:FONT }}>
-                {editSaving ? "Saving…" : "Save Changes"}
-              </button>
-              {editErr && <p style={{ fontSize:12.5, color:"#dc2626", fontWeight:600 }}>{editErr}</p>}
             </div>
           </div>
 
-          {/* Block / Unblock */}
-          <div style={{ ...CARD, padding:22, border:"1.5px solid #fecaca", background:"#fffafa" }}>
-            <p style={{ fontSize:15, fontWeight:800, color:"#b91c1c", marginBottom:4 }}>Danger Zone</p>
-            <p style={{ fontSize:12.5, color:"#94a3b8", marginBottom:16 }}>Blocking prevents this vendor from accessing the platform.</p>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#fff5f5", border:"1px solid #fecaca", borderRadius:12, padding:"14px 18px" }}>
-              <div>
-                <p style={{ fontSize:13.5, fontWeight:700, color:"#0f172a" }}>{isBlocked ? "Unblock Vendor Account" : "Block Vendor Account"}</p>
-                <p style={{ fontSize:12, color:"#94a3b8", marginTop:2 }}>Currently <strong style={{ color: isBlocked ? "#dc2626" : "#16a34a" }}>{isBlocked ? "Blocked" : "Active"}</strong></p>
-              </div>
-              <button onClick={toggleBlock} disabled={toggling} style={{ display:"flex", alignItems:"center", gap:7, padding:"8px 18px", borderRadius:9, border:"none", background: isBlocked ? "#16a34a" : "#dc2626", color:"#fff", fontWeight:700, fontSize:13, cursor: toggling ? "wait" : "pointer", fontFamily:FONT, opacity: toggling ? 0.7 : 1 }}>
-                {toggling ? <Loader2 style={{ width:14, height:14, animation:"spin 1s linear infinite" }} /> : isBlocked ? <ShieldCheck style={{ width:14, height:14 }} /> : <ShieldOff style={{ width:14, height:14 }} />}
-                {toggling ? "Updating…" : isBlocked ? "Unblock Account" : "Block Account"}
-              </button>
-            </div>
-          </div>
+          {/* Right content */}
+          <div style={{ flex:1, minWidth:0 }}>
 
+            {/* ─ Profile ─ */}
+            {settingsSection === "profile" && (
+              <div style={{ ...CARD, padding:24 }}>
+                <div style={{ marginBottom:20 }}>
+                  <p style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>Edit Profile</p>
+                  <p style={{ fontSize:12.5, color:"#94a3b8", marginTop:3 }}>Update the vendor&apos;s business details</p>
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                  {([
+                    { label:"Vendor Name",    value:editName,          setter:setEditName,          placeholder:"Company name",      upper:false },
+                    { label:"City",           value:editCity,          setter:setEditCity,          placeholder:"City",               upper:false },
+                    { label:"Contact Person", value:editContactPerson, setter:setEditContactPerson, placeholder:"Full name",          upper:false },
+                    { label:"Phone Number",   value:editPhone,         setter:setEditPhone,         placeholder:"+91 XXXXX XXXXX",    upper:false },
+                    { label:"Email Address",  value:editEmail,         setter:setEditEmail,         placeholder:"email@example.com",  upper:false },
+                    { label:"PAN Number",     value:editPan,           setter:setEditPan,           placeholder:"ABCDE1234F",         upper:true  },
+                    { label:"GST Number",     value:editGst,           setter:setEditGst,           placeholder:"22AAAAA0000A1Z5",    upper:true  },
+                  ] as { label:string; value:string; setter:(v:string)=>void; placeholder:string; upper:boolean }[]).map(({ label, value, setter, placeholder, upper }) => (
+                    <div key={label} style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>{label}</label>
+                      <input
+                        value={value}
+                        onChange={e => setter(upper ? e.target.value.toUpperCase() : e.target.value)}
+                        placeholder={placeholder}
+                        style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc", letterSpacing: upper ? "0.04em" : undefined }}
+                        onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE}
+                        onBlur={e  => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginTop:22, paddingTop:20, borderTop:"1px solid #f1f5f9" }}>
+                  <div style={{ marginBottom:14 }}>
+                    <p style={{ fontSize:14, fontWeight:800, color:"#0f172a" }}>Billing Settings</p>
+                    <p style={{ fontSize:12.5, color:"#94a3b8", marginTop:3 }}>
+                      {editBillingType === "PREPAID"
+                        ? "PREPAID: Trips are allowed only when wallet balance is available."
+                        : "POSTPAID: Trips are billed later and controlled by credit limit."}
+                    </p>
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Billing Type</label>
+                      <select
+                        value={editBillingType}
+                        onChange={e => {
+                          const next = e.target.value as VendorBillingType;
+                          setEditBillingType(next);
+                          if (next === "PREPAID") {
+                            setEditCreditLimit("");
+                            setEditBillingCycle("MONTHLY");
+                            setEditDueDays("7");
+                          }
+                        }}
+                        style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }}
+                      >
+                        <option value="PREPAID">PREPAID</option>
+                        <option value="POSTPAID">POSTPAID</option>
+                      </select>
+                    </div>
+
+                    {editBillingType === "POSTPAID" && (
+                      <>
+                        <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                          <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Credit Limit</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={editCreditLimit}
+                            onChange={e => setEditCreditLimit(e.target.value)}
+                            placeholder="50000"
+                            style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }}
+                          />
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                          <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Billing Cycle</label>
+                          <select
+                            value={editBillingCycle}
+                            onChange={e => setEditBillingCycle(e.target.value as VendorBillingCycle)}
+                            style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }}
+                          >
+                            <option value="WEEKLY">WEEKLY</option>
+                            <option value="MONTHLY">MONTHLY</option>
+                          </select>
+                        </div>
+                        <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                          <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Payment Due Days</label>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={editDueDays}
+                            onChange={e => setEditDueDays(e.target.value)}
+                            placeholder="7"
+                            style={{ padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display:"flex", alignItems:"center", gap:12, marginTop:24, paddingTop:20, borderTop:"1px solid #f1f5f9" }}>
+                  <button onClick={handleSaveProfile} disabled={editSaving} style={{ padding:"9px 22px", borderRadius:9, background:BLUE, border:"none", color:"#fff", fontWeight:700, fontSize:13.5, cursor: editSaving ? "wait" : "pointer", opacity: editSaving ? 0.7 : 1, fontFamily:FONT }}>
+                    {editSaving ? "Saving…" : "Save Changes"}
+                  </button>
+                  {editErr && <p style={{ fontSize:12.5, color:"#dc2626", fontWeight:600 }}>{editErr}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* ─ Account & Security ─ */}
+            {settingsSection === "security" && (
+              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+                {/* Update Password */}
+                <div style={{ ...CARD, padding:22 }}>
+                  <p style={{ fontSize:15, fontWeight:800, color:"#0f172a", marginBottom:4 }}>Update Password</p>
+                  <p style={{ fontSize:12.5, color:"#94a3b8", marginBottom:16 }}>Set a new login password for this vendor account.</p>
+
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>New Password</label>
+                      <div style={{ position:"relative" }}>
+                        <input
+                          type={pwShow ? "text" : "password"}
+                          placeholder="Min 8 characters"
+                          value={pwForm.password}
+                          onChange={e => { setPwForm(f => ({ ...f, password: e.target.value })); setPwError(null); setPwSaved(false); }}
+                          style={{ width:"100%", padding:"9px 36px 9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc", boxSizing:"border-box" as const }}
+                          onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE}
+                          onBlur={e  => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPwShow(s => !s)}
+                          style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", padding:4, color:"#94a3b8" }}
+                        >
+                          {pwShow ? <EyeOff style={{ width:16, height:16 }} /> : <Eye style={{ width:16, height:16 }} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                      <label style={{ fontSize:12, fontWeight:600, color:"#334155", fontFamily:FONT }}>Confirm Password</label>
+                      <input
+                        type={pwShow ? "text" : "password"}
+                        placeholder="Confirm the password"
+                        value={pwForm.confirm}
+                        onChange={e => { setPwForm(f => ({ ...f, confirm: e.target.value })); setPwError(null); setPwSaved(false); }}
+                        style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:9, fontSize:13.5, fontFamily:FONT, color:"#0f172a", outline:"none", background:"#fafbfc" }}
+                        onFocus={e => (e.target as HTMLInputElement).style.borderColor = BLUE}
+                        onBlur={e  => (e.target as HTMLInputElement).style.borderColor = "#e2e8f0"}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <button
+                      disabled={pwSaving || !pwForm.password || !pwForm.confirm}
+                      onClick={async () => {
+                        setPwError(null); setPwSaved(false);
+                        if (pwForm.password.length < 8) { setPwError("Password must be at least 8 characters"); return; }
+                        if (pwForm.password !== pwForm.confirm) { setPwError("Passwords do not match"); return; }
+                        setPwSaving(true);
+                        try {
+                          await vendorsApi.updatePassword(id, pwForm.password);
+                          setPwSaved(true);
+                          setPwForm({ password:"", confirm:"" });
+                          setTimeout(() => setPwSaved(false), 3000);
+                        } catch (err) {
+                          setPwError(err instanceof Error ? err.message : "Failed to update password");
+                        } finally { setPwSaving(false); }
+                      }}
+                      style={{ padding:"9px 22px", borderRadius:9, background: pwSaved ? "#22c55e" : BLUE, color:"#fff", fontWeight:700, fontSize:13.5, cursor:(pwSaving || !pwForm.password || !pwForm.confirm) ? "not-allowed" : "pointer", opacity:(pwSaving || !pwForm.password || !pwForm.confirm) ? 0.6 : 1, border:"none", fontFamily:FONT, transition:"background 0.2s" }}
+                    >
+                      {pwSaving ? "Updating…" : pwSaved ? "✓ Updated" : "Update Password"}
+                    </button>
+                    {pwSaved  && !pwError && <p style={{ fontSize:12.5, color:"#22c55e", fontWeight:600 }}>Password updated successfully.</p>}
+                    {pwError  && <p style={{ fontSize:12.5, color:"#dc2626", fontWeight:600 }}>{pwError}</p>}
+                  </div>
+                </div>
+
+                {/* Block / Unblock — Danger Zone */}
+                <div style={{ ...CARD, padding:22, border:"1.5px solid #fecaca", background:"#fffafa" }}>
+                  <p style={{ fontSize:15, fontWeight:800, color:"#b91c1c", marginBottom:4 }}>Danger Zone</p>
+                  <p style={{ fontSize:12.5, color:"#94a3b8", marginBottom:16 }}>Blocking prevents this vendor from accessing the platform.</p>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#fff5f5", border:"1px solid #fecaca", borderRadius:12, padding:"14px 18px" }}>
+                    <div>
+                      <p style={{ fontSize:13.5, fontWeight:700, color:"#0f172a" }}>{isBlocked ? "Unblock Vendor Account" : "Block Vendor Account"}</p>
+                      <p style={{ fontSize:12, color:"#94a3b8", marginTop:2 }}>Currently <strong style={{ color: isBlocked ? "#dc2626" : "#16a34a" }}>{isBlocked ? "Blocked" : "Active"}</strong></p>
+                    </div>
+                    <button onClick={toggleBlock} disabled={toggling} style={{ display:"flex", alignItems:"center", gap:7, padding:"8px 18px", borderRadius:9, border:"none", background: isBlocked ? "#16a34a" : "#dc2626", color:"#fff", fontWeight:700, fontSize:13, cursor: toggling ? "wait" : "pointer", fontFamily:FONT, opacity: toggling ? 0.7 : 1 }}>
+                      {toggling ? <Loader2 style={{ width:14, height:14, animation:"spin 1s linear infinite" }} /> : isBlocked ? <ShieldCheck style={{ width:14, height:14 }} /> : <ShieldOff style={{ width:14, height:14 }} />}
+                      {toggling ? "Updating…" : isBlocked ? "Unblock Account" : "Block Account"}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </div>
         </div>
       )}
 
@@ -1204,17 +1501,23 @@ export default function VendorProfilePage() {
       {viewingDoc && viewingDoc.file_url && (() => {
         const storedType = detectFileType(viewingDoc.file_url);
         const apiBase    = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-        // Always proxy PDFs through the backend — avoids 401/CORS from Cloudinary
-        // regardless of whether the stored URL is /image/upload/ or /raw/upload/.
+        // Always proxy PDFs through the backend — avoids 401/CORS issues for
+        // both legacy Cloudinary URLs and new Google Drive URLs.
         const viewerUrl  = storedType === "pdf"
           ? `${apiBase}/api/superadmin/vendors/${id}/documents/${viewingDoc.doc_type}/download`
           : viewingDoc.file_url;
+        const previewLinkResolver = storedType === "pdf"
+          ? () => vendorsApi.documents
+              .previewLink(id, viewingDoc.doc_type)
+              .then(r => r.data.url)
+          : undefined;
         return (
           <DocumentViewer
             url={viewerUrl}
             fileTypeHint={storedType}
             fileName={DOCS.find(d => d.key === viewingDoc.doc_type)?.label ?? viewingDoc.doc_type}
             onClose={() => setViewingDoc(null)}
+            previewLinkResolver={previewLinkResolver}
           />
         );
       })()}

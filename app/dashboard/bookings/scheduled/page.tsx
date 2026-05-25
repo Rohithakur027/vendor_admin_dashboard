@@ -9,7 +9,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import type { Booking } from "@/modules/bookings/types";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
@@ -390,7 +390,7 @@ export default function ScheduledBookingsPage() {
       }
       return out;
     });
-    exportToCsv("scheduled-trips", rows);
+    exportToXlsx("scheduled-trips", rows, "Scheduled Trips");
   }
 
   return (
@@ -426,7 +426,7 @@ export default function ScheduledBookingsPage() {
           />
 
           <ColumnsPopover tableKey={TABLE_KEY} visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
-          <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" />
+          <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} className="ml-auto" label="Export XLSX" />
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">

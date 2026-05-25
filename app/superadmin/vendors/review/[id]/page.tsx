@@ -123,13 +123,14 @@ export default function VendorReviewPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT, maxWidth: 780 }}>
 
       {/* ── Back + header ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 4 }}>
         <button
-          onClick={() => router.back()}
-          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#64748B", background: "#F1F5F9", border: "none", borderRadius: 9, padding: "7px 13px", cursor: "pointer" }}
+          onClick={() => router.push("/superadmin/vendors")}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1.5px solid #E8EEF4", borderRadius: 10, background: "#fff", color: "#334155", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: FONT }}
         >
-          <ArrowLeft style={{ width: 14, height: 14 }} /> Back
+          <ArrowLeft style={{ width: 16, height: 16 }} /> Back
         </button>
+        <div style={{ width: 1, height: 28, background: "#E8EEF4" }} />
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Vendor Review</h2>
           <p style={{ fontSize: 12.5, color: "#64748B", marginTop: 2 }}>Self-registered vendor — review details and approve or reject</p>

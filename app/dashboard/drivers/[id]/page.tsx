@@ -3,8 +3,9 @@
 import { useParams, useRouter } from "next/navigation";
 import { useVendor } from "@/context/VendorContext";
 import { DriverHistoryMap } from "@/components/DriverHistoryMap";
-import { vendorDriversApi } from "@/lib/api";
-import { useState, useEffect } from "react";
+import { vendorDriversApi, type DriverDocument } from "@/lib/api";
+import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft, Route, TrendingUp, Circle,
   IndianRupee, ArrowRight, User, Phone, Car,
@@ -12,6 +13,12 @@ import {
 } from "lucide-react";
 import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import { STATUS_STYLES } from "@/components/StatusBadge";
+import { detectFileType, type FileType } from "@/components/document-viewer/useDocumentViewer";
+
+const DocumentViewer = dynamic(
+  () => import("@/components/document-viewer/DocumentViewer").then(m => ({ default: m.DocumentViewer })),
+  { ssr: false },
+);
 
 // ── constants ────────────────────────────────────────────────────────────────
 const ACCENT = "#2563EB";
@@ -23,6 +30,12 @@ const CARD_STYLE: React.CSSProperties = {
 };
 
 const DUMMY_WEEKLY = [320, 0, 480, 750, 210, 680, 540];
+const DRIVER_DOCS: { doc_type: string; name: string }[] = [
+  { doc_type: "driving_license", name: "Driving License" },
+  { doc_type: "insurance", name: "Vehicle Insurance" },
+  { doc_type: "tax_certificate", name: "Tax Certificate" },
+  { doc_type: "vehicle_rc", name: "Vehicle RC" },
+];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso: string) {
@@ -134,22 +147,28 @@ function EarningsBar({ pct, color }: { pct: number; color: string }) {
   return <div style={{ height: "100%", width: `${w}%`, background: color, borderRadius: 20, transition: "width 0.7s ease" }} />;
 }
 
+function docBadge(doc?: DriverDocument) {
+  if (!doc?.submitted) {
+    return { label: "Not Submitted", bg: "#F1F5F9", text: "#64748B", border: "#E2E8F0", dot: "#CBD5E1" };
+  }
+  if (doc.is_verified) {
+    return { label: "Verified", bg: "#DCFCE7", text: "#15803D", border: "#BBF7D0", dot: "#22C55E" };
+  }
+  return { label: "Uploaded", bg: "#DBEAFE", text: "#2563EB", border: "#BFDBFE", dot: "#60A5FA" };
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function DriverProfilePage() {
   const { id }   = useParams<{ id: string }>();
   const router   = useRouter();
   const { drivers, bookings, isLoading } = useVendor();
   const [activeTab, setActiveTab] = useState("overview");
+  const [driverDocuments, setDriverDocuments] = useState<DriverDocument[] | null>(null);
+  const [docsLoadedForId, setDocsLoadedForId] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; fileName: string; fileTypeHint?: FileType } | null>(null);
+  const docsLoadedRef = useRef(false);
 
   const driver = drivers.find(d => d.id === id);
-  if (!isLoading && !driver) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p style={{ color: "#64748B" }}>Driver not found.</p>
-        <button onClick={() => router.back()} style={{ fontSize: 13, color: ACCENT, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Go back</button>
-      </div>
-    );
-  }
 
   const font        = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
   const drvInitials = driver ? driver.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() : "";
@@ -199,6 +218,34 @@ export default function DriverProfilePage() {
     { value: "history",  label: "Location History" },
     { value: "settings", label: "Settings" },
   ];
+
+  useEffect(() => {
+    docsLoadedRef.current = false;
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || activeTab !== "settings" || docsLoadedRef.current) return;
+    docsLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await vendorDriversApi.documents(id);
+        setDriverDocuments(res.data);
+        setDocsLoadedForId(id);
+      } catch {
+        setDriverDocuments([]);
+        setDocsLoadedForId(id);
+      }
+    })();
+  }, [id, activeTab]);
+
+  if (!isLoading && !driver) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p style={{ color: "#64748B" }}>Driver not found.</p>
+        <button onClick={() => router.back()} style={{ fontSize: 13, color: ACCENT, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Go back</button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ fontFamily: font, color: "#0F172A" }}>
@@ -717,44 +764,143 @@ export default function DriverProfilePage() {
 
       {/* ══ TAB: SETTINGS ══ */}
       {activeTab === "settings" && (
-        <div style={{ ...CARD_STYLE, padding: 24 }}>
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Driver Information</p>
-            <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Full profile details for this driver</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ ...CARD_STYLE, padding: 24 }}>
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Driver Information</p>
+              <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Full profile details for this driver</p>
+            </div>
+            {(() => {
+              type SettingsEntry =
+                | { label: string; value: string; _skeleton?: false; _key?: never }
+                | { label: string; value: string; _skeleton: true; _key: number };
+
+              const settingsEntries: SettingsEntry[] = isLoading || !driver
+                ? Array.from({ length: 8 }).map((_, i) => ({ label: "", value: "", _skeleton: true, _key: i }))
+                : [
+                  { label: "Full Name",           value: driver.name },
+                  { label: "Phone Number",        value: driver.phone },
+                  { label: "Vehicle",             value: driver.vehicle ?? "—" },
+                  { label: "Vehicle Reg No.",     value: driver.vehicleReg ?? "—" },
+                  { label: "Vehicle Type",        value: driver.vehicleType ?? "—" },
+                  { label: "Vehicle Color",       value: driver.vehicleColor ?? "—" },
+                  { label: "Status",              value: driver.status },
+                  { label: "Assigned Supervisor", value: driver.assignedSupervisorName ?? "None" },
+                ];
+
+              return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              {settingsEntries.map((entry) => (
+                <div key={entry._key ?? entry.label}>
+                  {entry._skeleton ? (
+                    <>
+                      <Skeleton className="h-3 w-24 mb-2" />
+                      <Skeleton className="h-4 w-32" />
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 11.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 5 }}>{entry.label}</p>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{entry.value}</p>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+              );
+            })()}
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
+              <p style={{ fontSize: 12.5, color: "#94A3B8" }}>To edit driver details, use the driver management section.</p>
+            </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {(isLoading || !driver
-              ? Array.from({ length: 8 }).map((_, i) => ({ label: "", value: "", _skeleton: true, _key: i }))
-              : [
-                { label: "Full Name",           value: driver.name },
-                { label: "Phone Number",        value: driver.phone },
-                { label: "Vehicle",             value: driver.vehicle ?? "—" },
-                { label: "Vehicle Reg No.",     value: driver.vehicleReg ?? "—" },
-                { label: "Vehicle Type",        value: driver.vehicleType ?? "—" },
-                { label: "Vehicle Color",       value: driver.vehicleColor ?? "—" },
-                { label: "Status",              value: driver.status },
-                { label: "Assigned Supervisor", value: driver.assignedSupervisorName ?? "None" },
-              ]
-            ).map((entry: any, i: number) => (
-              <div key={entry._key ?? entry.label}>
-                {entry._skeleton ? (
-                  <>
-                    <Skeleton className="h-3 w-24 mb-2" />
-                    <Skeleton className="h-4 w-32" />
-                  </>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 11.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 5 }}>{entry.label}</p>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{entry.value}</p>
-                  </>
-                )}
+
+          <div style={{ ...CARD_STYLE, padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Documents</p>
+                <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Driver licence and vehicle document records</p>
               </div>
-            ))}
-          </div>
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
-            <p style={{ fontSize: 12.5, color: "#94A3B8" }}>To edit driver details, use the driver management section.</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 20, padding: "4px 12px" }}>
+                  {driverDocuments?.length ?? 0} total
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#15803D", background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 20, padding: "4px 12px" }}>
+                  {driverDocuments?.filter(doc => doc.is_verified).length ?? 0} verified
+                </span>
+              </div>
+            </div>
+
+            {docsLoadedForId !== id ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16 }}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} style={{ padding: "14px 0", borderTop: i === 0 ? "1px solid #F1F5F9" : "1px solid #F8FAFC" }}>
+                    <Skeleton className="h-3.5 w-40 mb-2" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16, padding: "11px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+                  {["DOCUMENT", "STATUS", "FILE", "ACTION"].map(h => (
+                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
+                  ))}
+                </div>
+
+                {DRIVER_DOCS.map((def, idx) => {
+                  const doc = driverDocuments?.find(d => d.doc_type === def.doc_type);
+                  const badge = docBadge(doc);
+                  const isLast = idx === DRIVER_DOCS.length - 1;
+                  return (
+                    <div
+                      key={def.doc_type}
+                      style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16, padding: "14px 20px", alignItems: "center", borderBottom: isLast ? "none" : "1px solid #F8FAFC" }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{def.name}</p>
+                        <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>{doc?.doc_number ?? "No document number"}</p>
+                      </div>
+
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: badge.bg, color: badge.text, border: `1px solid ${badge.border}`, width: "fit-content" }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.dot, flexShrink: 0 }} />
+                        {badge.label}
+                      </span>
+
+                      <span style={{ fontSize: 12.5, color: "#334155", fontWeight: 600 }}>
+                        {doc?.expiry_date ? new Date(doc.expiry_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                      </span>
+
+                      <div>
+                        {doc?.file_url ? (
+                          <button
+                            onClick={() => setViewingDoc({
+                              url: doc.file_url!,
+                              fileName: def.name,
+                              fileTypeHint: detectFileType(doc.file_url!),
+                            })}
+                            style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}
+                          >
+                            View
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12.5, color: "#94A3B8", fontStyle: "italic" }}>Not available</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {viewingDoc && (
+        <DocumentViewer
+          url={viewingDoc.url}
+          fileName={viewingDoc.fileName}
+          fileTypeHint={viewingDoc.fileTypeHint}
+          onClose={() => setViewingDoc(null)}
+        />
       )}
 
     </div>

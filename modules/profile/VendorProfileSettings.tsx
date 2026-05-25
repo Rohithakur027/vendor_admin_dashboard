@@ -175,7 +175,7 @@ export function VendorProfileSettings() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-center gap-4">
         <div
           className="h-[60px] w-[60px] rounded-full flex items-center justify-center text-white text-xl font-extrabold shrink-0"
-          style={{ background: isBlocked ? "#94A3B8" : BLUE }}
+          style={{ background: BLUE }}
         >
           {initials(vendor?.name)}
         </div>

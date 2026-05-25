@@ -39,13 +39,17 @@ export function buildTripRenderers(
   supervisorName: (id: string | null | undefined) => string,
   driverFor:      (b: Booking) => DriverInfo,
 ) {
+  function tripLabel(b: Booking) {
+    return b.bookingRef ?? EM_DASH;
+  }
+
   return {
     tripId: {
       header:   () => "TRIP ID & TYPE",
       body:     (b: Booking) => (
         <div className="flex flex-col items-start gap-1 min-w-0">
-          <span className="font-extrabold text-[#111827] text-[13px] truncate" title={b.bookingRef ?? ""}>
-            {b.bookingRef ?? EM_DASH}
+          <span className="font-extrabold text-[#111827] text-[13px] truncate" title={tripLabel(b)}>
+            {tripLabel(b)}
           </span>
           <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-[#eef2ff] text-blue-600 text-[10px] font-bold ring-1 ring-inset ring-blue-100/50">
             {b.type ?? EM_DASH}
@@ -53,7 +57,7 @@ export function buildTripRenderers(
         </div>
       ),
       skeleton: () => (<div className="space-y-2"><Skeleton className="h-3.5 w-16" /><Skeleton className="h-4 w-12 rounded" /></div>),
-      csv:      (b: Booking) => `${b.bookingRef ?? ""}${b.type ? ` · ${b.type}` : ""}`,
+      csv:      (b: Booking) => `${tripLabel(b)}${b.type ? ` · ${b.type}` : ""}`,
     },
     route: {
       header:   () => "ROUTE",
@@ -116,6 +120,17 @@ export function buildTripRenderers(
         const d = driverFor(b);
         return [d.vehicleReg, d.vehicle].filter(Boolean).join(" · ");
       },
+    },
+    vendor: {
+      header:   () => "VENDOR",
+      body:     (b: Booking) => {
+        const vendorName = (b as Booking & { vendorName?: string | null }).vendorName ?? (b.bookingSource ?? "");
+        return vendorName
+          ? <span className="text-[13px] font-medium text-slate-600 truncate block" title={vendorName}>{vendorName}</span>
+          : <span className="text-[13px] text-slate-300 italic">{EM_DASH}</span>;
+      },
+      skeleton: () => <Skeleton className="h-3.5 w-24" />,
+      csv:      (b: Booking) => (b as Booking & { vendorName?: string | null }).vendorName ?? (b.bookingSource ?? ""),
     },
     driver: {
       header:   () => "DRIVER",

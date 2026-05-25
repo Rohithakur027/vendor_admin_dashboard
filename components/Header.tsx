@@ -46,10 +46,6 @@ export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void })
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-          <div className="flex flex-col items-end leading-tight">
-            <span className="text-sm font-semibold">{displayName}</span>
-            <span className="text-xs text-slate-500">{roleLabel}</span>
-          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem className="gap-2">

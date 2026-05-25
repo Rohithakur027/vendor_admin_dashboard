@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useVendor } from "@/context/VendorContext";
 import { reportsApi, type SupervisorSummaryData } from "@/lib/api";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   A, fmt, fmtINRk, toIsoDate,
@@ -13,6 +13,7 @@ import { SvgBarChart, SvgDonut } from "./charts";
 import { DateRangePicker } from "./DateRangePicker";
 import { Route } from "lucide-react";
 import { ExportButton } from "@/components/ExportButton";
+import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import { SearchBar } from "@/components/SearchBar";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
@@ -50,6 +51,7 @@ export function PanelSupervisorReport({
   const [hourlyExpand,    setHourlyExpand]    = useState(false);
   const [dailyExpand,     setDailyExpand]     = useState(false);
   const [companyVisualize, setCompanyVisualize] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const supervisor = supervisorId === "all" ? null : supervisors.find((s) => s.id === supervisorId) ?? null;
 
@@ -215,34 +217,12 @@ export function PanelSupervisorReport({
         const col = tripsSpec.columns.find(c => c.key === k);
         if (!col) continue;
 
-        if (k === "tripId") {
-          out["Trip ID"]   = b.bookingRef ?? "";
-          out["Trip Type"] = b.type ?? "";
-          continue;
-        }
-        if (k === "route") {
-          out["Pickup Address"]      = b.pickupLocation;
-          out["Destination Address"] = b.dropLocation;
-          continue;
-        }
-        if (k === "supervisorCompany") {
-          out["Supervisor"] = supervisorLookup(b.supervisorId);
-          out["Company"]    = b.bookingSource ?? "";
-          continue;
-        }
-        if (k === "vehicle") {
-          const d = driverFor(b);
-          out["Vehicle Reg"]   = d.vehicleReg ?? "";
-          out["Vehicle Model"] = d.vehicle    ?? "";
-          continue;
-        }
-
         const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
         out[col.label] = r ? r.csv(b) : "";
       }
       return out;
     });
-    exportToCsv(`trips-${title.replace(/\s+/g, "-").toLowerCase()}-${dateFrom}-to-${dateTo}`, rows);
+    exportToXlsx(`trips-${title.replace(/\s+/g, "-").toLowerCase()}-${dateFrom}-to-${dateTo}`, rows, "Trips");
   }
 
   if (loading) return <ReportSkeleton hideHeader={hideHeader} statCount={3} />;
@@ -321,6 +301,7 @@ export function PanelSupervisorReport({
               onClick={handleExportTrips}
               disabled={filteredTrips.length === 0}
               className="ml-auto"
+              label="Export XLSX"
             />
           </>
         )}
@@ -623,8 +604,9 @@ export function PanelSupervisorReport({
                   filteredTrips.map((booking) => (
                     <div
                       key={booking.id}
-                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors group"
+                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 transition-colors group cursor-pointer"
                       style={{ gridTemplateColumns: gridTemplate }}
+                      onClick={() => setSelectedBooking(booking)}
                     >
                       {visibleCols.map((k, j) => {
                         const r = (renderers as Record<string, { body: (b: Booking) => React.ReactNode }>)[k];
@@ -646,6 +628,8 @@ export function PanelSupervisorReport({
         </div>
         </div>
       )}
+
+      <BookingDetailModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
 
       {companyVisualize && (() => {
         const palette = [A, "#93C5FD", "#FB923C", "#10B981", "#A78BFA", "#F472B6", "#FBBF24", "#22D3EE", "#34D399", "#F87171"];

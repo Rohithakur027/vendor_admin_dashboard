@@ -22,8 +22,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SK Travels — Vendor Dashboard",
-  description: "Vendor management portal for SK Travels",
+  title: "SK Voyages — Vendor Dashboard",
+  description: "Vendor management portal for SK Voyages",
 };
 
 export const viewport: Viewport = {

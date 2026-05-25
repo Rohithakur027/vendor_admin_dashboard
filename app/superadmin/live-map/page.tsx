@@ -7,6 +7,7 @@ import { Navigation, Circle, Search, AlertCircle, ChevronRight, ChevronLeft, X, 
 import { superadminApi, type LiveDriver, type LiveLocationEvent, type LocationHistoryPoint } from "@/lib/api";
 import { getSocket } from "@/lib/socket";
 import type { DriverStatusEvent } from "@/lib/useDriverStatusFeed";
+import { CustomDatePicker, CustomTimePicker, format12h } from "@/components/HistoryPickers";
 
 const ACCENT = "#2563EB";
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
@@ -37,7 +38,7 @@ function carSvg(body: string, sos = false): string {
 }
 
 function popupHtml(d: LiveDriver): string {
-  const plate  = d.vehicle?.plate ?? "—";
+  const plate  = d.vehicle?.plate ?? d.driver_ref ?? "—";
   const veh    = d.vehicle ? `${d.vehicle.model ?? ""}${d.vehicle.type ? `  ·  ${d.vehicle.type}` : ""}` : "No vehicle";
   const ref    = d.driver_ref ?? d.driver_id.slice(0, 8);
   const vendor = d.vendor?.name ?? "—";
@@ -50,13 +51,13 @@ function popupHtml(d: LiveDriver): string {
   return `
     <div onclick="window.__liveMapSelectDriver('${d.driver_id}',${d.lat},${d.lng})" style="font-family:system-ui,sans-serif;min-width:210px;cursor:pointer;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
-        <span style="font-size:13px;font-weight:800;color:#0F172A;">${escapeHtml(d.name)}</span>
+        <span style="font-size:14px;font-weight:800;color:#0F172A;font-family:monospace;letter-spacing:0.3px;">${escapeHtml(plate)}</span>
         ${badge}
       </div>
+      <div style="font-size:12.5px;font-weight:700;color:#1E293B;margin-bottom:2px;">${escapeHtml(d.name)}</div>
       <div style="font-size:11px;color:#64748B;margin-bottom:8px;">${escapeHtml(d.phone)}</div>
       <div style="background:#F1F5F9;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
-        <div style="font-size:13.5px;font-weight:800;color:#0F172A;letter-spacing:0.6px;font-family:monospace;">${escapeHtml(plate)}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:3px;">${escapeHtml(veh)}</div>
+        <div style="font-size:11px;color:#475569;">${escapeHtml(veh)}</div>
       </div>
       <div style="border-top:1px solid #F1F5F9;padding-top:7px;">
         <div style="font-size:9.5px;color:#94A3B8;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:3px;">${escapeHtml(ref)} · ${escapeHtml(vendor)}</div>
@@ -219,6 +220,36 @@ function removeHistoryLayers(map: mapboxgl.Map): void {
   if (map.getSource(HIST_SOURCE)) map.removeSource(HIST_SOURCE);
 }
 
+function addTrafficToMap(map: mapboxgl.Map, visible: boolean): void {
+  if (!map.getSource("mapbox-traffic")) {
+    map.addSource("mapbox-traffic", {
+      type: "vector",
+      url: "mapbox://mapbox.mapbox-traffic-v1",
+    });
+  }
+  if (!map.getLayer("traffic-lines")) {
+    map.addLayer({
+      id: "traffic-lines",
+      type: "line",
+      source: "mapbox-traffic",
+      "source-layer": "traffic",
+      layout: { visibility: visible ? "visible" : "none" },
+      paint: {
+        "line-width": 3,
+        "line-color": [
+          "match",
+          ["get", "congestion"],
+          "low",      "#00E653",
+          "moderate", "#FFD600",
+          "heavy",    "#E65100",
+          "severe",   "#C50000",
+          "#CBD5E1",
+        ] as mapboxgl.Expression,
+      },
+    });
+  }
+}
+
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
@@ -270,11 +301,14 @@ export default function LiveMapPage() {
 
   const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef          = useRef<mapboxgl.Map | null>(null);
-  const markersRef      = useRef<Record<string, MarkerRef>>({});
-  const driversRef      = useRef<LiveDriver[]>([]);
-  const modeRef         = useRef<"live" | "history">("live");
+  const [trafficEnabled, setTrafficEnabled] = useState(false);
+
+  const mapContainerRef    = useRef<HTMLDivElement>(null);
+  const mapRef             = useRef<mapboxgl.Map | null>(null);
+  const markersRef         = useRef<Record<string, MarkerRef>>({});
+  const driversRef         = useRef<LiveDriver[]>([]);
+  const modeRef            = useRef<"live" | "history">("live");
+  const trafficEnabledRef  = useRef(false);
   driversRef.current = drivers;
   modeRef.current    = mode;
 
@@ -378,6 +412,17 @@ export default function LiveMapPage() {
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
     setMapReady(true);
+
+    let styleLoaded = false;
+    map.on("load", () => {
+      styleLoaded = true;
+      addTrafficToMap(map, trafficEnabledRef.current);
+    });
+    map.on("style.load", () => {
+      if (!styleLoaded) return;
+      addTrafficToMap(map, trafficEnabledRef.current);
+    });
+
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(mapContainerRef.current);
     return () => {
@@ -503,6 +548,16 @@ export default function LiveMapPage() {
     mapRef.current?.flyTo({ center: [d.lng, d.lat], zoom: 14, duration: 900, essential: true });
   }
 
+  function toggleTraffic() {
+    const next = !trafficEnabledRef.current;
+    trafficEnabledRef.current = next;
+    setTrafficEnabled(next);
+    const map = mapRef.current;
+    if (map && map.isStyleLoaded() && map.getLayer("traffic-lines")) {
+      map.setLayoutProperty("traffic-lines", "visibility", next ? "visible" : "none");
+    }
+  }
+
   const onlineCount  = drivers.filter((d) => d.is_online).length;
   const offlineCount = drivers.filter((d) => !d.is_online).length;
 
@@ -572,6 +627,69 @@ export default function LiveMapPage() {
           </span>
         ))}
       </div>
+
+      {/* Traffic toggle button — left side, below legend */}
+      <button
+        onClick={toggleTraffic}
+        style={{
+          position: "absolute", top: 122, left: 16, zIndex: 10,
+          display: "flex", alignItems: "center", gap: 7,
+          padding: "7px 13px",
+          background: trafficEnabled ? ACCENT : "rgba(255,255,255,0.97)",
+          border: `1.5px solid ${trafficEnabled ? "#1d4ed8" : "rgba(226,232,240,0.9)"}`,
+          borderRadius: 11,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.10)",
+          backdropFilter: "blur(8px)",
+          cursor: "pointer",
+          fontFamily: font,
+          fontSize: 12,
+          fontWeight: 700,
+          color: trafficEnabled ? "#fff" : "#0F172A",
+          userSelect: "none",
+        }}
+        title={trafficEnabled ? "Hide traffic layer" : "Show traffic layer"}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="9" y="2" width="6" height="20" rx="3" stroke="currentColor" strokeWidth="2"/>
+          <circle cx="12" cy="7"  r="1.8" fill={trafficEnabled ? "#fca5a5" : "#EF4444"}/>
+          <circle cx="12" cy="12" r="1.8" fill={trafficEnabled ? "#fde68a" : "#F59E0B"}/>
+          <circle cx="12" cy="17" r="1.8" fill={trafficEnabled ? "#bbf7d0" : "#22C55E"}/>
+        </svg>
+        Traffic
+        <span style={{
+          fontSize: 9.5, fontWeight: 800, padding: "1px 6px", borderRadius: 4,
+          background: trafficEnabled ? "rgba(255,255,255,0.22)" : "#F1F5F9",
+          color: trafficEnabled ? "#fff" : "#64748B",
+          letterSpacing: 0.3,
+        }}>
+          {trafficEnabled ? "ON" : "OFF"}
+        </span>
+      </button>
+
+      {/* Traffic color legend — shown when traffic is ON */}
+      {trafficEnabled && (
+        <div style={{
+          position: "absolute", top: 166, left: 16, zIndex: 10,
+          background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)",
+          border: "1.5px solid rgba(226,232,240,0.9)",
+          borderRadius: 11, padding: "9px 12px",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          fontFamily: font,
+        }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 7 }}>Traffic</div>
+          {[
+            { label: "Low",      color: "#00E653" },
+            { label: "Moderate", color: "#FFD600" },
+            { label: "Heavy",    color: "#E65100" },
+            { label: "Severe",   color: "#C50000" },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+              <div style={{ width: 18, height: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#334155" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
@@ -749,20 +867,16 @@ export default function LiveMapPage() {
                         onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
                         onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
                       >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{d.name}</span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 800, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.3px" }}>{d.vehicle?.plate ?? d.driver_ref ?? "—"}</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 700, color: d.is_online ? "#16A34A" : "#94A3B8" }}>
                             <Circle className="h-2 w-2 fill-current" /> {d.is_online ? "Online" : "Offline"}
                           </span>
                         </div>
-                        {d.vehicle && (
-                          <div style={{ fontSize: 11.5, color: "#64748B", fontFamily: "monospace" }}>
-                            {d.vehicle.plate}{d.vehicle.model ? ` · ${d.vehicle.model}` : ""}
-                          </div>
-                        )}
-                        {!d.vehicle && d.driver_ref && (
-                          <div style={{ fontSize: 11.5, color: "#94A3B8" }}>{d.driver_ref}</div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{d.name}</span>
+                          {d.vehicle?.model && <span style={{ fontSize: 11, color: "#94A3B8" }}>· {d.vehicle.model}</span>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -782,14 +896,13 @@ export default function LiveMapPage() {
                   <div style={{ flex: 1, overflowY: "auto", padding: "16px 14px" }}>
                     {/* Driver info */}
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", marginBottom: 2 }}>{histDriver.name}</div>
-                      {histDriver.vehicle ? (
-                        <div style={{ fontSize: 12, color: "#64748B", fontFamily: "monospace" }}>
-                          {histDriver.vehicle.plate}{histDriver.vehicle.model ? ` · ${histDriver.vehicle.model}` : ""}
-                        </div>
-                      ) : histDriver.driver_ref ? (
-                        <div style={{ fontSize: 12, color: "#94A3B8" }}>{histDriver.driver_ref}</div>
-                      ) : null}
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A", fontFamily: "monospace", letterSpacing: "0.3px", marginBottom: 2 }}>
+                        {histDriver.vehicle?.plate ?? histDriver.driver_ref ?? "—"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{histDriver.name}</span>
+                        {histDriver.vehicle?.model && <span style={{ fontSize: 12, color: "#94A3B8" }}>· {histDriver.vehicle.model}</span>}
+                      </div>
                     </div>
 
                     {/* Date + time range selector */}
@@ -841,54 +954,47 @@ export default function LiveMapPage() {
                           </div>
 
                           {/* Date card (custom display over hidden native input) */}
-                          <div className="hist-date-card" style={{ marginBottom: 10 }}>
-                            <div
-                              className="hist-date-display"
-                              style={{
-                                display: "flex", alignItems: "center", gap: 12,
-                                height: 50, padding: "0 14px",
-                                borderRadius: 11,
-                                background: "#F8FAFC",
-                                border: "1.5px solid #E2E8F0",
-                                transition: "all 0.15s",
-                              }}
-                            >
-                              <div style={{
-                                width: 34, height: 34, borderRadius: 9,
-                                background: "#EFF6FF",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                flexShrink: 0,
-                              }}>
-                                <Calendar className="h-4 w-4" style={{ color: ACCENT }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                                  Date
+                          <div style={{ marginBottom: 10 }}>
+                            <CustomDatePicker value={histDate} onChange={(v) => setHistDate(v)}>
+                              <div
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 12,
+                                  height: 50, padding: "0 14px",
+                                  borderRadius: 11,
+                                  background: "#F8FAFC",
+                                  border: "1.5px solid #E2E8F0",
+                                  transition: "all 0.15s",
+                                }}
+                              >
+                                <div style={{
+                                  width: 34, height: 34, borderRadius: 9,
+                                  background: "#F1F5F9",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  flexShrink: 0,
+                                }}>
+                                  <Calendar className="h-4 w-4" style={{ color: "#475569" }} />
                                 </div>
-                                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", marginTop: 1 }}>
-                                  {formatDateLong(histDate)}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                    Date
+                                  </div>
+                                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", marginTop: 1 }}>
+                                    {formatDateLong(histDate)}
+                                  </div>
                                 </div>
+                                <ChevronRight className="h-4 w-4" style={{ color: "#94A3B8", flexShrink: 0 }} />
                               </div>
-                              <ChevronRight className="h-4 w-4" style={{ color: "#94A3B8", flexShrink: 0 }} />
-                            </div>
-                            <input
-                              type="date"
-                              value={histDate}
-                              max={todayStr}
-                              onChange={(e) => { if (e.target.value) setHistDate(e.target.value); }}
-                              aria-label="Pick date"
-                            />
+                            </CustomDatePicker>
                           </div>
 
                           {/* Time row */}
                           <div style={{ display: "flex", alignItems: "stretch", gap: 8, marginBottom: 10 }}>
                             {/* From */}
-                            <div className="hist-time-card">
+                            <CustomTimePicker value={histStartTime} onChange={v => setHistStartTime(v)}>
                               <div
-                                className="hist-time-display"
                                 style={{
-                                  display: "flex", alignItems: "center", gap: 10,
-                                  height: 50, padding: "0 12px",
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  height: 50, padding: "0 10px",
                                   borderRadius: 11,
                                   background: "#F8FAFC",
                                   border: "1.5px solid #E2E8F0",
@@ -897,28 +1003,22 @@ export default function LiveMapPage() {
                               >
                                 <div style={{
                                   width: 32, height: 32, borderRadius: 9,
-                                  background: "#DCFCE7",
+                                  background: "#F1F5F9",
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   flexShrink: 0,
                                 }}>
-                                  <Clock className="h-4 w-4" style={{ color: "#15803D" }} />
+                                  <Clock className="h-4 w-4" style={{ color: "#475569" }} />
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>
                                     From
                                   </div>
-                                  <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginTop: 1, fontVariantNumeric: "tabular-nums" }}>
-                                    {histStartTime}
+                                  <div style={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A", marginTop: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {format12h(histStartTime)}
                                   </div>
                                 </div>
                               </div>
-                              <input
-                                type="time"
-                                value={histStartTime}
-                                onChange={(e) => { if (e.target.value) setHistStartTime(e.target.value); }}
-                                aria-label="From time"
-                              />
-                            </div>
+                            </CustomTimePicker>
 
                             {/* Separator */}
                             <div style={{ display: "flex", alignItems: "center", color: "#CBD5E1", flexShrink: 0 }}>
@@ -926,12 +1026,11 @@ export default function LiveMapPage() {
                             </div>
 
                             {/* To */}
-                            <div className="hist-time-card">
+                            <CustomTimePicker value={histEndTime} onChange={v => setHistEndTime(v)} align="right">
                               <div
-                                className="hist-time-display"
                                 style={{
-                                  display: "flex", alignItems: "center", gap: 10,
-                                  height: 50, padding: "0 12px",
+                                  display: "flex", alignItems: "center", gap: 8,
+                                  height: 50, padding: "0 10px",
                                   borderRadius: 11,
                                   background: "#F8FAFC",
                                   border: "1.5px solid #E2E8F0",
@@ -940,28 +1039,22 @@ export default function LiveMapPage() {
                               >
                                 <div style={{
                                   width: 32, height: 32, borderRadius: 9,
-                                  background: "#FEE2E2",
+                                  background: "#F1F5F9",
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   flexShrink: 0,
                                 }}>
-                                  <Clock className="h-4 w-4" style={{ color: "#B91C1C" }} />
+                                  <Clock className="h-4 w-4" style={{ color: "#475569" }} />
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>
                                     To
                                   </div>
-                                  <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginTop: 1, fontVariantNumeric: "tabular-nums" }}>
-                                    {histEndTime}
+                                  <div style={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A", marginTop: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {format12h(histEndTime)}
                                   </div>
                                 </div>
                               </div>
-                              <input
-                                type="time"
-                                value={histEndTime}
-                                onChange={(e) => { if (e.target.value) setHistEndTime(e.target.value); }}
-                                aria-label="To time"
-                              />
-                            </div>
+                            </CustomTimePicker>
                           </div>
 
                           {/* Entire-day shortcut */}

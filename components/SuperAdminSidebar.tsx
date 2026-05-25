@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutGrid, Building2, Users, Shield, ClipboardCheck, BarChart2, MapPin,
-  ChevronLeft, ChevronRight, Settings, MessageSquare, LogOut,
+  ChevronLeft, ChevronRight, UserCog, MessageSquare, LogOut, FileText,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
+  subItems?: { label: string; href: string; reportType?: "vendor" | "driver" }[];
   // null = always shown; otherwise hidden for superadmin_member without this permission.
   permission?: keyof typeof SUPERADMIN_PERMISSION_KEYS | null;
   // true = hidden from superadmin_member entirely (e.g. team management).
@@ -28,8 +29,18 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { label: "Drivers",           href: "/superadmin/drivers",           icon: Users,         permission: "DRIVER_MANAGEMENT" },
   { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck, permission: "DRIVER_MANAGEMENT" },
   { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare, permission: "TRIP_MONITORING" },
-  { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2,     permission: "REPORTS_MANAGEMENT" },
-  { label: "Settings",          href: "/superadmin/settings",          icon: Settings,      permission: null, adminOnly: true },
+  { label: "Invoices",          href: "/superadmin/invoices",          icon: FileText,      permission: "REPORTS_MANAGEMENT" },
+  {
+    label: "Reports",
+    href: "/superadmin/reports?type=vendor",
+    icon: BarChart2,
+    permission: "REPORTS_MANAGEMENT",
+    subItems: [
+      { label: "Vendor Report", href: "/superadmin/reports?type=vendor", reportType: "vendor" },
+      { label: "Driver Report", href: "/superadmin/reports?type=driver", reportType: "driver" },
+    ],
+  },
+  { label: "User Management",   href: "/superadmin/settings",          icon: UserCog,       permission: null, adminOnly: true },
 ];
 
 function getInitials(name: string): string {
@@ -61,9 +72,10 @@ export function SuperAdminSidebar({
   onMobileOpenChange: (open: boolean) => void;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, logout } = useAuth();
   const isMember     = user?.role === "superadmin_member";
-  const brandName    = "SK Travels";
+  const brandName    = "SK Voyages";
   const displayName  = isMember ? (user?.full_name?.trim() || brandName) : brandName;
   const roleLabel    = isMember ? (user?.role_label?.trim() || "Team Member") : "Super Admin";
   const initials     = getInitials(displayName);
@@ -110,7 +122,7 @@ export function SuperAdminSidebar({
               <Shield className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-none">SK Travels</p>
+              <p className="font-bold text-sm leading-none">SK Voyages</p>
               <p className="text-xs text-muted-foreground mt-0.5">Super Admin</p>
             </div>
           </div>
@@ -119,8 +131,10 @@ export function SuperAdminSidebar({
 
       {/* Nav */}
       <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active = href === "/superadmin" ? pathname === href : pathname.startsWith(href);
+        {navItems.map(({ label, href, icon: Icon, subItems }) => {
+          const baseHref = href.split("?")[0];
+          const active = baseHref === "/superadmin" ? pathname === baseHref : pathname.startsWith(baseHref);
+          const reportType = searchParams.get("type") === "driver" ? "driver" : "vendor";
           const link = (
             <Link
               href={href}
@@ -141,6 +155,28 @@ export function SuperAdminSidebar({
           return (
             <div key={href}>
               {isCollapsed ? <NavTooltip label={label}>{link}</NavTooltip> : link}
+              {!isCollapsed && subItems && active && (
+                <div className="mt-1 ml-7 space-y-1">
+                  {subItems.map((sub) => {
+                    const subActive = pathname === "/superadmin/reports" && sub.reportType === reportType;
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        onClick={onLinkClick}
+                        className={cn(
+                          "block rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                          subActive
+                            ? "bg-blue-50 text-blue-600"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        {sub.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
