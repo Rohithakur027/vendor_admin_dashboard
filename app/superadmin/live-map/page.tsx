@@ -26,14 +26,14 @@ const DRIVER_MARKER_PNG = {
 } as const;
 
 function popupHtml(d: LiveDriver): string {
-  const plate  = d.vehicle?.plate ?? d.driver_ref ?? "—";
-  const veh    = d.vehicle ? `${d.vehicle.model ?? ""}${d.vehicle.type ? `  ·  ${d.vehicle.type}` : ""}` : "No vehicle";
-  const ref    = d.driver_ref ?? d.driver_id.slice(0, 8);
+  const plate = d.vehicle?.plate ?? d.driver_ref ?? "—";
+  const veh = d.vehicle ? `${d.vehicle.model ?? ""}${d.vehicle.type ? `  ·  ${d.vehicle.type}` : ""}` : "No vehicle";
+  const ref = d.driver_ref ?? d.driver_id.slice(0, 8);
   const vendor = d.vendor?.name ?? "—";
-  const route  = d.trip
+  const route = d.trip
     ? `${d.trip.from} <span style="color:#CBD5E1;margin:0 3px;">→</span> ${d.trip.to}`
     : "Idle — no active trip";
-  const badge  = !d.is_online
+  const badge = !d.is_online
     ? `<span style="background:#F1F5F9;color:#475569;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;"><span style="width:5px;height:5px;border-radius:50%;background:#94A3B8;display:inline-block;"></span>Offline</span>`
     : `<span style="background:#DCFCE7;color:#15803D;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;"><span style="width:5px;height:5px;border-radius:50%;background:#16A34A;display:inline-block;"></span>${d.status}</span>`;
   return `
@@ -146,16 +146,27 @@ function markerDotColor(d: LiveDriver): string {
   return "#22C55E";
 }
 
+function markerCarFilter(d: LiveDriver): string {
+  const sos = (d as unknown as { sos?: boolean }).sos === true;
+  if (sos) return "hue-rotate(0deg)"; // SOS is red
+  if (!d.is_online) return "hue-rotate(0deg)"; // Offline is red
+  if (d.status === "On Trip") {
+    return "hue-rotate(220deg) saturate(1.3) brightness(0.95)"; // Blue (#3B82F6 style)
+  }
+  return "hue-rotate(135deg) saturate(1.2) brightness(0.95)"; // Green (#22C55E style)
+}
+
 function createMarkerEl(d: LiveDriver, selected: boolean): HTMLDivElement {
   const el = document.createElement("div");
   el.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;position:relative;overflow:visible;";
-  const c     = markerColors(d, selected);
-  const dot   = markerDotColor(d);
+  const c = markerColors(d, selected);
+  const dot = markerDotColor(d);
   const plate = d.vehicle?.plate ?? d.driver_ref ?? "DRIVER";
+  const carFilter = markerCarFilter(d);
   el.innerHTML = `
     <div class="car-wrap" style="position:relative;filter:${c.glow};transition:filter 0.2s;overflow:visible;">
       <span class="status-dot" style="position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:12px;height:12px;border-radius:50%;background:${dot};border:2px solid #fff;box-shadow:0 0 0 3px rgba(255,255,255,0.88), 0 0 10px ${dot}88;z-index:4;"></span>
-      <img class="car-img" src="${DRIVER_MARKER_SRC}" alt="" width="46" height="48" draggable="false" style="display:block;width:46px;height:48px;user-select:none;-webkit-user-drag:none;" />
+      <img class="car-img" src="${DRIVER_MARKER_SRC}" alt="" width="46" height="48" draggable="false" style="display:block;width:46px;height:48px;user-select:none;-webkit-user-drag:none;filter:${carFilter};transition:filter 0.2s;" />
     </div>
     <span class="reg-lbl" style="background:${selected ? ACCENT : "#fff"};color:${selected ? "#fff" : "#0F172A"};font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;box-shadow:0 2px 8px rgba(0,0,0,0.16);white-space:nowrap;font-family:monospace;letter-spacing:0.5px;margin-top:-2px;">${escapeHtml(plate)}</span>
   `;
@@ -163,25 +174,26 @@ function createMarkerEl(d: LiveDriver, selected: boolean): HTMLDivElement {
 }
 
 function updateMarkerStyle(el: HTMLDivElement, d: LiveDriver, selected: boolean, plate: string) {
-  const dot  = el.querySelector(".status-dot") as HTMLSpanElement | null;
+  const dot = el.querySelector(".status-dot") as HTMLSpanElement | null;
   const wrap = el.querySelector(".car-wrap") as HTMLDivElement | null;
-  const img  = el.querySelector(".car-img")  as HTMLImageElement | null;
-  const lbl  = el.querySelector(".reg-lbl")  as HTMLSpanElement | null;
+  const img = el.querySelector(".car-img") as HTMLImageElement | null;
+  const lbl = el.querySelector(".reg-lbl") as HTMLSpanElement | null;
   if (!dot || !wrap || !img || !lbl) return;
   const c = markerColors(d, selected);
   dot.style.background = markerDotColor(d);
   dot.style.boxShadow = `0 0 0 3px rgba(255,255,255,0.88), 0 0 10px ${markerDotColor(d)}88`;
   img.src = DRIVER_MARKER_SRC;
+  img.style.filter = markerCarFilter(d);
   wrap.style.filter = c.glow;
   lbl.style.background = selected ? ACCENT : "#fff";
-  lbl.style.color      = selected ? "#fff" : "#0F172A";
+  lbl.style.color = selected ? "#fff" : "#0F172A";
   lbl.textContent = plate;
 }
 
 /* ── History layer helpers ──────────────────────────────────────────── */
 const HIST_SOURCE = "driver-history";
-const HIST_LINE   = "driver-history-line";
-const HIST_DOTS   = "driver-history-dots";
+const HIST_LINE = "driver-history-line";
+const HIST_DOTS = "driver-history-dots";
 
 function addHistoryLayers(map: mapboxgl.Map, points: LocationHistoryPoint[]): void {
   const coords = points.map((p) => [p.lng, p.lat]);
@@ -190,9 +202,9 @@ function addHistoryLayers(map: mapboxgl.Map, points: LocationHistoryPoint[]): vo
     data: {
       type: "FeatureCollection",
       features: [
-        { type: "Feature", properties: {},              geometry: { type: "LineString", coordinates: coords } },
-        { type: "Feature", properties: { pt: "start" }, geometry: { type: "Point",      coordinates: coords[0] } },
-        { type: "Feature", properties: { pt: "end" },   geometry: { type: "Point",      coordinates: coords[coords.length - 1] } },
+        { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } },
+        { type: "Feature", properties: { pt: "start" }, geometry: { type: "Point", coordinates: coords[0] } },
+        { type: "Feature", properties: { pt: "end" }, geometry: { type: "Point", coordinates: coords[coords.length - 1] } },
       ],
     },
   });
@@ -215,8 +227,8 @@ function addHistoryLayers(map: mapboxgl.Map, points: LocationHistoryPoint[]): vo
 }
 
 function removeHistoryLayers(map: mapboxgl.Map): void {
-  if (map.getLayer(HIST_DOTS))   map.removeLayer(HIST_DOTS);
-  if (map.getLayer(HIST_LINE))   map.removeLayer(HIST_LINE);
+  if (map.getLayer(HIST_DOTS)) map.removeLayer(HIST_DOTS);
+  if (map.getLayer(HIST_LINE)) map.removeLayer(HIST_LINE);
   if (map.getSource(HIST_SOURCE)) map.removeSource(HIST_SOURCE);
 }
 
@@ -239,10 +251,10 @@ function addTrafficToMap(map: mapboxgl.Map, visible: boolean): void {
         "line-color": [
           "match",
           ["get", "congestion"],
-          "low",      "#00E653",
+          "low", "#00E653",
           "moderate", "#FFD600",
-          "heavy",    "#E65100",
-          "severe",   "#C50000",
+          "heavy", "#E65100",
+          "severe", "#C50000",
           "#CBD5E1",
         ] as mapboxgl.Expression,
       },
@@ -255,34 +267,34 @@ function fmtTime(iso: string): string {
 }
 
 interface MarkerRef {
-  marker:   mapboxgl.Marker;
-  el:       HTMLDivElement;
-  popup:    mapboxgl.Popup;
-  visKey:   string;
+  marker: mapboxgl.Marker;
+  el: HTMLDivElement;
+  popup: mapboxgl.Popup;
+  visKey: string;
   popupKey: string;
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
 export default function LiveMapPage() {
-  const [drivers,     setDrivers]     = useState<LiveDriver[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
-  const [search,      setSearch]      = useState("");
-  const [selectedId,  setSelectedId]  = useState<string | null>(null);
-  const [panelOpen,   setPanelOpen]   = useState(true);
-  const [mapReady,    setMapReady]    = useState(false);
+  const [drivers, setDrivers] = useState<LiveDriver[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
 
   // History mode
-  const [mode,        setMode]        = useState<"live" | "history">("live");
-  const [histSearch,  setHistSearch]  = useState("");
-  const [histDriver,  setHistDriver]  = useState<LiveDriver | null>(null);
+  const [mode, setMode] = useState<"live" | "history">("live");
+  const [histSearch, setHistSearch] = useState("");
+  const [histDriver, setHistDriver] = useState<LiveDriver | null>(null);
   const toDateStr = (d: Date) => {
     const yyyy = d.getFullYear();
-    const mm   = String(d.getMonth() + 1).padStart(2, "0");
-    const dd   = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   };
-  const todayStr     = toDateStr(new Date());
+  const todayStr = toDateStr(new Date());
   const yesterdayStr = toDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
   const formatDateLong = (s: string) => {
     if (!s) return "";
@@ -291,33 +303,33 @@ export default function LiveMapPage() {
       weekday: "short", day: "numeric", month: "short", year: "numeric",
     });
   };
-  const [histDate,      setHistDate]      = useState<string>(todayStr);
+  const [histDate, setHistDate] = useState<string>(todayStr);
   const [histStartTime, setHistStartTime] = useState<string>("00:00");
-  const [histEndTime,   setHistEndTime]   = useState<string>("23:59");
-  const [histApplied,   setHistApplied]   = useState<{ date: string; startTime: string; endTime: string } | null>(null);
-  const [histPoints,    setHistPoints]    = useState<LocationHistoryPoint[] | null>(null);
-  const [histLoading,   setHistLoading]   = useState(false);
-  const [histError,     setHistError]     = useState<string | null>(null);
+  const [histEndTime, setHistEndTime] = useState<string>("23:59");
+  const [histApplied, setHistApplied] = useState<{ date: string; startTime: string; endTime: string } | null>(null);
+  const [histPoints, setHistPoints] = useState<LocationHistoryPoint[] | null>(null);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histError, setHistError] = useState<string | null>(null);
 
   const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
   const [trafficEnabled, setTrafficEnabled] = useState(false);
 
-  const mapContainerRef    = useRef<HTMLDivElement>(null);
-  const mapRef             = useRef<mapboxgl.Map | null>(null);
-  const markersRef         = useRef<Record<string, MarkerRef>>({});
-  const driversRef         = useRef<LiveDriver[]>([]);
-  const modeRef            = useRef<"live" | "history">("live");
-  const trafficEnabledRef  = useRef(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<Record<string, MarkerRef>>({});
+  const driversRef = useRef<LiveDriver[]>([]);
+  const modeRef = useRef<"live" | "history">("live");
+  const trafficEnabledRef = useRef(false);
   driversRef.current = drivers;
-  modeRef.current    = mode;
+  modeRef.current = mode;
 
   // Strip <main> padding so map bleeds edge-to-edge
   useEffect(() => {
     const mainEl = document.querySelector<HTMLElement>("main");
     if (!mainEl) return;
     const prev = { padding: mainEl.style.padding, overflow: mainEl.style.overflow };
-    mainEl.style.padding  = "0";
+    mainEl.style.padding = "0";
     mainEl.style.overflow = "hidden";
     return () => { mainEl.style.padding = prev.padding; mainEl.style.overflow = prev.overflow; };
   }, []);
@@ -367,9 +379,9 @@ export default function LiveMapPage() {
         const next = prev.slice();
         next[idx] = {
           ...next[idx],
-          is_online:  ev.is_online,
-          status:     ev.status as LiveDriver["status"],
-          speed:      ev.is_online ? next[idx].speed : null,
+          is_online: ev.is_online,
+          status: ev.status as LiveDriver["status"],
+          speed: ev.is_online ? next[idx].speed : null,
           updated_at: ev.last_seen_at,
           ...(ev.lat != null ? { lat: ev.lat } : {}),
           ...(ev.lng != null ? { lng: ev.lng } : {}),
@@ -378,10 +390,10 @@ export default function LiveMapPage() {
       });
     };
     sock.on("superadmin:location:update", onUpdate);
-    sock.on("superadmin:driver:status",   onStatus);
+    sock.on("superadmin:driver:status", onStatus);
     return () => {
       sock.off("superadmin:location:update", onUpdate);
-      sock.off("superadmin:driver:status",   onStatus);
+      sock.off("superadmin:driver:status", onStatus);
     };
   }, [loadSnapshot]);
 
@@ -443,21 +455,21 @@ export default function LiveMapPage() {
     drivers.forEach((d) => {
       seen.add(d.driver_id);
       const selected = d.driver_id === selectedId;
-      const plate    = d.vehicle?.plate ?? d.driver_ref ?? "DRIVER";
+      const plate = d.vehicle?.plate ?? d.driver_ref ?? "DRIVER";
       const existing = markersRef.current[d.driver_id];
-      const visKey   = `${selected}|${d.is_online}|${d.status}|${plate}`;
+      const visKey = `${selected}|${d.is_online}|${d.status}|${plate}`;
       const popupKey = `${visKey}|${d.name}|${d.phone}|${d.vendor?.name ?? ""}|${d.vehicle?.model ?? ""}|${d.vehicle?.type ?? ""}|${d.trip?.from ?? ""}|${d.trip?.to ?? ""}|${d.trip?.booking_ref ?? ""}|${d.driver_ref ?? ""}`;
       if (existing) {
         existing.marker.setLngLat([d.lng, d.lat]);
         existing.popup.setLngLat([d.lng, d.lat]);
         if (existing.popupKey !== popupKey) { existing.popup.setHTML(popupHtml(d)); existing.popupKey = popupKey; }
-        if (existing.visKey   !== visKey)   { updateMarkerStyle(existing.el, d, selected, plate); existing.visKey = visKey; }
+        if (existing.visKey !== visKey) { updateMarkerStyle(existing.el, d, selected, plate); existing.visKey = visKey; }
         return;
       }
-      const el     = createMarkerEl(d, selected);
+      const el = createMarkerEl(d, selected);
       const marker = new mapboxgl.Marker({ element: el, anchor: "bottom" })
         .setLngLat([d.lng, d.lat]).addTo(map);
-      const popup  = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -66], className: "drv-popup", maxWidth: "270px" })
+      const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, offset: [0, -66], className: "drv-popup", maxWidth: "270px" })
         .setLngLat([d.lng, d.lat]).setHTML(popupHtml(d));
       let hideTimer: ReturnType<typeof setTimeout> | null = null;
       const showPopup = () => {
@@ -493,7 +505,7 @@ export default function LiveMapPage() {
   useEffect(() => {
     if (!histDriver || !histApplied) { setHistPoints(null); setHistError(null); return; }
     const from = new Date(`${histApplied.date}T${histApplied.startTime}:00`);
-    const to   = new Date(`${histApplied.date}T${histApplied.endTime}:59`);
+    const to = new Date(`${histApplied.date}T${histApplied.endTime}:59`);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) {
       setHistError("Invalid date/time range");
       setHistPoints(null);
@@ -520,7 +532,7 @@ export default function LiveMapPage() {
       removeHistoryLayers(map);
       addHistoryLayers(map, histPoints);
       const lngs = histPoints.map((p) => p.lng);
-      const lats  = histPoints.map((p) => p.lat);
+      const lats = histPoints.map((p) => p.lat);
       map.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         { padding: { top: 60, bottom: 60, left: 60, right: 360 }, duration: 900 },
@@ -558,12 +570,12 @@ export default function LiveMapPage() {
     }
   }
 
-  const onlineCount  = drivers.filter((d) => d.is_online).length;
+  const onlineCount = drivers.filter((d) => d.is_online).length;
   const offlineCount = drivers.filter((d) => !d.is_online).length;
 
   const filtered = drivers.filter((d) => {
     if (!search) return true;
-    const q     = search.toLowerCase();
+    const q = search.toLowerCase();
     const plate = (d.vehicle?.plate ?? "").toLowerCase().replace(/-/g, "");
     return (
       d.name.toLowerCase().includes(q) ||
@@ -576,7 +588,7 @@ export default function LiveMapPage() {
 
   const histFiltered = drivers.filter((d) => {
     if (!histSearch) return true;
-    const q     = histSearch.toLowerCase();
+    const q = histSearch.toLowerCase();
     const plate = (d.vehicle?.plate ?? "").toLowerCase().replace(/-/g, "");
     return (
       d.name.toLowerCase().includes(q) ||
@@ -617,9 +629,9 @@ export default function LiveMapPage() {
       <div style={{ position: "absolute", top: 76, left: 16, zIndex: 10, background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)", border: "1.5px solid rgba(226,232,240,0.9)", borderRadius: 11, padding: "9px 12px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", fontFamily: font }}>
         <span style={{ fontSize: 10, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginRight: 2 }}>Legend</span>
         {[
-          { color: "#22C55E", label: "Available" },
-          { color: "#3B82F6", label: "On Trip"   },
-          { color: "#94A3B8", label: "Offline"   },
+          { color: "#22C55E", label: "Online" },
+          { color: "#3B82F6", label: "On Trip" },
+          { color: "#EF4444", label: "Offline" },
         ].map((it) => (
           <span key={it.label} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: "#334155" }}>
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: it.color, flexShrink: 0, boxShadow: "0 0 0 1.5px white, 0 0 0 2.5px rgba(15,23,42,0.06)" }} />
@@ -650,10 +662,10 @@ export default function LiveMapPage() {
         title={trafficEnabled ? "Hide traffic layer" : "Show traffic layer"}
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="9" y="2" width="6" height="20" rx="3" stroke="currentColor" strokeWidth="2"/>
-          <circle cx="12" cy="7"  r="1.8" fill={trafficEnabled ? "#fca5a5" : "#EF4444"}/>
-          <circle cx="12" cy="12" r="1.8" fill={trafficEnabled ? "#fde68a" : "#F59E0B"}/>
-          <circle cx="12" cy="17" r="1.8" fill={trafficEnabled ? "#bbf7d0" : "#22C55E"}/>
+          <rect x="9" y="2" width="6" height="20" rx="3" stroke="currentColor" strokeWidth="2" />
+          <circle cx="12" cy="7" r="1.8" fill={trafficEnabled ? "#fca5a5" : "#EF4444"} />
+          <circle cx="12" cy="12" r="1.8" fill={trafficEnabled ? "#fde68a" : "#F59E0B"} />
+          <circle cx="12" cy="17" r="1.8" fill={trafficEnabled ? "#bbf7d0" : "#22C55E"} />
         </svg>
         Traffic
         <span style={{
@@ -678,10 +690,10 @@ export default function LiveMapPage() {
         }}>
           <div style={{ fontSize: 9.5, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 7 }}>Traffic</div>
           {[
-            { label: "Low",      color: "#00E653" },
+            { label: "Low", color: "#00E653" },
             { label: "Moderate", color: "#FFD600" },
-            { label: "Heavy",    color: "#E65100" },
-            { label: "Severe",   color: "#C50000" },
+            { label: "Heavy", color: "#E65100" },
+            { label: "Severe", color: "#C50000" },
           ].map(({ label, color }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
               <div style={{ width: 18, height: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -909,15 +921,15 @@ export default function LiveMapPage() {
                     {(() => {
                       const isDirty =
                         !histApplied ||
-                        histApplied.date      !== histDate ||
+                        histApplied.date !== histDate ||
                         histApplied.startTime !== histStartTime ||
-                        histApplied.endTime   !== histEndTime;
+                        histApplied.endTime !== histEndTime;
                       const rangeInvalid = histStartTime >= histEndTime;
-                      const isEntireDay  = histStartTime === "00:00" && histEndTime === "23:59";
+                      const isEntireDay = histStartTime === "00:00" && histEndTime === "23:59";
                       const setDay = () => { setHistStartTime("00:00"); setHistEndTime("23:59"); };
 
                       const presets: { label: string; date: string }[] = [
-                        { label: "Today",     date: todayStr     },
+                        { label: "Today", date: todayStr },
                         { label: "Yesterday", date: yesterdayStr },
                       ];
 
@@ -1207,7 +1219,7 @@ export default function LiveMapPage() {
         const speedKmh = selected.speed != null ? Math.round(selected.speed) : null;
         const lastSeen = (() => {
           const ms = Date.now() - new Date(selected.updated_at).getTime();
-          const s  = Math.floor(ms / 1000);
+          const s = Math.floor(ms / 1000);
           if (s < 60) return `${s}s ago`;
           const m = Math.floor(s / 60);
           if (m < 60) return `${m} min ago`;
