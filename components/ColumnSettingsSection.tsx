@@ -31,6 +31,10 @@ export function ColumnSettingsSection({ spec }: Props) {
     toggle(key);
   }
 
+  function handleSelectAll() {
+    setColumns(spec.columns.map(col => col.key));
+  }
+
   function onDragStart(key: string) { setDragKey(key); }
   function onDragOver(e: React.DragEvent) { e.preventDefault(); }
   function onDrop(targetKey: string) {
@@ -59,6 +63,13 @@ export function ColumnSettingsSection({ spec }: Props) {
               Customized
             </span>
           )}
+          <button
+            onClick={handleSelectAll}
+            disabled={columns.length === totalCount}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Select all
+          </button>
           <button
             onClick={reset}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium text-slate-600 hover:bg-slate-50"

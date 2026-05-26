@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,12 +19,16 @@ const pageTitles: Record<string, string> = {
   "/dashboard/bookings/active": "Active Trips",
   "/dashboard/bookings/past": "Past Trips",
   "/dashboard/bookings/scheduled": "Scheduled Trips",
+  "/dashboard/settings": "Settings",
 };
 
 export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { logout, user } = useAuth();
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title = pathname === "/dashboard/settings" && searchParams.get("tab") === "team"
+    ? "User Management"
+    : pageTitles[pathname] ?? "Dashboard";
   const vendorName  = user?.vendor_name?.trim() || "Vendor";
   const isMember    = user?.role === "vendor_member";
   const displayName = isMember ? (user?.full_name?.trim() || vendorName) : vendorName;
@@ -46,10 +50,6 @@ export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void })
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-          <div className="flex flex-col items-end leading-tight">
-            <span className="text-sm font-semibold">{displayName}</span>
-            <span className="text-xs text-slate-500">{roleLabel}</span>
-          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem className="gap-2">

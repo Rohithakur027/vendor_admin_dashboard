@@ -55,7 +55,9 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
       .finally(() => setDocsLoading(false));
   }, [activeTab, booking?.driverId]);
 
-  const driver     = booking?.driverId     ? drivers.find((d) => d.id === booking.driverId)         : null;
+  const driver     = booking?.driverId
+    ? drivers.find((d) => d.id === booking.driverId)
+    : null;
   const supervisor = booking?.supervisorId ? supervisors.find((s) => s.id === booking.supervisorId) : null;
   const ss         = booking ? (STATUS_STYLES[booking.status] ?? null) : null;
   const isOngoing  = booking?.status === "Ongoing";

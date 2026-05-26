@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Users, UserCheck, UserX, Plus, Pencil, Trash2,
-  X, ChevronLeft, Building2, Car, Map, BarChart2,
+  X, ChevronLeft, ChevronRight, Building2, Car, Map, BarChart2,
   CheckCircle2, Shield, Check, Mail, Phone, Calendar,
-  Clock, AlertCircle, Eye, EyeOff,
+  Clock, AlertCircle, Eye, EyeOff, KeyRound,
 } from "lucide-react";
 import { TeamMemberFilters } from "@/app/dashboard/settings/TeamMemberFilters";
 import { Switch } from "@/components/ui/switch";
@@ -435,16 +435,16 @@ function MemberDialog({
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
           ) : <div />}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onClose} disabled={isSaving} className="rounded-xl text-[13px]">Cancel</Button>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl h-9 px-5 text-[13px]">Cancel</Button>
             {step === 1 ? (
-              <Button size="sm" onClick={() => { if (validateStep1()) setStep(2); }}
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-[13px] px-5">
-                Next: Permissions
+              <Button onClick={() => { if (validateStep1()) setStep(2); }}
+                className="rounded-xl h-9 px-5 text-[13px] bg-blue-600 hover:bg-blue-700 gap-1.5">
+                Next <ChevronRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button size="sm" onClick={() => onSave(form)} disabled={isSaving}
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 text-[13px] px-5 min-w-[110px]">
+              <Button onClick={() => onSave(form)} disabled={isSaving}
+                className="rounded-xl h-9 px-5 text-[13px] bg-blue-600 hover:bg-blue-700 min-w-[110px]">
                 {isSaving ? "Saving…" : mode === "add" ? "Add Member" : "Save Changes"}
               </Button>
             )}
@@ -520,6 +520,12 @@ export default function SuperAdminSettingsPage() {
   const [saving,         setSaving]         = useState(false);
   const [deleting,       setDeleting]       = useState(false);
   const [deleteDialog,   setDeleteDialog]   = useState<{ open: boolean; member: TeamMemberShape | null }>({ open: false, member: null });
+  const [pwDialog,       setPwDialog]       = useState<{ open: boolean; member: TeamMemberShape | null }>({ open: false, member: null });
+  const [pwForm,         setPwForm]         = useState({ password: "", confirm: "" });
+  const [pwSaving,       setPwSaving]       = useState(false);
+  const [pwError,        setPwError]        = useState<string | null>(null);
+  const [showPw,         setShowPw]         = useState(false);
+  const [showConfirm,    setShowConfirm]    = useState(false);
 
   function addToast(message: string, error = false) {
     const id = Date.now();
@@ -621,6 +627,30 @@ export default function SuperAdminSettingsPage() {
     }
   }
 
+  function openPwDialog(m: TeamMemberShape) {
+    setPwForm({ password: "", confirm: "" });
+    setPwError(null);
+    setShowPw(false);
+    setShowConfirm(false);
+    setPwDialog({ open: true, member: m });
+  }
+
+  async function handlePasswordSave() {
+    if (!pwDialog.member) return;
+    if (pwForm.password.length < 6) { setPwError("Password must be at least 6 characters"); return; }
+    if (pwForm.password !== pwForm.confirm) { setPwError("Passwords do not match"); return; }
+    setPwSaving(true); setPwError(null);
+    try {
+      await superadminTeamApi.update(pwDialog.member.id, { password: pwForm.password });
+      addToast(`Password updated for ${pwDialog.member.full_name}`);
+      setPwDialog({ open: false, member: null });
+    } catch (err) {
+      setPwError((err as Error).message);
+    } finally {
+      setPwSaving(false);
+    }
+  }
+
   const filtered = members.filter(m => {
     const q = search.toLowerCase();
     const matchSearch = !q || m.full_name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role_label.toLowerCase().includes(q);
@@ -631,7 +661,7 @@ export default function SuperAdminSettingsPage() {
   const totalActive   = members.filter(m =>  m.is_active).length;
   const totalInactive = members.filter(m => !m.is_active).length;
 
-  const COLS = "grid-cols-[minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_100px_110px_60px_76px]";
+  const COLS = "grid-cols-[minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_100px_110px_60px_108px]";
 
   return (
     <div style={{ fontFamily: FONT }} className="space-y-5">
@@ -640,7 +670,7 @@ export default function SuperAdminSettingsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">Team Members</h1>
+            <h1 className="text-lg font-semibold text-slate-800">User Management</h1>
             <p className="text-sm text-slate-500">Manage admin access and module permissions</p>
           </div>
         </div>
@@ -735,11 +765,15 @@ export default function SuperAdminSettingsPage() {
               </div>
 
               <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                <button onClick={() => openEdit(m)}
+                <button onClick={() => openEdit(m)} title="Edit member"
                   className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => setDeleteDialog({ open: true, member: m })}
+                <button onClick={() => openPwDialog(m)} title="Update password"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
+                  <KeyRound className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setDeleteDialog({ open: true, member: m })} title="Remove member"
                   className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -784,6 +818,67 @@ export default function SuperAdminSettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Password update dialog */}
+      <Dialog open={pwDialog.open} onOpenChange={o => !pwSaving && setPwDialog(d => ({ ...d, open: o }))}>
+        <DialogContent className="sm:max-w-[400px] p-0 gap-0 rounded-2xl overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100">
+            <DialogTitle className="text-[15px] font-bold text-slate-800">
+              Update Password
+            </DialogTitle>
+            <p className="text-[12px] text-slate-400 mt-0.5">{pwDialog.member?.full_name}</p>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[11.5px] font-semibold text-slate-500 uppercase tracking-wide">New Password</label>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  value={pwForm.password}
+                  onChange={e => setPwForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Min. 6 characters"
+                  className="h-[38px] rounded-xl border-slate-200 text-[13px] pr-9"
+                  disabled={pwSaving}
+                />
+                <button type="button" onClick={() => setShowPw(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11.5px] font-semibold text-slate-500 uppercase tracking-wide">Confirm Password</label>
+              <div className="relative">
+                <Input
+                  type={showConfirm ? "text" : "password"}
+                  value={pwForm.confirm}
+                  onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                  placeholder="Re-enter password"
+                  className="h-[38px] rounded-xl border-slate-200 text-[13px] pr-9"
+                  disabled={pwSaving}
+                />
+                <button type="button" onClick={() => setShowConfirm(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+            {pwError && (
+              <p className="text-[12px] text-red-500 font-medium">{pwError}</p>
+            )}
+          </div>
+          <div className="px-6 pb-5 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setPwDialog({ open: false, member: null })} disabled={pwSaving}
+              className="rounded-xl h-9 px-5 text-[13px]">
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordSave} disabled={pwSaving || !pwForm.password || !pwForm.confirm}
+              className="rounded-xl h-9 px-5 text-[13px] bg-blue-600 hover:bg-blue-700 text-white min-w-[110px]">
+              {pwSaving ? "Saving…" : "Update Password"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Toasts */}
       <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2">

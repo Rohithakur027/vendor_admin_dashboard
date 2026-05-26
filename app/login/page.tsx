@@ -57,19 +57,19 @@ export default function LoginPage() {
         <div style={{ position: "absolute", top: "38%", right: -40, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
 
         {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, zIndex: 1 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
+          <div style={{ width: 60, height: 60, borderRadius: 14, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
               <path d="M3 17h18M5 17V9a2 2 0 012-2h10a2 2 0 012 2v8M9 17v-4h6v4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               <circle cx="7.5" cy="17.5" r="1.5" fill="#fff"/>
               <circle cx="16.5" cy="17.5" r="1.5" fill="#fff"/>
             </svg>
           </div>
-          <span style={{ color: "#fff", fontSize: 16, fontWeight: 800, letterSpacing: "-0.01em" }}>SK Travels</span>
+          <span style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.01em" }}>SK Voyages</span>
         </div>
 
         {/* Tagline */}
-        <div style={{ marginTop: 28, zIndex: 1 }}>
+        <div style={{ marginTop: 48, zIndex: 1 }}>
           <h1 style={{ color: "#fff", fontSize: 32, fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.02em" }}>
             One platform<br />for your entire<br />fleet.
           </h1>
@@ -156,12 +156,6 @@ export default function LoginPage() {
           </svg>
         </div>
 
-        {/* Bottom tagline dots */}
-        <div style={{ display: "flex", gap: 6, zIndex: 1 }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ width: i === 1 ? 20 : 6, height: 6, borderRadius: 3, background: i === 1 ? "#fff" : "rgba(255,255,255,0.35)" }} />
-          ))}
-        </div>
       </div>
 
       {/* ── Right panel ── */}

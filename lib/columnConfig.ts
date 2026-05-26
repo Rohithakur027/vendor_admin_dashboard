@@ -8,8 +8,11 @@ export type TableKey =
   | "supervisors" | "drivers"        | "invoices"
   | "supervisorRecentTrips"
   // Super admin
-  | "vendors"     | "allDrivers"     | "driverOnboarding"
-  | "driverTrips" | "vendorTripsAdmin";
+  | "vendors"     | "unverifiedVendors" | "allDrivers" | "driverOnboarding"
+  | "driverTrips" | "vendorTripsAdmin"
+  | "superadminVendorReportTrips"
+  | "generalBookingEnquiries" | "specialBookingEnquiries"
+  | "superadminInvoices";
 
 export type Role = "vendor_admin" | "superadmin";
 
@@ -51,9 +54,14 @@ const TRIP_COLUMNS: ColumnDef[] = [
   { key: "distance",          label: "Distance",             dbFields: "distance_km",                      minWidth: 100 },
   { key: "escort",            label: "Escort",               dbFields: "escort_required + escort_pickup",  minWidth: 140 },
   { key: "notes",             label: "Notes",                dbFields: "notes",                            minWidth: 160 },
-  { key: "invoice",           label: "Invoice",              dbFields: "invoice_id",                       minWidth: 130 },
   { key: "pickupLatLng",      label: "Pickup Lat/Lng",       dbFields: "pickup_lat + pickup_lng",          minWidth: 140 },
   { key: "dropLatLng",        label: "Drop Lat/Lng",         dbFields: "drop_lat + drop_lng",              minWidth: 140 },
+];
+
+// Extends TRIP_COLUMNS with a Vendor column — used on superadmin detail pages.
+const TRIP_COLUMNS_WITH_VENDOR: ColumnDef[] = [
+  ...TRIP_COLUMNS,
+  { key: "vendor", label: "Vendor", dbFields: "vendor_name", minWidth: 140 },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -147,6 +155,8 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "phone",         label: "Phone",          dbFields: "phone",                   minWidth: 140 },
       { key: "contactPerson", label: "Contact Person", dbFields: "contact_person",          minWidth: 150 },
       { key: "status",        label: "Status",         dbFields: "status badge",            minWidth: 110 },
+      { key: "billingType",   label: "Billing Type",   dbFields: "billing_type",            minWidth: 130 },
+      { key: "creditLimit",   label: "Credit Limit",   dbFields: "credit_limit",            minWidth: 140 },
       { key: "wallet",        label: "Wallet Balance", dbFields: "wallet_balance",          minWidth: 140 },
       { key: "pan",           label: "PAN Card",       dbFields: "pan_card_number",         minWidth: 150 },
       { key: "gst",           label: "GST Number",     dbFields: "gst_number",              minWidth: 160 },
@@ -154,6 +164,19 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "createdAt",     label: "Joined On",      dbFields: "created_at (IST)",        minWidth: 130 },
     ],
     defaults: ["name", "email", "phone", "contactPerson", "status", "createdAt"],
+  },
+
+  unverifiedVendors: {
+    key: "unverifiedVendors", role: "superadmin",
+    title: "Unverified Vendors", blurb: "Vendor signup requests pending review",
+    columns: [
+      { key: "name",          label: "Vendor",         dbFields: "name",           minWidth: 180 },
+      { key: "email",         label: "Email",          dbFields: "email",          minWidth: 200 },
+      { key: "phone",         label: "Phone",          dbFields: "phone",          minWidth: 140 },
+      { key: "contactPerson", label: "Contact Person", dbFields: "contact_person", minWidth: 160 },
+      { key: "reviewStatus",  label: "Review Status",  dbFields: "is_verified",   minWidth: 140 },
+    ],
+    defaults: ["name", "email", "phone", "contactPerson", "reviewStatus"],
   },
 
   allDrivers: {
@@ -164,11 +187,8 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "phone",      label: "Phone",        dbFields: "phone",                           minWidth: 140 },
       { key: "email",      label: "Email",        dbFields: "email",                           minWidth: 200 },
       { key: "status",     label: "Status",       dbFields: "status + is_online + is_verified",minWidth: 140 },
-      { key: "zone",       label: "Zone",         dbFields: "zone",                            minWidth: 120 },
       { key: "vehicle",    label: "Vehicle",      dbFields: "plate_number + model + type",     minWidth: 180 },
       { key: "lastSeen",   label: "Last Active",  dbFields: "last_active_at (IST)",            minWidth: 150 },
-      { key: "totalTrips", label: "Total Trips",  dbFields: "total_trips",                     minWidth: 120 },
-      { key: "documents",  label: "Documents",    dbFields: "docs.total + docs.verified",      minWidth: 130 },
       { key: "createdAt",  label: "Joined On",    dbFields: "created_at (IST)",                minWidth: 140 },
     ],
     defaults: ["name", "phone", "vehicle", "status", "lastSeen", "createdAt"],
@@ -193,22 +213,74 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
   driverTrips: {
     key: "driverTrips", role: "superadmin",
     title: "Driver Recent Trips", blurb: "Trips completed by this driver",
-    columns: [
-      { key: "tripId",            label: "Trip ID & Type",       dbFields: "trip_ref + type badge",           minWidth: 130 },
-      { key: "route",             label: "Route",                dbFields: "pickup_address → drop_address",   minWidth: 200 },
-      { key: "supervisorCompany", label: "Vendor",               dbFields: "supervisor name + company badge", minWidth: 160 },
-      { key: "fare",              label: "Fare",                 dbFields: "fare",                            minWidth: 100 },
-      { key: "status",            label: "Status",               dbFields: "status badge",                    minWidth: 110 },
-      { key: "createdAt",         label: "Created At",           dbFields: "created_at (IST)",                minWidth: 140 },
-    ],
+    columns: TRIP_COLUMNS_WITH_VENDOR,
     defaults: ["tripId", "route", "supervisorCompany", "fare", "status", "createdAt"],
   },
 
   vendorTripsAdmin: {
     key: "vendorTripsAdmin", role: "superadmin",
     title: "Vendor Trips (Admin)", blurb: "Trips list shown on the superadmin vendor detail page",
-    columns: TRIP_COLUMNS,
+    columns: TRIP_COLUMNS_WITH_VENDOR,
     defaults: ["tripId", "route", "supervisorCompany", "vehicle", "driver", "fare", "status", "createdAt"],
+  },
+
+  superadminVendorReportTrips: {
+    key: "superadminVendorReportTrips", role: "superadmin",
+    title: "Vendor Report Trips", blurb: "Trips list shown in the superadmin vendor report view",
+    columns: TRIP_COLUMNS_WITH_VENDOR,
+    defaults: ["tripId", "route", "supervisorCompany", "vendor", "vehicle", "driver", "fare", "status", "createdAt"],
+  },
+
+  generalBookingEnquiries: {
+    key: "generalBookingEnquiries", role: "superadmin",
+    title: "Booking Enquiries", blurb: "Customer booking requests",
+    columns: [
+      { key: "enqRef",          label: "Booking ID",       dbFields: "enq_ref",                        minWidth: 130 },
+      { key: "customer",        label: "Customer",         dbFields: "customer_name + email + phone",  minWidth: 180 },
+      { key: "route",           label: "Route",            dbFields: "pickup_location → destination",  minWidth: 220 },
+      { key: "type",            label: "Vehicle Type",     dbFields: "vehicle_type + is_scheduled",    minWidth: 150 },
+      { key: "bookingCategory", label: "Booking Category", dbFields: "booking_type",                   minWidth: 150 },
+      { key: "passengers",      label: "Passengers",       dbFields: "passengers",                     minWidth: 110 },
+      { key: "createdAt",       label: "Created At",       dbFields: "created_at (IST)",               minWidth: 150 },
+      { key: "distance",        label: "Distance",         dbFields: "distance_km",                    minWidth: 110 },
+      { key: "scheduledAt",     label: "Scheduled At",     dbFields: "scheduled_at (IST)",             minWidth: 150 },
+      { key: "isReturnTrip",    label: "Return Trip",      dbFields: "is_return_trip",                 minWidth: 120 },
+      { key: "returnAt",        label: "Return Date",      dbFields: "return_at (IST)",                minWidth: 150 },
+    ],
+    defaults: ["enqRef", "customer", "route", "type", "passengers", "createdAt"],
+  },
+
+  superadminInvoices: {
+    key: "superadminInvoices", role: "superadmin",
+    title: "Vendor Invoices", blurb: "Invoices generated for vendors by superadmin",
+    columns: [
+      { key: "invoiceNo",  label: "Invoice No.", dbFields: "invoice_number",         minWidth: 130 },
+      { key: "vendor",     label: "Vendor",      dbFields: "vendor_id (name)",        minWidth: 160 },
+      { key: "period",     label: "Period",      dbFields: "period_from + period_to", minWidth: 160 },
+      { key: "amount",     label: "Amount",      dbFields: "amount",                  minWidth: 110 },
+      { key: "status",     label: "Status",      dbFields: "status badge",            minWidth: 120 },
+      { key: "issuedAt",   label: "Issued On",   dbFields: "issued_at",               minWidth: 130 },
+      { key: "dueDate",    label: "Due Date",    dbFields: "due_date",                minWidth: 130 },
+      { key: "paidAt",     label: "Paid On",     dbFields: "paid_at",                 minWidth: 130 },
+      { key: "paymentRef", label: "Payment Ref", dbFields: "payment_ref",             minWidth: 140 },
+      { key: "notes",      label: "Notes",       dbFields: "notes",                   minWidth: 160 },
+    ],
+    defaults: ["invoiceNo", "vendor", "period", "amount", "status", "issuedAt", "dueDate"],
+  },
+
+  specialBookingEnquiries: {
+    key: "specialBookingEnquiries", role: "superadmin",
+    title: "Special Enquiry", blurb: "Special enquiries from the website",
+    columns: [
+      { key: "enqRef",      label: "Enquiry ID",   dbFields: "enq_ref",               minWidth: 130 },
+      { key: "name",        label: "Customer",     dbFields: "name + email + mobile",  minWidth: 180 },
+      { key: "companyName", label: "Company",      dbFields: "company_name",           minWidth: 160 },
+      { key: "message",     label: "Message",      dbFields: "message",                minWidth: 220 },
+      { key: "createdAt",   label: "Created At",   dbFields: "created_at (IST)",       minWidth: 150 },
+      { key: "email",       label: "Email",        dbFields: "email",                  minWidth: 180 },
+      { key: "mobile",      label: "Mobile",       dbFields: "mobile",                 minWidth: 130 },
+    ],
+    defaults: ["enqRef", "name", "companyName", "message", "createdAt"],
   },
 };
 
@@ -231,6 +303,9 @@ export function tablesForRole(role: Role | string | undefined | null): TableSpec
       TABLE_SPECS.driverOnboarding,
       TABLE_SPECS.driverTrips,
       TABLE_SPECS.vendorTripsAdmin,
+      TABLE_SPECS.generalBookingEnquiries,
+      TABLE_SPECS.specialBookingEnquiries,
+      TABLE_SPECS.superadminInvoices,
     ];
   }
   return [];

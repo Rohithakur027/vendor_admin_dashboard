@@ -15,6 +15,7 @@ const pageTitles: Record<string, string> = {
   "/superadmin": "Overview",
   "/superadmin/vendors": "Vendors",
   "/superadmin/drivers": "Drivers",
+  "/superadmin/settings": "User Management",
 };
 
 export function SuperAdminHeader({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
@@ -38,14 +39,6 @@ export function SuperAdminHeader({ onMobileMenuClick }: { onMobileMenuClick: () 
 
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 outline-none">
-          <div className="flex flex-col items-end leading-tight">
-            <span className="text-sm font-semibold">{user?.full_name ?? "Super Admin"}</span>
-            <span className="text-xs text-slate-500">
-              {user?.role === "superadmin_member"
-                ? (user?.role_label?.trim() || "Team Member")
-                : "Super Admin"}
-            </span>
-          </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuItem className="gap-2">

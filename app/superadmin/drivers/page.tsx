@@ -16,7 +16,7 @@ import {
 } from "@/components/FilterPanel";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
 
@@ -102,7 +102,7 @@ function renderCell(key: string, d: DriverApiItem) {
     case "status":
       return (
         <div className="flex flex-col gap-1 items-start">
-          <StatusBadge status={d.status} size="sm" />
+          <StatusBadge status={d.isOnline ? "Online" : "Offline"} size="sm" />
           {d.isVerified && (
             <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
               ✓ Verified
@@ -149,11 +149,38 @@ function renderCell(key: string, d: DriverApiItem) {
   }
 }
 
+function exportValue(key: string, d: DriverApiItem) {
+  switch (key) {
+    case "name":
+      return d.name;
+    case "phone":
+      return d.phone;
+    case "email":
+      return d.email ?? null;
+    case "status":
+      return d.isOnline ? "Online" : "Offline";
+    case "zone":
+      return d.zone ?? null;
+    case "vehicle":
+      return [d.vehicle?.plateNumber, d.vehicle?.model, d.vehicle?.type].filter(Boolean).join(" | ");
+    case "lastSeen":
+      return d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : null;
+    case "totalTrips":
+      return d.totalTrips;
+    case "documents":
+      return `${d.documents.verified}/${d.documents.total}`;
+    case "createdAt":
+      return fmtJoined(d.createdAt);
+    default:
+      return null;
+  }
+}
+
 export default function SuperAdminDriversPage() {
   const router = useRouter();
 
   const TABLE_KEY = "allDrivers" as const;
-  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
+  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, setColumns: setCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
   const spec = getTableSpec(TABLE_KEY);
 
   const gridTemplate = useMemo(
@@ -179,7 +206,7 @@ export default function SuperAdminDriversPage() {
     setError("");
     try {
       const res = await superadminApi.drivers.list({
-        limit:  200,
+        limit: 200,
         status: statusFilter !== "All" ? statusFilter : undefined,
       });
       setDrivers(res.data);
@@ -190,7 +217,13 @@ export default function SuperAdminDriversPage() {
     }
   }, [statusFilter]);
 
-  useEffect(() => { fetchDrivers(); }, [fetchDrivers]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchDrivers();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [fetchDrivers]);
 
   const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
     setDrivers((prev) => {
@@ -211,8 +244,8 @@ export default function SuperAdminDriversPage() {
 
   const totalCt     = drivers.length;
   const onTripCt    = drivers.filter(d => d.status === "On Trip").length;
-  const availableCt = drivers.filter(d => d.status === "Available").length;
-  const offlineCt   = drivers.filter(d => d.status === "Offline").length;
+  const availableCt = drivers.filter(d => d.isOnline).length;
+  const offlineCt   = drivers.filter(d => !d.isOnline).length;
 
   const filteredDrivers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -229,23 +262,15 @@ export default function SuperAdminDriversPage() {
   }, [drivers, search]);
 
   function handleExport() {
-    const rows = filteredDrivers.map(d => ({
-      "Driver Name":   d.name,
-      "Driver ID":     d.driverRef ?? "",
-      "Phone":         d.phone,
-      "Email":         d.email ?? "",
-      "Zone":          d.zone ?? "",
-      "Vehicle Plate": d.vehicle?.plateNumber ?? "",
-      "Vehicle Model": d.vehicle?.model ?? "",
-      "Vehicle Type":  d.vehicle?.type ?? "",
-      "Status":        d.status,
-      "Verified":      d.isVerified ? "Yes" : "No",
-      "Total Trips":   d.totalTrips,
-      "Docs Verified": `${d.documents.verified}/${d.documents.total}`,
-      "Last Active":   d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : "",
-      "Joined On":     fmtJoined(d.createdAt),
-    }));
-    exportToCsv("drivers.csv", rows);
+    const rows = filteredDrivers.map((d) => {
+      const row: Record<string, string | number | null> = {};
+      for (const key of visibleCols) {
+        const col = spec.columns.find((c) => c.key === key);
+        row[col?.label ?? key] = exportValue(key, d);
+      }
+      return row;
+    });
+    exportToXlsx("drivers", rows, "Drivers");
   }
 
   return (
@@ -258,7 +283,7 @@ export default function SuperAdminDriversPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
         <StatCard loading={loading} label="Total Drivers"  value={totalCt}     icon={Users}       />
         <StatCard loading={loading} label="On Trip"        value={onTripCt}    icon={Navigation}  />
-        <StatCard loading={loading} label="Available"      value={availableCt} icon={CircleCheck} />
+        <StatCard loading={loading} label="Online"         value={availableCt} icon={CircleCheck} />
         <StatCard loading={loading} label="Offline"        value={offlineCt}   icon={WifiOff}     />
       </div>
 
@@ -292,10 +317,11 @@ export default function SuperAdminDriversPage() {
           totalCount={colTotal}
           onToggle={toggleCol}
           onReset={resetCols}
+          onSelectAll={() => setCols(spec.columns.map((c) => c.key))}
         />
 
         <div className="ml-auto">
-          <ExportButton onClick={handleExport} disabled={filteredDrivers.length === 0} />
+          <ExportButton onClick={handleExport} disabled={filteredDrivers.length === 0} label="Export XLSX" />
         </div>
       </div>
 
@@ -309,7 +335,7 @@ export default function SuperAdminDriversPage() {
               {visibleCols.map(key => {
                 const col = spec.columns.find(c => c.key === key);
                 return (
-                  <div key={key} style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                  <div key={key} style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                     {col?.label ?? key}
                   </div>
                 );

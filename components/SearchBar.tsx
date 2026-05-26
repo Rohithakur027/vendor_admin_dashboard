@@ -15,7 +15,11 @@ export function SearchBar({ value, onChange, placeholder = "Search…", classNam
     <div className={`relative flex-1 max-w-[380px] z-10 ${className ?? ""}`}>
       <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
       <Input
-        autoComplete="off"
+        name="team-member-search"
+        autoComplete="new-password"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}

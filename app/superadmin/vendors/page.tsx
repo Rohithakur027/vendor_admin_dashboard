@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { vendorsApi, type CreateVendorPayload } from "@/lib/api";
+import { vendorsApi, type CreateVendorPayload, type VendorBillingCycle, type VendorBillingType } from "@/lib/api";
 import type { Vendor } from "@/lib/mock-data";
 import {
   Plus, X, RefreshCw,
@@ -18,10 +18,11 @@ import { Button } from "@/components/ui/button";
 import { SearchBar } from "@/components/SearchBar";
 import { Input }  from "@/components/ui/input";
 import { Label }  from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton, SkeletonInline } from "@/components/ui/skeleton";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
 
@@ -42,6 +43,13 @@ function fmtPhone(phone: string) {
   return phone;
 }
 
+function phoneExportValue(phone: string): string | number {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  const value = Number(digits);
+  return Number.isSafeInteger(value) ? value : digits;
+}
+
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
@@ -55,9 +63,12 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 export default function SuperAdminVendorsPage() {
   const router = useRouter();
-  const TABLE_KEY = "vendors" as const;
-  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: colTotal } = useColumnPreferences(TABLE_KEY);
-  const spec = getTableSpec(TABLE_KEY);
+  const VERIFIED_TABLE_KEY = "vendors" as const;
+  const UNVERIFIED_TABLE_KEY = "unverifiedVendors" as const;
+  const { columns: visibleCols, toggle: toggleCol, reset: resetCols, totalCount: colTotal } = useColumnPreferences(VERIFIED_TABLE_KEY);
+  const { columns: unverifiedVisibleCols, toggle: toggleUnverifiedCol, reset: resetUnverifiedCols, totalCount: unverifiedColTotal } = useColumnPreferences(UNVERIFIED_TABLE_KEY);
+  const spec = getTableSpec(VERIFIED_TABLE_KEY);
+  const unverifiedSpec = getTableSpec(UNVERIFIED_TABLE_KEY);
 
   const gridTemplate = useMemo(
     () => visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" "),
@@ -66,6 +77,14 @@ export default function SuperAdminVendorsPage() {
   const minTableWidth = useMemo(
     () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 48,
     [visibleCols, spec.columns],
+  );
+  const unverifiedGridTemplate = useMemo(
+    () => `${unverifiedVisibleCols.map(k => { const c = unverifiedSpec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" ")} 110px`,
+    [unverifiedVisibleCols, unverifiedSpec.columns],
+  );
+  const unverifiedMinTableWidth = useMemo(
+    () => unverifiedVisibleCols.reduce((s, k) => s + (unverifiedSpec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 158,
+    [unverifiedVisibleCols, unverifiedSpec.columns],
   );
 
   const [vendors,     setVendors]     = useState<Vendor[]>([]);
@@ -91,6 +110,16 @@ export default function SuperAdminVendorsPage() {
   const [walletEnabled,  setWalletEnabled]  = useState(false);
   const [walletAmount,   setWalletAmount]   = useState("");
   const [passError,      setPassError]      = useState("");
+  const [billingType,    setBillingType]    = useState<VendorBillingType>("PREPAID");
+  const [creditLimit,    setCreditLimit]    = useState("");
+  const [billingCycle,   setBillingCycle]   = useState<VendorBillingCycle>("MONTHLY");
+  const [paymentDueDays, setPaymentDueDays] = useState("7");
+  const [billingErrors,  setBillingErrors]  = useState<{
+    billing_type?: string;
+    credit_limit?: string;
+    billing_cycle?: string;
+    payment_due_days?: string;
+  }>({});
 
   // Step 3 fields
   const [panNum,  setPanNum]  = useState("");
@@ -119,28 +148,33 @@ export default function SuperAdminVendorsPage() {
   const activeVendorFilterCount = statusFilter !== "All" ? 1 : 0;
 
   function handleExport() {
-    const colLabelMap: Record<string, string> = Object.fromEntries(spec.columns.map(c => [c.key, c.label]));
+    const exportSpec = vendorTab === "verified" ? spec : unverifiedSpec;
+    const exportCols = vendorTab === "verified" ? visibleCols : unverifiedVisibleCols;
+    const colLabelMap: Record<string, string> = Object.fromEntries(exportSpec.columns.map(c => [c.key, c.label]));
     const rows = filtered.map(v => {
-      const row: Record<string, string | number> = {};
-      visibleCols.forEach(key => {
+      const row: Record<string, string | number | null> = {};
+      exportCols.forEach(key => {
         const label = colLabelMap[key] ?? key;
         switch (key) {
           case "name":          row[label] = v.name; break;
-          case "city":          row[label] = v.city ?? ""; break;
+          case "city":          row[label] = v.city ?? null; break;
           case "email":         row[label] = v.email; break;
-          case "phone":         row[label] = v.phone; break;
+          case "phone":         row[label] = phoneExportValue(v.phone); break;
           case "contactPerson": row[label] = v.contactPerson; break;
           case "status":        row[label] = v.status; break;
+          case "billingType":   row[label] = v.billing_type ?? "PREPAID"; break;
+          case "creditLimit":   row[label] = v.credit_limit != null ? `₹${v.credit_limit}` : "—"; break;
           case "wallet":        row[label] = v.wallet_balance != null ? `₹${v.wallet_balance}` : "—"; break;
-          case "pan":           row[label] = ""; break;
-          case "gst":           row[label] = ""; break;
-          case "address":       row[label] = (v as Vendor & { address?: string }).address ?? ""; break;
+          case "pan":           row[label] = null; break;
+          case "gst":           row[label] = null; break;
+          case "address":       row[label] = (v as Vendor & { address?: string }).address ?? null; break;
           case "createdAt":     row[label] = fmtJoined(v.joinedAt); break;
+          case "reviewStatus":  row[label] = "Pending"; break;
         }
       });
       return row;
     });
-    exportToCsv("vendors.csv", rows);
+    exportToXlsx(vendorTab === "verified" ? "vendors" : "unverified-vendors", rows, vendorTab === "verified" ? "Vendors" : "Unverified Vendors");
   }
 
   const verifiedVendors   = vendors.filter(v => v.is_verified !== false);
@@ -199,6 +233,28 @@ export default function SuperAdminVendorsPage() {
     return Object.keys(e).length === 0;
   }
 
+  function validateBilling(): boolean {
+    const e: typeof billingErrors = {};
+    if (billingType !== "PREPAID" && billingType !== "POSTPAID") {
+      e.billing_type = "Billing type is required";
+    }
+    if (billingType === "POSTPAID") {
+      const limit = Number(creditLimit);
+      const days  = Number(paymentDueDays);
+      if (!creditLimit || !Number.isFinite(limit) || limit <= 0) {
+        e.credit_limit = "Credit limit must be greater than 0";
+      }
+      if (billingCycle !== "WEEKLY" && billingCycle !== "MONTHLY") {
+        e.billing_cycle = "Select a billing cycle";
+      }
+      if (!paymentDueDays || !Number.isInteger(days) || days <= 0) {
+        e.payment_due_days = "Payment due days must be greater than 0";
+      }
+    }
+    setBillingErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   function handleNext() {
     if (step === 1) {
       if (!validateStep1()) return;
@@ -216,12 +272,14 @@ export default function SuperAdminVendorsPage() {
 
     // Step 3: validate credentials then create vendor + upload docs
     if (!password || password.length < 8) { setPassError("Password must be at least 8 characters"); return; }
+    if (!validateBilling()) return;
 
     setSubmitting(true);
     setSubmitError("");
     setSubmitPhase("vendor");
 
     try {
+      const isPostpaid = billingType === "POSTPAID";
       const payload: CreateVendorPayload = {
         name: form.name,
         contactPerson: form.contactPerson,
@@ -229,8 +287,13 @@ export default function SuperAdminVendorsPage() {
         ...(form.address.trim() ? { address: form.address.trim() } : {}),
         password,
         secondaryPOCs: pocs.filter((p) => p.name || p.email || p.phone),
-        ...(walletEnabled && walletAmount ? { walletAmount: parseFloat(walletAmount) } : {}),
+        ...(billingType === "PREPAID" && walletEnabled && walletAmount ? { walletAmount: parseFloat(walletAmount) } : {}),
         sendCredentials: sendEmail,
+        billing_type: billingType,
+        credit_limit: isPostpaid ? Number(creditLimit) : 0,
+        outstanding_balance: 0,
+        billing_cycle: isPostpaid ? billingCycle : "MONTHLY",
+        payment_due_days: isPostpaid ? Number(paymentDueDays) : 7,
       };
 
       const res = await vendorsApi.create(payload);
@@ -269,6 +332,11 @@ export default function SuperAdminVendorsPage() {
     setWalletEnabled(false);
     setSendEmail(true);
     setPassError("");
+    setBillingType("PREPAID");
+    setCreditLimit("");
+    setBillingCycle("MONTHLY");
+    setPaymentDueDays("7");
+    setBillingErrors({});
     setSubmitError("");
     setSubmitSuccess(false);
     setPanNum(""); setPanFile(null);
@@ -364,20 +432,16 @@ export default function SuperAdminVendorsPage() {
           </FilterPanel>
         </div>
 
-        {vendorTab === "verified" && (
-          <>
-            <ColumnsPopover
-              tableKey={TABLE_KEY}
-              visible={visibleCols}
-              totalCount={colTotal}
-              onToggle={toggleCol}
-              onReset={resetCols}
-            />
-            <div className="ml-auto">
-              <ExportButton onClick={handleExport} disabled={filtered.length === 0} />
-            </div>
-          </>
-        )}
+        <ColumnsPopover
+          tableKey={vendorTab === "verified" ? VERIFIED_TABLE_KEY : UNVERIFIED_TABLE_KEY}
+          visible={vendorTab === "verified" ? visibleCols : unverifiedVisibleCols}
+          totalCount={vendorTab === "verified" ? colTotal : unverifiedColTotal}
+          onToggle={vendorTab === "verified" ? toggleCol : toggleUnverifiedCol}
+          onReset={vendorTab === "verified" ? resetCols : resetUnverifiedCols}
+        />
+        <div className="ml-auto">
+          <ExportButton onClick={handleExport} disabled={filtered.length === 0} label="Export XLSX" />
+        </div>
       </div>
 
       {listError && (
@@ -390,34 +454,48 @@ export default function SuperAdminVendorsPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="w-full overflow-x-auto">
 
-          {/* ── UNVERIFIED TAB — fixed layout ── */}
+          {/* ── UNVERIFIED TAB — dynamic columns ── */}
           {vendorTab === "unverified" && (
-            <div className="min-w-[860px]">
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_140px_110px] items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                {["VENDOR", "EMAIL", "PHONE", "CONTACT PERSON", "REVIEW STATUS", "ACTION"].map(h => (
-                  <div key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</div>
-                ))}
+            <div className="w-fit min-w-full" style={{ minWidth: unverifiedMinTableWidth }}>
+              <div className="grid items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
+                {unverifiedVisibleCols.map(key => {
+                  const col = unverifiedSpec.columns.find(c => c.key === key);
+                  return (
+                    <div key={key} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{col?.label ?? key}</div>
+                  );
+                })}
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Action</div>
               </div>
               <div className="flex flex-col divide-y divide-slate-100">
                 {loadingList ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_140px_110px] items-center gap-6 px-6 py-3.5">
-                      <Skeleton className="h-3.5 w-3/4" /><Skeleton className="h-3.5 w-2/3" /><Skeleton className="h-3.5 w-28" /><Skeleton className="h-3.5 w-1/2" /><Skeleton className="h-6 w-20 rounded-full" /><Skeleton className="h-7 w-20 rounded-lg" />
+                    <div key={i} className="grid items-center gap-6 px-6 py-3.5" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
+                      {unverifiedVisibleCols.map(k => <Skeleton key={k} className="h-3.5 w-3/4" />)}
+                      <Skeleton className="h-7 w-20 rounded-lg" />
                     </div>
                   ))
                 ) : filtered.length === 0 ? (
                   <div className="text-center py-14 text-slate-500"><p className="text-sm font-medium">No unverified vendors.</p></div>
                 ) : filtered.map(v => (
-                  <div key={v.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.8fr)_150px_minmax(0,1.4fr)_140px_110px] items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors">
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
-                    </div>
-                    <span className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>
-                    <span className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>
-                    <span className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>
-                    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#FEF3C7", color:"#92400E", border:"1px solid #FDE68A", borderRadius:20, fontSize:11, fontWeight:700, padding:"3px 10px", whiteSpace:"nowrap", width:"fit-content" }}>
-                      <span style={{ width:6, height:6, borderRadius:"50%", background:"#F59E0B", flexShrink:0 }} /> Pending
-                    </span>
+                  <div key={v.id} className="grid items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
+                    {unverifiedVisibleCols.map(key => {
+                      switch (key) {
+                        case "name": return (
+                          <div key={key} className="flex flex-col min-w-0">
+                            <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
+                          </div>
+                        );
+                        case "email":         return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>;
+                        case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
+                        case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
+                        case "reviewStatus":  return (
+                          <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#FEF3C7", color:"#92400E", border:"1px solid #FDE68A", borderRadius:20, fontSize:11, fontWeight:700, padding:"3px 10px", whiteSpace:"nowrap", width:"fit-content" }}>
+                            <span style={{ width:6, height:6, borderRadius:"50%", background:"#F59E0B", flexShrink:0 }} /> Pending
+                          </span>
+                        );
+                        default: return <span key={key} className="text-[13px] text-slate-400">—</span>;
+                      }
+                    })}
                     <div>
                       <button onClick={() => router.push(`/superadmin/vendors/review/${v.id}`)} style={{ fontSize:12, fontWeight:700, color:"#2563EB", background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
                         Review
@@ -474,6 +552,8 @@ export default function SuperAdminVendorsPage() {
                           case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
                           case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
                           case "status":        return <div key={key}><StatusBadge status={v.status} size="sm" /></div>;
+                          case "billingType":   return <span key={key} className="text-[12px] text-slate-700 font-bold">{v.billing_type ?? "PREPAID"}</span>;
+                          case "creditLimit":   return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.credit_limit != null ? `₹${Number(v.credit_limit).toLocaleString("en-IN")}` : "—"}</span>;
                           case "wallet":        return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.wallet_balance != null ? `₹${Number(v.wallet_balance).toLocaleString("en-IN")}` : "—"}</span>;
                           case "pan":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
                           case "gst":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
@@ -715,7 +795,86 @@ export default function SuperAdminVendorsPage() {
                     <span className="text-[13px] text-slate-500 font-medium">Send credentials to email</span>
                   </div>
 
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <Field label="Billing Type" error={billingErrors.billing_type}>
+                      <Select
+                        value={billingType}
+                        onValueChange={(value) => {
+                          const next = value as VendorBillingType;
+                          setBillingType(next);
+                          setBillingErrors({});
+                          if (next === "PREPAID") {
+                            setCreditLimit("");
+                            setBillingCycle("MONTHLY");
+                            setPaymentDueDays("7");
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-[38px] w-full rounded-xl border-slate-200 bg-white text-[13px]">
+                          <SelectValue placeholder="Select billing type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PREPAID">PREPAID</SelectItem>
+                          <SelectItem value="POSTPAID">POSTPAID</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <p className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11.5px] font-medium text-blue-700">
+                      {billingType === "PREPAID"
+                        ? "PREPAID: Trips are allowed only when wallet balance is available."
+                        : "POSTPAID: Trips are billed later and controlled by credit limit."}
+                    </p>
+
+                    {billingType === "POSTPAID" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="Credit Limit" error={billingErrors.credit_limit}>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-semibold text-[13px]">₹</span>
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="50000"
+                              value={creditLimit}
+                              onChange={(e) => { setCreditLimit(e.target.value); setBillingErrors(p => ({ ...p, credit_limit: undefined })); }}
+                              className="h-[38px] rounded-xl border-slate-200 bg-white text-[13px] pl-7"
+                            />
+                          </div>
+                        </Field>
+                        <Field label="Billing Cycle" error={billingErrors.billing_cycle}>
+                          <Select
+                            value={billingCycle}
+                            onValueChange={(value) => {
+                              setBillingCycle(value as VendorBillingCycle);
+                              setBillingErrors(p => ({ ...p, billing_cycle: undefined }));
+                            }}
+                          >
+                            <SelectTrigger className="h-[38px] w-full rounded-xl border-slate-200 bg-white text-[13px]">
+                              <SelectValue placeholder="Select cycle" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="WEEKLY">WEEKLY</SelectItem>
+                              <SelectItem value="MONTHLY">MONTHLY</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="Payment Due Days" error={billingErrors.payment_due_days}>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="7"
+                            value={paymentDueDays}
+                            onChange={(e) => { setPaymentDueDays(e.target.value); setBillingErrors(p => ({ ...p, payment_due_days: undefined })); }}
+                            className="h-[38px] rounded-xl border-slate-200 bg-white text-[13px]"
+                          />
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Wallet setup */}
+                  {billingType === "PREPAID" && (
                   <div className="pt-1 border-t border-slate-200">
                     <div className="flex items-center justify-between py-2">
                       <div className="flex items-center gap-2">
@@ -737,6 +896,7 @@ export default function SuperAdminVendorsPage() {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -783,7 +943,7 @@ export default function SuperAdminVendorsPage() {
 
               {submitting && (
                 <p className="text-[11px] text-blue-500 font-medium text-right mt-2 animate-pulse">
-                  {submitPhase === "docs" ? "Uploading documents to Cloudinary…" : "Creating account & sending credentials…"}
+                  {submitPhase === "docs" ? "Uploading documents to Google Drive…" : "Creating account & sending credentials…"}
                 </p>
               )}
               {submitSuccess && (

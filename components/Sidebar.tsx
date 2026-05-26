@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutGrid,
   User,
+  Users,
   Route,
   Truck,
-  FileText,
   BarChart2,
+  FileText,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -27,7 +28,7 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-type SubItem = { label: string; href: string };
+type SubItem = { label: string; href: string; reportType?: "supervisor" | "company" };
 
 type NavItem = {
   label: string;
@@ -54,8 +55,18 @@ const ALL_NAV_ITEMS: NavItem[] = [
       { label: "Scheduled Trips", href: "/dashboard/bookings/scheduled" },
     ],
   },
-  { label: "Invoicing", href: "/dashboard/accounts/invoicing", icon: FileText,  permission: "INVOICING_MONITORING" },
-  { label: "Reports",   href: "/dashboard/reports",            icon: BarChart2, permission: "REPORT_MONITORING" },
+  {
+    label: "Reports",
+    href: "/dashboard/reports?type=supervisor",
+    icon: BarChart2,
+    permission: "REPORT_MONITORING",
+    subItems: [
+      { label: "Supervisor Report", href: "/dashboard/reports?type=supervisor", reportType: "supervisor" },
+      { label: "Company Report",    href: "/dashboard/reports?type=company",    reportType: "company" },
+    ],
+  },
+  { label: "Invoices", href: "/dashboard/accounts/invoicing", icon: FileText, permission: "REPORT_MONITORING", adminOnly: true },
+  { label: "User Management", href: "/dashboard/settings?tab=team", icon: Users, permission: null, adminOnly: true },
   { label: "Settings",  href: "/dashboard/settings",           icon: Settings,  permission: null, adminOnly: true },
 ];
 
@@ -81,12 +92,14 @@ export function Sidebar({
   onMobileOpenChange: (open: boolean) => void;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, logout } = useAuth();
-  const vendorName  = user?.vendor_name?.trim() || "Vendor";
-  const displayName = user?.full_name?.trim() || vendorName;
-  const isMember    = user?.role === "vendor_member";
-  const roleLabel   = isMember ? (user?.role_label?.trim() || "Team Member") : "Admin";
-  const initials    = getInitials(isMember ? displayName : vendorName);
+  const brandName    = "SK Voyages";
+  const vendorName   = user?.vendor_name?.trim() || brandName;
+  const displayName  = user?.full_name?.trim() || vendorName;
+  const isMember     = user?.role === "vendor_member";
+  const roleLabel    = isMember ? (user?.role_label?.trim() || "Team Member") : "Vendor Admin";
+  const initials     = getInitials(isMember ? displayName : vendorName);
 
   const navItems = useMemo<NavItem[]>(() => {
     if (!isMember) return ALL_NAV_ITEMS;
@@ -103,7 +116,7 @@ export function Sidebar({
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     ALL_NAV_ITEMS.forEach(item => {
-      if (item.subItems) init[item.href] = pathname.startsWith(item.href);
+      if (item.subItems) init[item.href] = pathname.startsWith(item.href.split("?")[0]);
     });
     return init;
   });
@@ -121,7 +134,7 @@ export function Sidebar({
     tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
   }
 
-  const SidebarContent = ({
+  const sidebarContent = ({
     isCollapsed = false,
     onLinkClick,
   }: {
@@ -141,7 +154,7 @@ export function Sidebar({
               <Truck className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-none truncate">{vendorName}</p>
+              <p className="font-bold text-sm leading-none truncate">{brandName}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Vendor Dashboard</p>
             </div>
           </div>
@@ -151,14 +164,18 @@ export function Sidebar({
       {/* Nav */}
       <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
         {navItems.map(({ label, href, icon: Icon, subItems }) => {
+          const baseHref = href.split("?")[0];
           // Settings has a sibling /dashboard/profile route that should also
           // show as active; everything else is exact-match unless it has sub-items.
-          const isSettings = href === "/dashboard/settings";
+          const isSettings = baseHref === "/dashboard/settings";
+          const isUserManagement = href.includes("?tab=team");
           const active = subItems
-            ? pathname.startsWith(href)
-            : isSettings
-              ? pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/profile")
-              : pathname === href;
+            ? pathname.startsWith(baseHref)
+            : isUserManagement
+              ? pathname.startsWith("/dashboard/settings") && searchParams.get("tab") === "team"
+              : isSettings
+                ? (pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/profile")) && searchParams.get("tab") !== "team"
+                : pathname === baseHref;
 
           if (subItems) {
             const isExpanded = !!expanded[href];
@@ -194,7 +211,11 @@ export function Sidebar({
                 {!isCollapsed && isExpanded && (
                   <div className="mt-1 flex flex-col space-y-0.5">
                     {subItems.map((sub) => {
-                      const isSubActive = pathname === sub.href;
+                      const subBaseHref = sub.href.split("?")[0];
+                      const reportType = searchParams.get("type") === "company" ? "company" : "supervisor";
+                      const isSubActive = sub.reportType
+                        ? pathname === subBaseHref && sub.reportType === reportType
+                        : pathname === subBaseHref;
                       return (
                         <Link
                           key={sub.href}
@@ -285,7 +306,9 @@ export function Sidebar({
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800 leading-none truncate">{isMember ? displayName : vendorName}</p>
+              <p className="text-sm font-bold text-slate-800 leading-none truncate">
+                {isMember ? displayName : vendorName}
+              </p>
               <p className="text-xs text-slate-400 mt-0.5 truncate">{roleLabel}</p>
             </div>
           </div>
@@ -303,7 +326,7 @@ export function Sidebar({
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
-        <SidebarContent isCollapsed={collapsed} />
+        {sidebarContent({ isCollapsed: collapsed })}
 
         {/* Collapse toggle */}
         <button
@@ -327,7 +350,7 @@ export function Sidebar({
       >
         {/* Always-visible 60px icon strip */}
         <div className="w-[60px] h-full flex flex-col bg-white border-r">
-          <SidebarContent isCollapsed={true} />
+          {sidebarContent({ isCollapsed: true })}
         </div>
 
         {/* Expanded overlay on hover */}
@@ -337,10 +360,10 @@ export function Sidebar({
             onMouseEnter={handleTabletEnter}
             onMouseLeave={handleTabletLeave}
           >
-            <SidebarContent
-              isCollapsed={false}
-              onLinkClick={() => setTabletExpanded(false)}
-            />
+            {sidebarContent({
+              isCollapsed: false,
+              onLinkClick: () => setTabletExpanded(false),
+            })}
           </div>
         )}
       </aside>
@@ -349,7 +372,7 @@ export function Sidebar({
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="w-56 bg-white border-r h-full shadow-xl flex flex-col">
-            <SidebarContent onLinkClick={() => onMobileOpenChange(false)} />
+            {sidebarContent({ onLinkClick: () => onMobileOpenChange(false) })}
           </div>
           <div
             className="flex-1 bg-black/40"

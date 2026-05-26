@@ -10,7 +10,7 @@ import { SkeletonInline } from "@/components/ui/skeleton";
 import { Plus } from "lucide-react";
 import type { Supervisor, SupervisorFormData, SupervisorStatus } from "@/modules/supervisors/types";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
 
@@ -27,9 +27,11 @@ export default function SupervisorsPage() {
   const [statusFilter, setStatusFilter] = useState<SupervisorStatus | "All">("All");
 
   const filtered = supervisors.filter((s) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase());
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      (s.phone ?? "").toLowerCase().includes(q);
     const matchesStatus = statusFilter === "All" || s.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -76,16 +78,16 @@ export default function SupervisorsPage() {
 
   function handleExport() {
     const rows = filtered.map((s) => ({
-      "Supervisor ID": s.ref ?? "",
+      "Supervisor ID": s.ref ?? null,
       "Name":    s.name,
       "Email":   s.email,
       "Phone":   s.phone,
       "Status":  s.status,
-      "Zone":    s.zone ?? "",
+      "Zone":    s.zone ?? null,
       "Wallet Used": s.walletUsed ?? 0,
-      "Joined On":   s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN") : "",
+      "Joined On":   s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN") : null,
     }));
-    exportToCsv("supervisors", rows);
+    exportToXlsx("supervisors", rows, "Supervisors");
   }
 
   return (
@@ -118,7 +120,7 @@ export default function SupervisorsPage() {
             onStatusFilterChange={setStatusFilter}
           />
         </div>
-        <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} />
+        <ExportButton onClick={handleExport} disabled={isLoading || filtered.length === 0} label="Export XLSX" />
       </div>
 
       <SupervisorTable

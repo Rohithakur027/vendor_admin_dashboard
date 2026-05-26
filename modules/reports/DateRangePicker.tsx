@@ -31,7 +31,7 @@ export function DateRangePicker({
 }) {
   const todayStr = toIsoDate(new Date());
   const isOutOfRange = (ds: string) => direction === "past" ? ds > todayStr : false;
-  const [mode,    setMode]    = useState<"range" | "single">(from === to ? "single" : "range");
+  const [mode,    setMode]    = useState<"range" | "single">("range");
   const [phase,   setPhase]   = useState<"from" | "to">("from");
   const [tmpFrom, setTmpFrom] = useState(from);
   const [tmpTo,   setTmpTo]   = useState(to);

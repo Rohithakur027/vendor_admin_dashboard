@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutGrid, Building2, Users, Shield, ClipboardCheck, BarChart2, MapPin,
-  ChevronLeft, ChevronRight, Settings, MessageSquare, LogOut,
+  ChevronLeft, ChevronRight, UserCog, MessageSquare, LogOut, FileText,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
+  subItems?: { label: string; href: string; reportType?: "vendor" | "driver" }[];
   // null = always shown; otherwise hidden for superadmin_member without this permission.
   permission?: keyof typeof SUPERADMIN_PERMISSION_KEYS | null;
   // true = hidden from superadmin_member entirely (e.g. team management).
@@ -22,14 +23,33 @@ type NavItem = {
 };
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",         href: "/superadmin",                   icon: LayoutGrid,    permission: null },
+  {
+    label: "Dashboard",
+    href: "/superadmin",
+    icon: LayoutGrid,
+    permission: null,
+    subItems: [
+      { label: "Overview", href: "/superadmin" },
+      { label: "New Dashboard", href: "/superadmin/dashboard/new" },
+    ],
+  },
   { label: "Vendors",           href: "/superadmin/vendors",           icon: Building2,     permission: "VENDOR_MANAGEMENT" },
   { label: "Live Map",          href: "/superadmin/live-map",          icon: MapPin,        permission: "TRIP_MONITORING" },
   { label: "Drivers",           href: "/superadmin/drivers",           icon: Users,         permission: "DRIVER_MANAGEMENT" },
   { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck, permission: "DRIVER_MANAGEMENT" },
   { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare, permission: "TRIP_MONITORING" },
-  { label: "Reports",           href: "/superadmin/reports",           icon: BarChart2,     permission: "REPORTS_MANAGEMENT" },
-  { label: "Settings",          href: "/superadmin/settings",          icon: Settings,      permission: null, adminOnly: true },
+  { label: "Invoices",          href: "/superadmin/invoices",          icon: FileText,      permission: "REPORTS_MANAGEMENT" },
+  {
+    label: "Reports",
+    href: "/superadmin/reports?type=vendor",
+    icon: BarChart2,
+    permission: "REPORTS_MANAGEMENT",
+    subItems: [
+      { label: "Vendor Report", href: "/superadmin/reports?type=vendor", reportType: "vendor" },
+      { label: "Driver Report", href: "/superadmin/reports?type=driver", reportType: "driver" },
+    ],
+  },
+  { label: "User Management",   href: "/superadmin/settings",          icon: UserCog,       permission: null, adminOnly: true },
 ];
 
 function getInitials(name: string): string {
@@ -53,50 +73,30 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-export function SuperAdminSidebar({
-  mobileOpen,
-  onMobileOpenChange,
-}: {
-  mobileOpen: boolean;
-  onMobileOpenChange: (open: boolean) => void;
-}) {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const isMember     = user?.role === "superadmin_member";
-  const brandName    = "SK Travels";
-  const displayName  = isMember ? (user?.full_name?.trim() || brandName) : brandName;
-  const roleLabel    = isMember ? (user?.role_label?.trim() || "Team Member") : "Super Admin";
-  const initials     = getInitials(displayName);
+type SidebarContentProps = {
+  isCollapsed?: boolean;
+  onLinkClick?: () => void;
+  pathname: string;
+  searchParams: ReturnType<typeof useSearchParams>;
+  navItems: NavItem[];
+  initials: string;
+  displayName: string;
+  roleLabel: string;
+  logout: () => void;
+};
 
-  const navItems = useMemo<NavItem[]>(() => {
-    if (!isMember) return ALL_NAV_ITEMS;
-    return ALL_NAV_ITEMS.filter(item => {
-      if (item.adminOnly) return false;
-      if (item.permission == null) return true;
-      return hasModuleAccess(user?.permissions, SUPERADMIN_PERMISSION_KEYS[item.permission]);
-    });
-  }, [isMember, user?.permissions]);
-
-  const [collapsed, setCollapsed] = useState(false);
-  const [tabletExpanded, setTabletExpanded] = useState(false);
-  const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleTabletEnter() {
-    if (tabletTimer.current) clearTimeout(tabletTimer.current);
-    setTabletExpanded(true);
-  }
-
-  function handleTabletLeave() {
-    tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
-  }
-
-  const SidebarContent = ({
-    isCollapsed = false,
-    onLinkClick,
-  }: {
-    isCollapsed?: boolean;
-    onLinkClick?: () => void;
-  }) => (
+function SidebarContent({
+  isCollapsed = false,
+  onLinkClick,
+  pathname,
+  searchParams,
+  navItems,
+  initials,
+  displayName,
+  roleLabel,
+  logout,
+}: SidebarContentProps) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={cn("border-b flex items-center", isCollapsed ? "px-3 py-5 justify-center" : "px-6 py-5")}>
@@ -110,7 +110,7 @@ export function SuperAdminSidebar({
               <Shield className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-none">SK Travels</p>
+              <p className="font-bold text-sm leading-none">SK Voyages</p>
               <p className="text-xs text-muted-foreground mt-0.5">Super Admin</p>
             </div>
           </div>
@@ -119,8 +119,10 @@ export function SuperAdminSidebar({
 
       {/* Nav */}
       <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
-        {navItems.map(({ label, href, icon: Icon }) => {
-          const active = href === "/superadmin" ? pathname === href : pathname.startsWith(href);
+        {navItems.map(({ label, href, icon: Icon, subItems }) => {
+          const baseHref = href.split("?")[0];
+          const active = baseHref === "/superadmin" ? pathname === baseHref : pathname.startsWith(baseHref);
+          const reportType = searchParams.get("type") === "driver" ? "driver" : "vendor";
           const link = (
             <Link
               href={href}
@@ -141,11 +143,34 @@ export function SuperAdminSidebar({
           return (
             <div key={href}>
               {isCollapsed ? <NavTooltip label={label}>{link}</NavTooltip> : link}
+              {!isCollapsed && subItems && (label === "Dashboard" || active) && (
+                <div className="mt-1 ml-7 space-y-1">
+                  {subItems.map((sub) => {
+                    const subActive = sub.reportType
+                      ? pathname === "/superadmin/reports" && sub.reportType === reportType
+                      : pathname === sub.href;
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        onClick={onLinkClick}
+                        className={cn(
+                          "block rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                          subActive
+                            ? "bg-blue-50 text-blue-600"
+                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        )}
+                      >
+                        {sub.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
       </nav>
-
 
       {/* Sign out — pinned above the user profile, red accent */}
       <div className={cn("border-t shrink-0", isCollapsed ? "px-2 py-2" : "px-3 py-2")}>
@@ -184,6 +209,45 @@ export function SuperAdminSidebar({
       </div>
     </div>
   );
+}
+
+export function SuperAdminSidebar({
+  mobileOpen,
+  onMobileOpenChange,
+}: {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { user, logout } = useAuth();
+  const isMember     = user?.role === "superadmin_member";
+  const brandName    = "SK Voyages";
+  const displayName  = isMember ? (user?.full_name?.trim() || brandName) : brandName;
+  const roleLabel    = isMember ? (user?.role_label?.trim() || "Team Member") : "Super Admin";
+  const initials     = getInitials(displayName);
+
+  const navItems = useMemo<NavItem[]>(() => {
+    if (!isMember) return ALL_NAV_ITEMS;
+    return ALL_NAV_ITEMS.filter(item => {
+      if (item.adminOnly) return false;
+      if (item.permission == null) return true;
+      return hasModuleAccess(user?.permissions, SUPERADMIN_PERMISSION_KEYS[item.permission]);
+    });
+  }, [isMember, user?.permissions]);
+
+  const [collapsed, setCollapsed] = useState(false);
+  const [tabletExpanded, setTabletExpanded] = useState(false);
+  const tabletTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleTabletEnter() {
+    if (tabletTimer.current) clearTimeout(tabletTimer.current);
+    setTabletExpanded(true);
+  }
+
+  function handleTabletLeave() {
+    tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
+  }
 
   return (
     <>
@@ -194,7 +258,16 @@ export function SuperAdminSidebar({
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
-        <SidebarContent isCollapsed={collapsed} />
+        <SidebarContent
+          isCollapsed={collapsed}
+          pathname={pathname}
+          searchParams={searchParams}
+          navItems={navItems}
+          initials={initials}
+          displayName={displayName}
+          roleLabel={roleLabel}
+          logout={logout}
+        />
 
         {/* Collapse toggle */}
         <button
@@ -218,7 +291,16 @@ export function SuperAdminSidebar({
       >
         {/* Always-visible 60px icon strip */}
         <div className="w-[60px] h-full flex flex-col bg-white border-r">
-          <SidebarContent isCollapsed={true} />
+          <SidebarContent
+            isCollapsed={true}
+            pathname={pathname}
+            searchParams={searchParams}
+            navItems={navItems}
+            initials={initials}
+            displayName={displayName}
+            roleLabel={roleLabel}
+            logout={logout}
+          />
         </div>
 
         {/* Expanded overlay on hover */}
@@ -231,6 +313,13 @@ export function SuperAdminSidebar({
             <SidebarContent
               isCollapsed={false}
               onLinkClick={() => setTabletExpanded(false)}
+              pathname={pathname}
+              searchParams={searchParams}
+              navItems={navItems}
+              initials={initials}
+              displayName={displayName}
+              roleLabel={roleLabel}
+              logout={logout}
             />
           </div>
         )}
@@ -240,7 +329,16 @@ export function SuperAdminSidebar({
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="w-56 bg-white border-r h-full shadow-xl flex flex-col">
-            <SidebarContent onLinkClick={() => onMobileOpenChange(false)} />
+            <SidebarContent
+              onLinkClick={() => onMobileOpenChange(false)}
+              pathname={pathname}
+              searchParams={searchParams}
+              navItems={navItems}
+              initials={initials}
+              displayName={displayName}
+              roleLabel={roleLabel}
+              logout={logout}
+            />
           </div>
           <div
             className="flex-1 bg-black/40"

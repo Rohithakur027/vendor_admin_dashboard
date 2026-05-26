@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { type InvoiceDetail, type InvoiceTripItem } from "@/lib/api";
+import { formatInvoiceNumber } from "@/lib/invoice-format";
 import ConsolidatedInvoiceCard from "./ConsolidatedInvoiceCard";
 
 const NAVY       = "#1B2B7E";
@@ -76,13 +77,148 @@ function numWords(n: number): string {
   return (parts.join(" ")||"Zero") + " Rupees" + (p ? " and "+h(p)+" Paise" : "") + " Only";
 }
 
-function RouteMap({ pickup, drop }: { pickup: string; drop: string; distanceKm?: number | null }) {
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function LocalRouteMap({
+  pickup,
+  drop,
+  pickupLat,
+  pickupLng,
+  dropLat,
+  dropLng,
+}: {
+  pickup: string;
+  drop: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropLat: number;
+  dropLng: number;
+}) {
+  const width = 300;
+  const height = 220;
+  const pad = 24;
+  const minLat = Math.min(pickupLat, dropLat);
+  const maxLat = Math.max(pickupLat, dropLat);
+  const minLng = Math.min(pickupLng, dropLng);
+  const maxLng = Math.max(pickupLng, dropLng);
+  const latSpan = Math.max(maxLat - minLat, 0.0015);
+  const lngSpan = Math.max(maxLng - minLng, 0.0015);
+  const mapW = width - pad * 2;
+  const mapH = height - pad * 2;
+  const toXY = (lat: number, lng: number) => ({
+    x: pad + ((lng - minLng) / lngSpan) * mapW,
+    y: height - pad - ((lat - minLat) / latSpan) * mapH,
+  });
+
+  const from = toXY(pickupLat, pickupLng);
+  const to = toXY(dropLat, dropLng);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const controlA = { x: from.x + dx * 0.32 - dy * 0.12, y: from.y + dy * 0.32 + dx * 0.08 };
+  const controlB = { x: from.x + dx * 0.68 + dy * 0.12, y: from.y + dy * 0.68 - dx * 0.08 };
+
+  const trimLabel = (value: string) => {
+    const first = value.split(",")[0]?.trim() || value;
+    return first.length > 20 ? `${first.slice(0, 19)}…` : first;
+  };
+
+  return (
+    <div style={{ position: "relative", height: 220, borderRadius: 10, overflow: "hidden", background: "#eaf0ea" }}>
+      <svg viewBox={`0 0 ${width} ${height}`} xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+        <defs>
+          <pattern id="route-grid" width="28" height="28" patternUnits="userSpaceOnUse">
+            <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#d9e3d9" strokeWidth="1" opacity="0.7" />
+          </pattern>
+          <linearGradient id="route-fill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f8fbf8" />
+            <stop offset="100%" stopColor="#edf5ed" />
+          </linearGradient>
+        </defs>
+        <rect width={width} height={height} fill="url(#route-fill)" />
+        <rect width={width} height={height} fill="url(#route-grid)" opacity="0.7" />
+        <path
+          d={`M ${from.x} ${from.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${to.x} ${to.y}`}
+          stroke={NAVY}
+          strokeWidth="3.5"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d={`M ${from.x} ${from.y} C ${controlA.x} ${controlA.y}, ${controlB.x} ${controlB.y}, ${to.x} ${to.y}`}
+          stroke="#ffffff"
+          strokeWidth="1"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeDasharray="5 7"
+          opacity="0.7"
+        />
+        <circle cx={from.x} cy={from.y} r="12" fill="#22c55e" opacity="0.16" />
+        <circle cx={to.x} cy={to.y} r="12" fill="#ef4444" opacity="0.16" />
+        <circle cx={from.x} cy={from.y} r="8" fill="#22c55e" />
+        <circle cx={from.x} cy={from.y} r="3.5" fill="#ffffff" />
+        <circle cx={to.x} cy={to.y} r="8" fill="#ef4444" />
+        <circle cx={to.x} cy={to.y} r="3.5" fill="#ffffff" />
+
+        <rect
+          x={Math.max(10, Math.min(width - 110, from.x + 12))}
+          y={Math.max(12, Math.min(height - 36, from.y - 18))}
+          width="100"
+          height="20"
+          rx="5"
+          fill="#ffffff"
+          opacity="0.92"
+        />
+        <text
+          x={Math.max(60, Math.min(width - 60, from.x + 62))}
+          y={Math.max(26, Math.min(height - 22, from.y - 4))}
+          fontSize="9"
+          fill="#166534"
+          fontFamily="sans-serif"
+          fontWeight="700"
+          textAnchor="middle"
+        >
+          {trimLabel(pickup)}
+        </text>
+
+        <rect
+          x={Math.max(10, Math.min(width - 110, to.x - 112))}
+          y={Math.max(12, Math.min(height - 36, to.y - 18))}
+          width="100"
+          height="20"
+          rx="5"
+          fill="#ffffff"
+          opacity="0.92"
+        />
+        <text
+          x={Math.max(50, Math.min(width - 50, to.x - 62))}
+          y={Math.max(26, Math.min(height - 22, to.y - 4))}
+          fontSize="9"
+          fill="#991b1b"
+          fontFamily="sans-serif"
+          fontWeight="700"
+          textAnchor="middle"
+        >
+          {trimLabel(drop)}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function GeocodedRouteMap({ pickup, drop }: { pickup: string; drop: string }) {
   const [mapUrl, setMapUrl] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const hasToken = Boolean(process.env.NEXT_PUBLIC_MAPBOX_TOKEN);
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-token">(() => (
+    hasToken ? "loading" : "no-token"
+  ));
 
   useEffect(() => {
-    const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!TOKEN) { setReady(true); return; }
+    if (!hasToken) return;
+    const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string;
 
     const geocode = (q: string) =>
       fetch(
@@ -93,17 +229,28 @@ function RouteMap({ pickup, drop }: { pickup: string; drop: string; distanceKm?:
 
     Promise.all([geocode(pickup), geocode(drop)])
       .then(([p, d]) => {
-        if (!p || !d) return;
+        if (!p || !d) {
+          setStatus("error");
+          return;
+        }
         const overlays = `pin-s-a+22c55e(${p[0]},${p[1]}),pin-s-b+ef4444(${d[0]},${d[1]})`;
         setMapUrl(
           `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlays}/auto/560x220@2x?padding=60&access_token=${TOKEN}`
         );
+        setStatus("ready");
       })
-      .catch(() => {})
-      .finally(() => setReady(true));
-  }, [pickup, drop]);
+      .catch(() => setStatus("error"));
+  }, [hasToken, pickup, drop]);
 
-  if (!ready) {
+  if (status === "no-token") {
+    return (
+      <div style={{ height: 220, borderRadius: 10, background: "#eaf0ea", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontSize: 12, color: "#6B7280" }}>Route map unavailable</span>
+      </div>
+    );
+  }
+
+  if (status === "loading") {
     return (
       <div style={{ height: 220, borderRadius: 10, background: "#eaf0ea", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <span style={{ fontSize: 12, color: "#6B7280" }}>Loading map…</span>
@@ -142,6 +289,45 @@ function RouteMap({ pickup, drop }: { pickup: string; drop: string; distanceKm?:
       </svg>
     </div>
   );
+}
+
+function RouteMap({
+  pickup,
+  drop,
+  pickupLat,
+  pickupLng,
+  dropLat,
+  dropLng,
+}: {
+  pickup: string;
+  drop: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  dropLat?: number | null;
+  dropLng?: number | null;
+}) {
+  if (process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
+    return <GeocodedRouteMap pickup={pickup} drop={drop} />;
+  }
+
+  if ([pickupLat, pickupLng, dropLat, dropLng].every(isFiniteNumber)) {
+    const pLat = pickupLat as number;
+    const pLng = pickupLng as number;
+    const dLat = dropLat as number;
+    const dLng = dropLng as number;
+    return (
+      <LocalRouteMap
+        pickup={pickup}
+        drop={drop}
+        pickupLat={pLat}
+        pickupLng={pLng}
+        dropLat={dLat}
+        dropLng={dLng}
+      />
+    );
+  }
+
+  return <GeocodedRouteMap pickup={pickup} drop={drop} />;
 }
 
 function TripInvoiceCard({
@@ -199,7 +385,7 @@ function TripInvoiceCard({
         </div>
         <div style={{ textAlign: "right" }}>
           <p style={{ fontSize: 22, fontWeight: 700, color: NAVY, margin: 0, letterSpacing: "-0.5px" }}>
-            {inv.invoiceNumber}
+            {formatInvoiceNumber(inv.invoiceNumber)}
           </p>
           <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0", lineHeight: 1.6 }}>
             Invoice date: {fmtDate(inv.issuedAt)}
@@ -245,7 +431,10 @@ function TripInvoiceCard({
           <RouteMap
             pickup={trip.pickupAddress || "Pickup"}
             drop={trip.dropAddress || "Drop"}
-            distanceKm={trip.distanceKm}
+            pickupLat={trip.pickupLat}
+            pickupLng={trip.pickupLng}
+            dropLat={trip.dropLat}
+            dropLng={trip.dropLng}
           />
         </div>
         <div style={{ padding: "1.25rem 2rem" }}>
@@ -340,7 +529,7 @@ function TripInvoiceCard({
           ))}
           <div style={{ background: "#F8F9FE", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
             <p style={{ fontSize: 11, color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
-              Please include <strong>{inv.invoiceNumber}</strong> in payment reference.<br />
+              Please include <strong>{formatInvoiceNumber(inv.invoiceNumber)}</strong> in payment reference.<br />
               This is a computer generated invoice — no signature required.
             </p>
           </div>
@@ -394,13 +583,50 @@ function TripInvoiceCard({
         alignItems: "center", flexWrap: "wrap", gap: 8, borderTop: "1px solid #E8ECF4",
       }}>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-          {inv.invoiceNumber} · {trip.tripRef || "—"} · {VI.name}
+          {formatInvoiceNumber(inv.invoiceNumber)} · {trip.tripRef || "—"} · {VI.name}
         </span>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>Due {fmtDate(inv.dueDate)}</span>
       </div>
     </div>
   );
 }
+
+export const TripInvoiceDocument = forwardRef<HTMLDivElement, {
+  inv: InvoiceDetail;
+  mode?: "summary" | "detailed" | "trips-only" | "auto";
+}>(
+  function TripInvoiceDocument({ inv, mode = "auto" }, ref) {
+    return (
+      <div ref={ref} style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        gap: 32, padding: "2rem", background: "#F4F6FB",
+      }}>
+        {inv.trips.length === 0 ? (
+          <div style={{ padding: "60px 0", textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>
+            No trip details available for this invoice.
+          </div>
+        ) : mode === "summary" ? (
+          <ConsolidatedInvoiceCard inv={inv} />
+        ) : mode === "trips-only" ? (
+          <>
+            {inv.trips.map((trip, idx) => (
+              <TripInvoiceCard key={trip.tripId} trip={trip} inv={inv} idx={idx} />
+            ))}
+          </>
+        ) : mode === "detailed" || mode === "auto" ? (
+          <>
+            <ConsolidatedInvoiceCard inv={inv} />
+            {inv.trips.map((trip, idx) => (
+              <TripInvoiceCard key={trip.tripId} trip={trip} inv={inv} idx={idx} />
+            ))}
+          </>
+        ) : null}
+      </div>
+    );
+  }
+);
+
+TripInvoiceDocument.displayName = "TripInvoiceDocument";
 
 export default function TripInvoiceView({
   inv,
@@ -409,7 +635,7 @@ export default function TripInvoiceView({
 }: {
   inv:      InvoiceDetail;
   onClose?: () => void;
-  mode?:    "summary" | "detailed" | "auto";
+  mode?:    "summary" | "detailed" | "trips-only" | "auto";
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
@@ -450,7 +676,7 @@ export default function TripInvoiceView({
         remaining -= pageH;
       }
 
-      pdf.save(`${inv.invoiceNumber}.pdf`);
+      pdf.save(`${formatInvoiceNumber(inv.invoiceNumber)}.pdf`);
     } catch (e) {
       console.error("PDF generation failed", e);
     } finally {
@@ -477,7 +703,7 @@ export default function TripInvoiceView({
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: NAVY, fontFamily: "monospace" }}>
-            {inv.invoiceNumber}
+            {formatInvoiceNumber(inv.invoiceNumber)}
           </span>
           <span style={{ fontSize: 13, color: "#6B7280" }}>
             · {inv.companyName} · {inv.tripCount} trip{inv.tripCount === 1 ? "" : "s"}
@@ -514,26 +740,7 @@ export default function TripInvoiceView({
         </div>
       </div>
 
-      {/* Invoice cards — this div is captured for PDF */}
-      <div ref={contentRef} style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: 32, padding: "2rem", background: "#F4F6FB",
-      }}>
-        {inv.trips.length === 0 ? (
-          <div style={{ padding: "60px 0", textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>
-            No trip details available for this invoice.
-          </div>
-        ) : mode === "summary" ? (
-          <ConsolidatedInvoiceCard inv={inv} />
-        ) : mode === "detailed" || mode === "auto" ? (
-          <>
-            <ConsolidatedInvoiceCard inv={inv} />
-            {inv.trips.map((trip, idx) => (
-              <TripInvoiceCard key={trip.tripId} trip={trip} inv={inv} idx={idx} />
-            ))}
-          </>
-        ) : null}
-      </div>
+      <TripInvoiceDocument ref={contentRef} inv={inv} mode={mode} />
     </div>
   );
 }

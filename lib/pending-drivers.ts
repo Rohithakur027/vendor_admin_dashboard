@@ -3,7 +3,7 @@ export type DocStatus = "Pending" | "Approved" | "Rejected";
 export interface VerificationDoc {
   id:              string;
   name:            string;
-  docType:         "license" | "aadhaar" | "rc" | "photo";
+  docType:         "license" | "aadhaar" | "rc" | "photo" | "photo_vehicle";
   uploaded:        boolean;
   status:          DocStatus;
   rejectionReason: string;
@@ -27,6 +27,7 @@ export const INIT_PENDING: PendingDriver[] = [
       { id: "aadhaar", name: "Aadhaar Card",      docType: "aadhaar", uploaded: true,  status: "Pending", rejectionReason: "" },
       { id: "rc",      name: "Vehicle RC",        docType: "rc",      uploaded: true,  status: "Pending", rejectionReason: "" },
       { id: "photo",   name: "Profile Photo",     docType: "photo",   uploaded: true,  status: "Pending", rejectionReason: "" },
+      { id: "photo_vehicle", name: "Photo with Vehicle", docType: "photo_vehicle", uploaded: false, status: "Pending", rejectionReason: "" },
     ],
   },
   {
@@ -37,6 +38,7 @@ export const INIT_PENDING: PendingDriver[] = [
       { id: "aadhaar", name: "Aadhaar Card",      docType: "aadhaar", uploaded: true,  status: "Approved", rejectionReason: "" },
       { id: "rc",      name: "Vehicle RC",        docType: "rc",      uploaded: true,  status: "Pending",  rejectionReason: "" },
       { id: "photo",   name: "Profile Photo",     docType: "photo",   uploaded: false, status: "Pending",  rejectionReason: "" },
+      { id: "photo_vehicle", name: "Photo with Vehicle", docType: "photo_vehicle", uploaded: false, status: "Pending", rejectionReason: "" },
     ],
   },
   {
@@ -47,6 +49,7 @@ export const INIT_PENDING: PendingDriver[] = [
       { id: "aadhaar", name: "Aadhaar Card",      docType: "aadhaar", uploaded: true,  status: "Approved", rejectionReason: "" },
       { id: "rc",      name: "Vehicle RC",        docType: "rc",      uploaded: false, status: "Pending",  rejectionReason: "" },
       { id: "photo",   name: "Profile Photo",     docType: "photo",   uploaded: true,  status: "Approved", rejectionReason: "" },
+      { id: "photo_vehicle", name: "Photo with Vehicle", docType: "photo_vehicle", uploaded: false, status: "Pending", rejectionReason: "" },
     ],
   },
   {
@@ -57,6 +60,7 @@ export const INIT_PENDING: PendingDriver[] = [
       { id: "aadhaar", name: "Aadhaar Card",      docType: "aadhaar", uploaded: false, status: "Pending", rejectionReason: "" },
       { id: "rc",      name: "Vehicle RC",        docType: "rc",      uploaded: false, status: "Pending", rejectionReason: "" },
       { id: "photo",   name: "Profile Photo",     docType: "photo",   uploaded: false, status: "Pending", rejectionReason: "" },
+      { id: "photo_vehicle", name: "Photo with Vehicle", docType: "photo_vehicle", uploaded: false, status: "Pending", rejectionReason: "" },
     ],
   },
   {
@@ -67,6 +71,7 @@ export const INIT_PENDING: PendingDriver[] = [
       { id: "aadhaar", name: "Aadhaar Card",      docType: "aadhaar", uploaded: true,  status: "Approved", rejectionReason: "" },
       { id: "rc",      name: "Vehicle RC",        docType: "rc",      uploaded: true,  status: "Pending",  rejectionReason: "" },
       { id: "photo",   name: "Profile Photo",     docType: "photo",   uploaded: false, status: "Pending",  rejectionReason: "" },
+      { id: "photo_vehicle", name: "Photo with Vehicle", docType: "photo_vehicle", uploaded: false, status: "Pending", rejectionReason: "" },
     ],
   },
 ];

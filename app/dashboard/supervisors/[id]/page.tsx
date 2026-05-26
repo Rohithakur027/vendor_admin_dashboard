@@ -21,13 +21,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookingDetailModal } from "@/modules/bookings/components/BookingDetailModal";
 import type { Booking } from "@/modules/bookings/types";
 import { SearchBar } from "@/components/SearchBar";
-import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
 import { TripsTable } from "@/modules/bookings/components/TripsTable";
-import { buildTripRenderers, formatIST } from "@/modules/bookings/tripRenderers";
+import { buildTripRenderers } from "@/modules/bookings/tripRenderers";
 import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
 import { toIsoDate } from "@/modules/reports/primitives";
 
@@ -175,6 +175,7 @@ export default function SupervisorDetailPage() {
     totalCount: tripsTotalCols,
     loading: tripsPrefsLoading,
   } = useColumnPreferences(SUPERVISOR_TRIPS_TABLE_KEY);
+  const tripsSpec = getTableSpec(SUPERVISOR_TRIPS_TABLE_KEY);
   const [deleteOpen,   setDeleteOpen]   = useState(false);
   const [settingsSection, setSettingsSection] = useState<"profile" | "security">("profile");
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as { name: string; address: string | null; city: string | null; state: string | null; pincode: string | null }[] });
@@ -199,28 +200,9 @@ export default function SupervisorDetailPage() {
   const [deleteError,   setDeleteError]   = useState<string | null>(null);
   const [selectedBooking,  setSelectedBooking]  = useState<Booking | null>(null);
   const [tripSearch,       setTripSearch]       = useState("");
-  const [tripStatus,       setTripStatus]       = useState("All Status");
-  const [tripType,         setTripType]         = useState("All Types");
-  const [draftTripStatus,  setDraftTripStatus]  = useState("All Status");
-  const [draftTripType,    setDraftTripType]    = useState("All Types");
-  const [tripFilterOpen,   setTripFilterOpen]   = useState(false);
   const [tripPeriod,       setTripPeriod]       = useState<TripPeriod>("all");
   const [tripDateFrom,     setTripDateFrom]     = useState("");
   const [tripDateTo,       setTripDateTo]       = useState("");
-
-  function openTripFilter() {
-    setDraftTripStatus(tripStatus);
-    setDraftTripType(tripType);
-    setTripFilterOpen(true);
-  }
-  function applyTripFilter() {
-    setTripStatus(draftTripStatus);
-    setTripType(draftTripType);
-    setTripFilterOpen(false);
-  }
-  function cancelTripFilter() {
-    setTripFilterOpen(false);
-  }
 
   function addCompany() {
     const t = addCompanyInput.trim();
@@ -460,10 +442,10 @@ export default function SupervisorDetailPage() {
 
           {/* 4 Stat chips */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-            <StatCard label="Total Trips"    value={supBookings.length}       icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
-            <StatCard label="Today's Trips"  value={supervisor.bookingsToday} icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
-            <StatCard label="Today's Completed" value={completedCt}              icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#0F172A" />
-            <StatCard label="Ongoing"           value={ongoingCt}                icon={Circle}       iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Today's Spend"     value={`₹${(supervisor.dailyHistory.find((d) => d.date === today)?.amount ?? 0).toLocaleString("en-IN")}`} icon={Wallet}     iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Assigned Companies" value={supervisor.companies.length} icon={Building2} iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Status"             value={supervisor.status}             icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#0F172A" />
+            <StatCard label="Presence"           value={supervisor.isOnline ? "Online" : "Offline"} icon={Circle} iconBg="#F1F5F9" iconColor="#0F172A" />
           </div>
 
           {/* Wallet + Right column */}
@@ -547,7 +529,6 @@ export default function SupervisorDetailPage() {
 
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "bookings" && (() => {
-        const tripFilterCount = (tripStatus !== "All Status" ? 1 : 0) + (tripType !== "All Types" ? 1 : 0);
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const filteredBookings = supBookings.filter(b => {
@@ -577,9 +558,7 @@ export default function SupervisorDetailPage() {
             vehicleReg.toLowerCase().replace(/\s+/g, "").includes(q.replace(/\s+/g, "")) ||
             b.pickupLocation.toLowerCase().includes(q) ||
             b.dropLocation.toLowerCase().includes(q);
-          const matchSt = tripStatus === "All Status" || b.status === tripStatus;
-          const matchTy = tripType   === "All Types"  || b.type   === tripType;
-          return matchQ && matchSt && matchTy;
+          return matchQ;
         });
 
         // Renderers identical to Past Trips. supervisorName is constant on
@@ -604,29 +583,6 @@ export default function SupervisorDetailPage() {
           {/* Search + Filter row */}
           <div className="flex flex-wrap gap-3 items-center">
             <SearchBar value={tripSearch} onChange={setTripSearch} placeholder="Search by ID, driver, phone, vehicle, route..." />
-            <div className="relative shrink-0">
-              <FilterTrigger onClick={openTripFilter} activeCount={tripFilterCount} />
-              <FilterPanel
-                open={tripFilterOpen}
-                onClose={cancelTripFilter}
-                onCancel={cancelTripFilter}
-                onApply={applyTripFilter}
-                activeCount={tripFilterCount}
-                onClearAll={() => { setDraftTripStatus("All Status"); setDraftTripType("All Types"); }}
-              >
-                <FilterSection label="Status">
-                  {["All Status","Ongoing","Completed","Pending","Cancelled"].map(s => (
-                    <FilterPill key={s} label={s} active={draftTripStatus === s} onClick={() => setDraftTripStatus(s)} />
-                  ))}
-                </FilterSection>
-                <FilterSection label="Trip Type">
-                  {["All Types","Instant","Scheduled"].map(t => (
-                    <FilterPill key={t} label={t} active={draftTripType === t} onClick={() => setDraftTripType(t)} />
-                  ))}
-                </FilterSection>
-              </FilterPanel>
-            </div>
-
             <TripDateFilter
               period={tripPeriod}
               dateFrom={tripDateFrom}
@@ -646,24 +602,21 @@ export default function SupervisorDetailPage() {
 
             <ExportButton
               onClick={() => {
-                const rows = filteredBookings.map(b => {
-                  const drv = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
-                  return {
-                    "Trip ID":   b.bookingRef ?? "",
-                    "Trip Type": b.type ?? "",
-                    "Route":     `${b.pickupLocation} → ${b.dropLocation}`,
-                    "Company":   b.bookingSource ?? "",
-                    "Vehicle":   [drv?.vehicleReg, drv?.vehicle].filter(Boolean).join(" · "),
-                    "Driver":    drv?.name ?? "",
-                    "Status":    b.status,
-                    "Fare":      b.fare ?? "",
-                    "Created At": formatIST(b.createdAt) ?? "",
-                  };
+                const rows = filteredBookings.map((b) => {
+                  const row: Record<string, string | number | null> = {};
+                  for (const k of tripsVisibleCols) {
+                    const col = tripsSpec.columns.find((c) => c.key === k);
+                    if (!col) continue;
+                    const r = (tripsRenderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
+                    row[col.label] = r ? r.csv(b) : null;
+                  }
+                  return row;
                 });
-                exportToCsv(`supervisor-${id}-trips`, rows);
+                exportToXlsx(`supervisor-${id}-trips`, rows, "Recent Trips");
               }}
               disabled={isLoading || filteredBookings.length === 0}
               className="ml-auto"
+              label="Export XLSX"
             />
           </div>
 
@@ -688,7 +641,7 @@ export default function SupervisorDetailPage() {
           <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       ) : (
-        <PanelSupervisorReport supervisorId={supervisor.id} hideHeader hideSupervisorPicker />
+        <PanelSupervisorReport supervisorId={supervisor.id} hideHeader hideSupervisorPicker hideTripsTab />
       ))}
 
       {/* ══ TAB: TRANSACTIONS ══ */}

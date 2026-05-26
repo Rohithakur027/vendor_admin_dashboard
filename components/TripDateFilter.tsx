@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { TbFilter } from "react-icons/tb";
+import { CalendarDays } from "lucide-react";
 import { toIsoDate } from "@/modules/reports/primitives";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -78,20 +78,26 @@ export function TripDateFilter({ period, dateFrom, dateTo, onChangePeriod, onApp
       ];
 
   const isActive = period !== "all";
+  const activeLabel =
+    period === "today" ? "Today" :
+    period === "7days" ? (direction === "past" ? "Last 7 Days" : "Next 7 Days") :
+    period === "30days" ? (direction === "past" ? "Last 30 Days" : "Next 30 Days") :
+    period === "custom" ? (dateFrom && dateTo && dateFrom !== dateTo ? `${fmtSel(dateFrom)} - ${fmtSel(dateTo)}` : fmtSel(dateFrom || todayStr)) :
+    "Date Range";
 
   return (
     <div className="relative shrink-0" ref={ref}>
       {/* Trigger */}
       <button
         onClick={() => setOpen(v => !v)}
-        className={`inline-flex items-center gap-2 h-[42px] px-4 rounded-xl text-[13px] font-semibold border-[1.5px] transition-colors ${
+        className={`inline-flex items-center gap-2 h-[42px] px-4 rounded-xl text-[12.5px] font-medium border transition-colors ${
           isActive
-            ? "bg-blue-50 border-blue-500 text-blue-600"
-            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+            ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
         }`}
       >
-        <TbFilter className="h-[15px] w-[15px] shrink-0" />
-        Filter
+        <CalendarDays className="h-[15px] w-[15px] shrink-0" />
+        <span className="max-w-[190px] truncate">{activeLabel}</span>
         {isActive && (
           <span className="flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">1</span>
         )}

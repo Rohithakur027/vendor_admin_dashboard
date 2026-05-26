@@ -122,7 +122,7 @@ function buildSections(r: OnboardingDetail) {
     sections.push({
       title: "VEHICLE INFORMATION",
       fields: [
-        { label: "PLATE NUMBER",     value: fmt(r.vehicle.plate_number),                          raw: r.vehicle.plate_number ?? "",                          key: "vehicle.plate_number" },
+        { label: "VEHICLE REGISTRATION NUMBER", value: fmt(r.vehicle.plate_number),               raw: r.vehicle.plate_number ?? "",                          key: "vehicle.plate_number" },
         { label: "MODEL",            value: fmt(r.vehicle.model),                                 raw: r.vehicle.model ?? "",                                 key: "vehicle.model" },
         { label: "COLOR",            value: fmt(r.vehicle.color),                                 raw: r.vehicle.color ?? "",                                 key: "vehicle.color" },
         { label: "MAKE",             value: fmt(r.vehicle.make),                                  raw: r.vehicle.make ?? "",                                  key: "vehicle.make" },
@@ -184,13 +184,20 @@ function ViewModal({
         </div>
       );
     }
+    // Google Drive files — use embedded preview iframe (handles both images and PDFs)
+    const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      const previewUrl = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+      return <iframe src={previewUrl} title={label} style={{ width: "100%", height: "100%", border: "none", background: "#fff" }} allow="autoplay" />;
+    }
     const k = fileKind(url);
     if (k === "image") {
       // eslint-disable-next-line @next/next/no-img-element
       return <img src={url} alt={label} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />;
     }
     if (k === "pdf") {
-      return <iframe src={url} title={label} style={{ width: "100%", height: "100%", border: "none", background: "#fff" }} />;
+      const viewerSrc = `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(url)}`;
+      return <iframe src={viewerSrc} title={label} style={{ width: "100%", height: "100%", border: "none", background: "#fff" }} />;
     }
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: 16 }}>
@@ -709,7 +716,7 @@ export default function DriverReviewPage() {
     driverOnboardingApi.get(id)
       .then(res => {
         setRecord(res.data);
-        setDriverDocs(res.data.documents.driver.map(mapDoc));
+        setDriverDocs(res.data.documents.driver.filter(d => d.doc_type !== "undertaking_letter").map(mapDoc));
         setVehicleDocs(res.data.documents.vehicle.map(mapDoc));
       })
       .finally(() => setLoading(false));

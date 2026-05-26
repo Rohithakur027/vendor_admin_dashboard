@@ -19,6 +19,11 @@ export interface Vendor {
   totalBookingsAllTime: number;
   secondaryPOCs?: { name: string; email: string; phone: string }[];
   wallet_balance?: number;
+  billing_type?: "PREPAID" | "POSTPAID";
+  credit_limit?: number;
+  outstanding_balance?: number;
+  billing_cycle?: "WEEKLY" | "MONTHLY";
+  payment_due_days?: number;
   is_verified?: boolean;
   verification_note?: string | null;
   address?: string;
