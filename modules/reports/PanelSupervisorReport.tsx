@@ -30,10 +30,12 @@ export function PanelSupervisorReport({
   supervisorId,
   hideHeader = false,
   hideSupervisorPicker = false,
+  hideTripsTab = false,
 }: {
   supervisorId: string;
   hideHeader?: boolean;
   hideSupervisorPicker?: boolean;
+  hideTripsTab?: boolean;
 }) {
   const { supervisors, bookings, drivers, apiCounts } = useVendor();
   const { columns: visibleCols, toggle, reset, totalCount, loading: prefsLoading } = useColumnPreferences(TRIPS_TABLE_KEY);
@@ -212,13 +214,13 @@ export function PanelSupervisorReport({
 
   function handleExportTrips() {
     const rows = filteredTrips.map((b) => {
-      const out: Record<string, string | number> = {};
+      const out: Record<string, string | number | null> = {};
       for (const k of visibleCols) {
         const col = tripsSpec.columns.find(c => c.key === k);
         if (!col) continue;
 
         const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
-        out[col.label] = r ? r.csv(b) : "";
+        out[col.label] = r ? r.csv(b) : null;
       }
       return out;
     });
@@ -229,8 +231,9 @@ export function PanelSupervisorReport({
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: "overview", label: "Overview" },
-    { key: "trips",    label: "Trips"    },
+    ...(hideTripsTab ? [] : [{ key: "trips" as const, label: "Trips" }]),
   ];
+  const currentTab: TabKey = hideTripsTab ? "overview" : activeTab;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -321,8 +324,8 @@ export function PanelSupervisorReport({
               cursor: "pointer",
               background: "none",
               border: "none",
-              borderBottom: activeTab === key ? `2px solid ${A}` : "2px solid transparent",
-              color: activeTab === key ? A : "#94A3B8",
+              borderBottom: currentTab === key ? `2px solid ${A}` : "2px solid transparent",
+              color: currentTab === key ? A : "#94A3B8",
               marginBottom: -1.5,
               transition: "color 0.15s",
             }}
@@ -333,7 +336,7 @@ export function PanelSupervisorReport({
       </div>
 
       {/* ── OVERVIEW TAB ── */}
-      {activeTab === "overview" && <>
+      {currentTab === "overview" && <>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         <StatCard label="Total Trips" value={String(totalBookings)} sub="In selected period" iconBg="#F1F5F9"
@@ -548,7 +551,7 @@ export function PanelSupervisorReport({
       </>}
 
       {/* ── TRIPS TAB ── */}
-      {activeTab === "trips" && (
+      {currentTab === "trips" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#64748B" }}>
           <span style={{ fontWeight: 600, color: "#94A3B8", fontSize: 14 }}>{filteredTrips.length}</span>

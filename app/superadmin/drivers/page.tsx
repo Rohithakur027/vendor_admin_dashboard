@@ -102,7 +102,7 @@ function renderCell(key: string, d: DriverApiItem) {
     case "status":
       return (
         <div className="flex flex-col gap-1 items-start">
-          <StatusBadge status={d.status} size="sm" />
+          <StatusBadge status={d.isOnline ? "Online" : "Offline"} size="sm" />
           {d.isVerified && (
             <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100">
               ✓ Verified
@@ -156,15 +156,15 @@ function exportValue(key: string, d: DriverApiItem) {
     case "phone":
       return d.phone;
     case "email":
-      return d.email ?? "";
+      return d.email ?? null;
     case "status":
-      return d.status;
+      return d.isOnline ? "Online" : "Offline";
     case "zone":
-      return d.zone ?? "";
+      return d.zone ?? null;
     case "vehicle":
       return [d.vehicle?.plateNumber, d.vehicle?.model, d.vehicle?.type].filter(Boolean).join(" | ");
     case "lastSeen":
-      return d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : "";
+      return d.lastActiveAt ? `${formatDateStrings(d.lastActiveAt).day} ${formatDateStrings(d.lastActiveAt).time}` : null;
     case "totalTrips":
       return d.totalTrips;
     case "documents":
@@ -172,7 +172,7 @@ function exportValue(key: string, d: DriverApiItem) {
     case "createdAt":
       return fmtJoined(d.createdAt);
     default:
-      return "";
+      return null;
   }
 }
 
@@ -206,7 +206,7 @@ export default function SuperAdminDriversPage() {
     setError("");
     try {
       const res = await superadminApi.drivers.list({
-        limit:  200,
+        limit: 200,
         status: statusFilter !== "All" ? statusFilter : undefined,
       });
       setDrivers(res.data);
@@ -217,7 +217,13 @@ export default function SuperAdminDriversPage() {
     }
   }, [statusFilter]);
 
-  useEffect(() => { fetchDrivers(); }, [fetchDrivers]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchDrivers();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [fetchDrivers]);
 
   const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
     setDrivers((prev) => {
@@ -238,8 +244,8 @@ export default function SuperAdminDriversPage() {
 
   const totalCt     = drivers.length;
   const onTripCt    = drivers.filter(d => d.status === "On Trip").length;
-  const availableCt = drivers.filter(d => d.status === "Available").length;
-  const offlineCt   = drivers.filter(d => d.status === "Offline").length;
+  const availableCt = drivers.filter(d => d.isOnline).length;
+  const offlineCt   = drivers.filter(d => !d.isOnline).length;
 
   const filteredDrivers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -257,7 +263,7 @@ export default function SuperAdminDriversPage() {
 
   function handleExport() {
     const rows = filteredDrivers.map((d) => {
-      const row: Record<string, string | number> = {};
+      const row: Record<string, string | number | null> = {};
       for (const key of visibleCols) {
         const col = spec.columns.find((c) => c.key === key);
         row[col?.label ?? key] = exportValue(key, d);
@@ -277,7 +283,7 @@ export default function SuperAdminDriversPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
         <StatCard loading={loading} label="Total Drivers"  value={totalCt}     icon={Users}       />
         <StatCard loading={loading} label="On Trip"        value={onTripCt}    icon={Navigation}  />
-        <StatCard loading={loading} label="Available"      value={availableCt} icon={CircleCheck} />
+        <StatCard loading={loading} label="Online"         value={availableCt} icon={CircleCheck} />
         <StatCard loading={loading} label="Offline"        value={offlineCt}   icon={WifiOff}     />
       </div>
 

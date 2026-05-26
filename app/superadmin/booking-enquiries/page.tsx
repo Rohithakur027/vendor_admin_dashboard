@@ -54,6 +54,15 @@ function phoneExportValue(phone: string): string | number {
   return Number.isSafeInteger(value) ? value : digits;
 }
 
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  try {
+    return new Date(iso).toDateString() === new Date().toDateString();
+  } catch {
+    return false;
+  }
+}
+
 const STATUS_PILL: Record<string, { bg: string; color: string; dot: string; border: string }> = {
   pending:         { bg: "#fefce8", color: "#854d0e", dot: "#eab308",  border: "#fef08a" },
   driver_assigned: { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6",  border: "#bfdbfe" },
@@ -134,11 +143,30 @@ const SPECIAL_COL_CFG: Record<string, { grid: string; label: string; minPx: numb
 };
 
 function GeneralCell({ b, colKey }: { b: WebsiteBookingEnquiry; colKey: string }) {
+  const isNewQuery = isToday(b.createdAt) && ["new", "pending"].includes((b.status ?? "").toLowerCase());
+
   switch (colKey) {
     case "enqRef":
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", fontFamily: FONT }}>{b.enqRef ?? "—"}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            {isNewQuery && (
+              <span
+                title="New today"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "#ef4444",
+                  boxShadow: "0 0 0 4px rgba(239,68,68,0.14)",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", fontFamily: FONT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {b.enqRef ?? "—"}
+            </span>
+          </div>
           <span style={{ fontSize: 10, fontWeight: 700, background: "#eef2ff", color: "#2563eb", padding: "2px 7px", borderRadius: 6, display: "inline-block", width: "fit-content", boxShadow: "inset 0 0 0 1px #e0e7ff" }}>
             {b.isScheduled ? "Scheduled" : "Instant"}
           </span>
@@ -307,16 +335,16 @@ export default function BookingEnquiriesPage() {
 
   function handleExportGeneral() {
     exportToXlsx("website-bookings.xlsx", filteredGeneral.map(b => {
-      const row: Record<string, string | number> = {};
+      const row: Record<string, string | number | null> = {};
 
       genCols.forEach((key) => {
         switch (key) {
           case "enqRef":
-            row["Booking ID"] = b.enqRef ?? "";
+            row["Booking ID"] = b.enqRef ?? null;
             break;
           case "customer":
             row["Customer Name"] = b.customerName;
-            row["Email"] = b.customerEmail ?? "";
+            row["Email"] = b.customerEmail ?? null;
             row["Phone"] = phoneExportValue(b.customerMobile);
             break;
           case "route":
@@ -324,10 +352,10 @@ export default function BookingEnquiriesPage() {
             row["Destination Address"] = b.destination;
             break;
           case "type":
-            row["Vehicle Type"] = b.vehicleType ?? "";
+            row["Vehicle Type"] = b.vehicleType ?? null;
             break;
           case "bookingCategory":
-            row["Booking Category"] = b.bookingCategory ?? "";
+            row["Booking Category"] = b.bookingCategory ?? null;
             break;
           case "passengers":
             row["Passengers"] = b.passengers;
@@ -336,7 +364,7 @@ export default function BookingEnquiriesPage() {
             row["Created At"] = `${fmtDate(b.createdAt).date} ${fmtDate(b.createdAt).time}`.trim();
             break;
           case "distance":
-            row["Distance"] = b.distanceKm ?? "";
+            row["Distance"] = b.distanceKm ?? null;
             break;
           case "scheduledAt":
             row["Scheduled At"] = `${fmtDate(b.scheduledAt).date} ${fmtDate(b.scheduledAt).time}`.trim();
@@ -356,20 +384,20 @@ export default function BookingEnquiriesPage() {
 
   function handleExportSpecial() {
     exportToXlsx("website-enquiries.xlsx", special.map(s => {
-      const row: Record<string, string | number> = {};
+      const row: Record<string, string | number | null> = {};
 
       specCols.forEach((key) => {
         switch (key) {
           case "enqRef":
-            row["Enquiry ID"] = s.enqRef ?? "";
+            row["Enquiry ID"] = s.enqRef ?? null;
             break;
           case "name":
             row["Customer Name"] = s.name;
-            row["Email"] = s.email ?? "";
+            row["Email"] = s.email ?? null;
             row["Mobile"] = phoneExportValue(s.mobile);
             break;
           case "companyName":
-            row["Company"] = s.companyName ?? "";
+            row["Company"] = s.companyName ?? null;
             break;
           case "message":
             row["Message"] = s.message;
@@ -378,7 +406,7 @@ export default function BookingEnquiriesPage() {
             row["Created At"] = `${fmtDate(s.createdAt).date} ${fmtDate(s.createdAt).time}`.trim();
             break;
           case "email":
-            row["Email"] = s.email ?? "";
+            row["Email"] = s.email ?? null;
             break;
           case "mobile":
             row["Mobile"] = phoneExportValue(s.mobile);
@@ -681,10 +709,13 @@ export default function BookingEnquiriesPage() {
 
       {/* Detail sidebars */}
       <WebsiteBookingDetailSidebar
+        key={selectedGeneral?.id ?? "booking-detail-closed"}
         booking={selectedGeneral}
         onClose={() => setSelectedGeneral(null)}
+        onAssigned={() => setRefreshTick(v => v + 1)}
       />
       <WebsiteGeneralEnquiryDetailSidebar
+        key={selectedSpecial?.id ?? "enquiry-detail-closed"}
         enquiry={selectedSpecial}
         onClose={() => setSelectedSpecial(null)}
       />

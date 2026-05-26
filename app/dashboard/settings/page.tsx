@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Users, UserCheck, UserX, Search, Plus, Pencil, Trash2,
+  Users, Plus, Pencil, Trash2,
   X, ChevronLeft, BookOpen, Map, BarChart2, FileText, KeyRound,
-  CheckCircle2, Shield, Check, Mail, Phone, Calendar,
-  Clock, AlertCircle, Filter, Eye, EyeOff, UserCircle,
+  CheckCircle2, Check, Mail, Phone, Calendar,
+  Clock, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
-import { VendorProfileSettings  } from "@/modules/profile/VendorProfileSettings";
-import { VendorSecuritySettings } from "@/modules/profile/VendorSecuritySettings";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input }  from "@/components/ui/input";
@@ -23,9 +20,6 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem,
-} from "@/components/ui/dropdown-menu";
 import type { PermissionModule } from "@/modules/team-members/types";
 import { vendorTeamApi, type TeamMemberShape } from "@/lib/api";
 
@@ -327,10 +321,6 @@ function MemberDialog({
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    if (open) { setForm(initialForm); setStep(1); setErrors({}); setShowPassword(false); }
-  }, [open, initialForm]);
-
   function setField<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm(f => ({ ...f, [key]: val }));
     setErrors(e => ({ ...e, [key]: undefined }));
@@ -525,6 +515,7 @@ function PermissionChips({ permissions }: { permissions: Record<string, string[]
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function VendorSettingsPage() {
+  const toastIdRef = useRef(0);
   const [members,        setMembers]        = useState<TeamMemberShape[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [loadError,      setLoadError]      = useState<string | null>(null);
@@ -546,26 +537,8 @@ export default function VendorSettingsPage() {
   const [pwShow,        setPwShow]        = useState(false);
   const [pwConfirmShow, setPwConfirmShow] = useState(false);
 
-  // ─── Tabs (Profile / Team Members / Account & Security) ──
-  type TabKey = "profile" | "team" | "security";
-  const router       = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam     = searchParams.get("tab");
-  const initialTab: TabKey =
-    tabParam === "profile"  ? "profile"  :
-    tabParam === "security" ? "security" : "team";
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
-
-  function switchTab(tab: TabKey) {
-    setActiveTab(tab);
-    const sp = new URLSearchParams(Array.from(searchParams.entries()));
-    if (tab === "team") sp.delete("tab"); else sp.set("tab", tab);
-    const qs = sp.toString();
-    router.replace(qs ? `/dashboard/settings?${qs}` : "/dashboard/settings");
-  }
-
   function addToast(message: string, error = false) {
-    const id = Date.now();
+    const id = ++toastIdRef.current;
     setToasts(ts => [...ts, { id, message, error }]);
   }
 
@@ -582,7 +555,24 @@ export default function VendorSettingsPage() {
     }
   }, []);
 
-  useEffect(() => { loadMembers(); }, [loadMembers]);
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = await vendorTeamApi.list();
+        if (!cancelled) setMembers(data);
+      } catch (err) {
+        if (!cancelled) setLoadError((err as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function openAdd() {
     setDialogMode("add"); setDialogForm(blankForm()); setEditingId(null); setDialogOpen(true);
@@ -711,55 +701,16 @@ export default function VendorSettingsPage() {
 
   return (
     <div style={{ fontFamily: FONT }} className="space-y-5">
-
-      {/* Settings page header */}
       <div>
         <h1 className="text-lg font-semibold text-slate-800">Settings</h1>
-        <p className="text-sm text-slate-500">Manage your profile, account & team members.</p>
+        <p className="text-sm text-slate-500">Manage vendor dashboard team members and permissions.</p>
       </div>
 
-      {/* Left-rail layout: vertical pill rail + right content card */}
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-start">
-
-        {/* ── Left rail ── */}
-        <nav className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2 flex flex-col gap-1 md:sticky md:top-4">
-          {([
-            { key: "profile",  label: "Profile",            icon: UserCircle },
-            { key: "team",     label: "Team Members",       icon: Users      },
-            { key: "security", label: "Account & Security", icon: Shield     },
-          ] as const).map(({ key, label, icon: Icon }) => {
-            const active = activeTab === key;
-            return (
-              <button
-                key={key}
-                onClick={() => switchTab(key)}
-                className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-colors ${
-                  active
-                    ? "bg-blue-50 text-blue-600"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* ── Right content ── */}
-        <div className="space-y-5 min-w-0">
-
-      {activeTab === "profile" && <VendorProfileSettings />}
-
-      {activeTab === "security" && <VendorSecuritySettings />}
-
-      {activeTab === "team" && <>
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">Team Members</h1>
-            <p className="text-sm text-slate-500">Manage staff access and module permissions</p>
+            <h1 className="text-lg font-semibold text-slate-800">User Management</h1>
+            <p className="text-sm text-slate-500">Existing members are loaded from the vendor team API.</p>
           </div>
         </div>
         <Button
@@ -773,12 +724,11 @@ export default function VendorSettingsPage() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Members", value: members.length, icon: Users    },
-          { label: "Active",        value: totalActive,    icon: UserCheck },
-          { label: "Inactive",      value: totalInactive,  icon: UserX     },
+          { label: "Active",        value: totalActive,    icon: CheckCircle2 },
+          { label: "Inactive",      value: totalInactive,  icon: AlertCircle },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -794,7 +744,6 @@ export default function VendorSettingsPage() {
         ))}
       </div>
 
-      {/* Search + filter */}
       <TeamMemberFilters
         search={search}
         onSearchChange={setSearch}
@@ -802,7 +751,6 @@ export default function VendorSettingsPage() {
         onFilterChange={setFilter}
       />
 
-      {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className={`grid ${COLS} items-center gap-4 px-5 py-3 bg-slate-50/50 border-b border-slate-100`}>
           {["MEMBER", "ROLE / DESIGNATION", "PERMISSIONS", "STATUS", "ADDED", "ACTIVE", ""].map((h, i) => (
@@ -871,22 +819,16 @@ export default function VendorSettingsPage() {
         )}
       </div>
 
-      </>}
-
-        </div>
-      </div>
-
-      {/* Detail sidebar (rendered always; visibility controlled by `member` prop) */}
       <DetailSidebar
-        member={activeTab === "team" ? selectedMember : null}
+        member={selectedMember}
         onClose={() => setSelectedMember(null)}
         onEdit={m => { setSelectedMember(null); openEdit(m); }}
         onToggleActive={toggleActive}
         onUpdatePassword={openPasswordDialog}
       />
 
-      {/* Add/Edit dialog */}
       <MemberDialog
+        key={`${dialogMode}-${editingId ?? "new"}-${dialogOpen ? "open" : "closed"}`}
         open={dialogOpen}
         mode={dialogMode}
         initialForm={dialogForm}
@@ -895,7 +837,6 @@ export default function VendorSettingsPage() {
         isSaving={saving}
       />
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteDialog.open} onOpenChange={o => !deleting && setDeleteDialog(d => ({ ...d, open: o }))}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
@@ -973,7 +914,6 @@ export default function VendorSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Toasts */}
       <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2">
         {toasts.map(t => <Toast key={t.id} toast={t} onDismiss={() => setToasts(ts => ts.filter(x => x.id !== t.id))} />)}
       </div>

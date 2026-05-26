@@ -1,13 +1,17 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Drawer,
   DrawerContent,
   DrawerClose,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Phone, Mail } from "lucide-react";
-import type { WebsiteBookingEnquiry, WebsiteGeneralEnquiry } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Download, Loader2, Mail, Phone, Search } from "lucide-react";
+import { TripInvoiceDocument } from "@/app/dashboard/accounts/invoicing/TripInvoiceView";
+import { superadminApi, type DriverApiItem, type InvoiceDetail, type WebsiteBookingEnquiry, type WebsiteGeneralEnquiry } from "@/lib/api";
 
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
 
@@ -36,6 +40,77 @@ function fmtPhone(phone: string) {
   if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
   if (digits.length === 12 && digits.startsWith("91")) return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
   return phone;
+}
+
+function toDateKey(value: string | null | undefined) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildBookingInvoice(booking: WebsiteBookingEnquiry): InvoiceDetail {
+  const fare = typeof booking.estimatedFare === "number" && Number.isFinite(booking.estimatedFare)
+    ? booking.estimatedFare
+    : 0;
+  const bookingDate = toDateKey(booking.scheduledAt ?? booking.createdAt);
+  const ref = (booking.enqRef ?? booking.id).replace(/\s+/g, "").toUpperCase();
+  const invoiceNumber = `INV-${ref}`;
+
+  return {
+    id: booking.id,
+    invoiceNumber,
+    companyName: booking.customerName,
+    companyAddress: booking.customerEmail ?? fmtPhone(booking.customerMobile),
+    periodFrom: bookingDate,
+    periodTo: bookingDate,
+    amount: fare,
+    status: "Pending",
+    issuedAt: bookingDate,
+    dueDate: addDays(bookingDate, 7),
+    paidAt: null,
+    tripCount: 1,
+    paymentRef: null,
+    notes: "Generated from booking enquiry details.",
+    trips: [
+      {
+        tripId: booking.id,
+        tripRef: booking.enqRef ?? booking.id.slice(0, 8).toUpperCase(),
+        pickupAddress: booking.pickupLocation,
+        dropAddress: booking.destination,
+        pickupTime: booking.scheduledAt ?? booking.createdAt ?? new Date().toISOString(),
+        dropTime: booking.returnAt,
+        fare,
+        supervisorName: "Website enquiry",
+        driverName: booking.driverName ?? "Unassigned",
+        driverId: booking.driverId ?? null,
+        driverPhone: booking.driverPhone ?? null,
+        vehicleModel: booking.vehicleType ?? null,
+        vehicleReg: null,
+        passengers: booking.passengers,
+        distanceKm: booking.distanceKm,
+        tollCharges: 0,
+        bookingType: booking.bookingType,
+        pickupLat: booking.pickupLat,
+        pickupLng: booking.pickupLng,
+        dropLat: booking.dropLat,
+        dropLng: booking.dropLng,
+      },
+    ],
+  };
 }
 
 function StatusPill({ status }: { status: string | null }) {
@@ -80,9 +155,267 @@ function ContactRow({ icon: Icon, value }: { icon: typeof Mail; value: string })
   );
 }
 
+function DriverCard({
+  driver,
+  selected,
+  onSelect,
+}: {
+  driver: DriverApiItem;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        borderRadius: 14,
+        border: `1.5px solid ${selected ? "#BFDBFE" : "#E5E7EB"}`,
+        background: selected ? "#EFF6FF" : "#fff",
+        padding: 14,
+        cursor: "pointer",
+        boxShadow: selected ? "0 0 0 1px #DBEAFE inset" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 15,
+            fontWeight: 900,
+            color: selected ? "#1D4ED8" : "#0F172A",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            letterSpacing: 0.8,
+          }}>
+            {driver.vehicle?.plateNumber ?? "No vehicle number"}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#334155", fontWeight: 700, marginTop: 3 }}>
+            {driver.vehicle?.model ?? driver.vehicle?.type ?? "Vehicle model not available"}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#64748B", fontWeight: 500, marginTop: 3 }}>
+            {driver.name}
+          </div>
+          <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 2 }}>
+            {fmtPhone(driver.phone)}
+          </div>
+        </div>
+        <span
+          style={{
+            fontSize: 10.5,
+            fontWeight: 800,
+            padding: "4px 9px",
+            borderRadius: 999,
+            background: driver.isOnline ? "#DCFCE7" : "#F1F5F9",
+            color: driver.isOnline ? "#15803D" : "#64748B",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {driver.isOnline ? "Online" : "Offline"}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 11.5 }}>
+        <span style={{ color: "#94A3B8", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: 0.4 }}>Last active</span>
+        <span style={{ color: "#334155", fontWeight: 600, textAlign: "right" as const }}>
+          {new Date(driver.lastActiveAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function BookingDriverAssignContent({
+  booking,
+  onCancel,
+  onAssigned,
+}: {
+  booking: WebsiteBookingEnquiry;
+  onCancel: () => void;
+  onAssigned: () => void;
+}) {
+  const [drivers, setDrivers] = useState<DriverApiItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(booking.driverId ?? null);
+  const [fare, setFare] = useState<string>(booking.estimatedFare != null ? String(booking.estimatedFare) : "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const loadDrivers = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await superadminApi.drivers.list({ limit: 100 });
+      setDrivers(res.data);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load drivers.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadDrivers();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [loadDrivers]);
+
+  const filteredDrivers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const pool = booking.isScheduled ? drivers : drivers.filter(driver => driver.isOnline);
+    if (!q) return pool;
+    return pool.filter(driver => {
+      const vehicle = [driver.vehicle?.plateNumber, driver.vehicle?.model, driver.vehicle?.type].filter(Boolean).join(" ").toLowerCase();
+      return (
+        driver.name.toLowerCase().includes(q) ||
+        driver.phone.toLowerCase().includes(q) ||
+        vehicle.includes(q)
+      );
+    });
+  }, [booking.isScheduled, drivers, search]);
+
+  const selectedDriver = filteredDrivers.find(d => d.id === selectedDriverId) ?? null;
+
+  async function handleAssign() {
+    if (!selectedDriverId) return;
+    const fareValue = Number(fare);
+    if (!Number.isFinite(fareValue) || fareValue < 0) {
+      setSaveError("Enter a valid fare before assigning the driver.");
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await superadminApi.bookingEnquiries.assignWebsiteBookingDriver(booking.id, {
+        driver_id: selectedDriverId,
+        estimated_fare: fareValue,
+      });
+      onAssigned();
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to assign driver.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.6 }}>
+            Fare
+          </div>
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            value={fare}
+            onChange={e => setFare(e.target.value)}
+            placeholder="Enter fare before assigning"
+            className="h-10 rounded-xl border-slate-200 bg-white text-[13px]"
+          />
+        </div>
+
+        <div style={{ position: "relative" }}>
+          <Search size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search drivers by name, phone, or vehicle"
+            className="h-10 rounded-xl border-slate-200 bg-white pl-9 text-[13px]"
+          />
+        </div>
+
+        {loadError && (
+          <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", color: "#B91C1C", borderRadius: 10, padding: "10px 12px", fontSize: 12 }}>
+            {loadError}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "18px 0", color: "#94A3B8", fontSize: 12.5, fontWeight: 600 }}>
+            <Loader2 size={15} className="animate-spin" />
+            Loading drivers…
+          </div>
+        ) : filteredDrivers.length === 0 ? (
+          <div style={{ padding: "16px 0", textAlign: "center", color: "#94A3B8", fontSize: 12.5 }}>
+            {booking.isScheduled ? "No drivers found." : "No online drivers found."}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 340, overflowY: "auto", paddingRight: 2 }}>
+            {filteredDrivers.map(driver => (
+              <DriverCard
+                key={driver.id}
+                driver={driver}
+                selected={selectedDriverId === driver.id}
+                onSelect={() => setSelectedDriverId(driver.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: "auto", position: "sticky", bottom: 0, background: "linear-gradient(to top, #fff 70%, rgba(255,255,255,0))", paddingTop: 8 }}>
+        {saveError && (
+          <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", color: "#B91C1C", borderRadius: 10, padding: "10px 12px", fontSize: 12, marginBottom: 10 }}>
+            {saveError}
+          </div>
+        )}
+        {selectedDriver && (
+          <div style={{ background: "#EFF6FF", border: "1.5px solid #BFDBFE", borderRadius: 13, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: "#1D4ED8", textTransform: "uppercase" as const, letterSpacing: 0.6, marginBottom: 6 }}>
+              Selected Driver
+            </div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>{selectedDriver.vehicle?.plateNumber ?? "No vehicle number"}</div>
+            <div style={{ fontSize: 12, color: "#334155", fontWeight: 700, marginTop: 2 }}>
+              {selectedDriver.vehicle?.model ?? selectedDriver.vehicle?.type ?? "Vehicle model not available"}
+            </div>
+            <div style={{ fontSize: 12, color: "#0F172A", marginTop: 2 }}>{selectedDriver.name}</div>
+            <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{fmtPhone(selectedDriver.phone)}</div>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10 }}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="h-10 flex-1 rounded-xl text-[13px] font-semibold"
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleAssign}
+            disabled={!selectedDriverId || saving || fare.trim() === ""}
+            className="h-10 flex-1 rounded-xl text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {saving ? "Assigning…" : "Save & Assign"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Website booking detail ────────────────────────────────────────────────────
 
-function WebsiteBookingContent({ b }: { b: WebsiteBookingEnquiry }) {
+function WebsiteBookingContent({
+  b,
+  invoiceData,
+  onDownloadInvoice,
+  downloadingInvoice,
+}: {
+  b: WebsiteBookingEnquiry;
+  invoiceData: InvoiceDetail | null;
+  onDownloadInvoice: () => void;
+  downloadingInvoice: boolean;
+}) {
   const pickupParts = b.pickupLocation.split(",").map(p => p.trim()).filter(Boolean);
   const destParts   = b.destination.split(",").map(p => p.trim()).filter(Boolean);
   const pickupMain  = pickupParts[0] ?? b.pickupLocation;
@@ -203,13 +536,15 @@ function WebsiteBookingContent({ b }: { b: WebsiteBookingEnquiry }) {
         </div>
       )}
 
-      {/* Status */}
-      {b.status && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
-          <SLabel>Status</SLabel>
-          <StatusPill status={b.status} />
-        </div>
-      )}
+      <Button
+        type="button"
+        onClick={onDownloadInvoice}
+        disabled={downloadingInvoice || !invoiceData}
+        className="h-10 w-full rounded-xl bg-blue-600 px-4 text-[13px] font-semibold text-white hover:bg-blue-700"
+      >
+        <Download size={14} className="mr-2" />
+        {downloadingInvoice ? "Generating…" : "Download Invoice"}
+      </Button>
 
     </div>
   );
@@ -262,13 +597,78 @@ function WebsiteGeneralEnquiryContent({ e }: { e: WebsiteGeneralEnquiry }) {
 
 // ── Exported sidebars ─────────────────────────────────────────────────────────
 
-export function WebsiteBookingDetailSidebar({ booking, onClose }: {
+export function WebsiteBookingDetailSidebar({ booking, onClose, onAssigned }: {
   booking: WebsiteBookingEnquiry | null;
   onClose: () => void;
+  onAssigned?: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"details" | "assign-driver">("details");
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [renderInvoiceDoc, setRenderInvoiceDoc] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  const invoiceData = useMemo(() => (booking ? buildBookingInvoice(booking) : null), [booking]);
+
+  const handleDownloadInvoice = useCallback(async () => {
+    if (!invoiceData || downloadingInvoice) return;
+    setDownloadingInvoice(true);
+    const hideScrollbars = document.createElement("style");
+    hideScrollbars.textContent =
+      "* { scrollbar-width: none !important; } *::-webkit-scrollbar { display: none !important; }";
+    document.head.appendChild(hideScrollbars);
+
+    try {
+      setRenderInvoiceDoc(true);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      if (!invoiceRef.current) {
+        throw new Error("Invoice document not ready");
+      }
+
+      const [{ toPng }, { jsPDF }] = await Promise.all([
+        import("html-to-image"),
+        import("jspdf"),
+      ]);
+
+      const dataUrl = await toPng(invoiceRef.current, {
+        pixelRatio: 2,
+        backgroundColor: "#F4F6FB",
+      });
+
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
+
+      const imgW = 210;
+      const pageH = 297;
+      const imgH = (img.height * imgW) / img.width;
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      let remaining = imgH;
+      let offset = 0;
+      while (remaining > 0) {
+        if (offset > 0) pdf.addPage();
+        pdf.addImage(dataUrl, "PNG", 0, -offset, imgW, imgH);
+        offset += pageH;
+        remaining -= pageH;
+      }
+
+      pdf.save(`${invoiceData.invoiceNumber}.pdf`);
+    } catch (err) {
+      console.error("Invoice generation failed", err);
+    } finally {
+      document.head.removeChild(hideScrollbars);
+      setRenderInvoiceDoc(false);
+      setDownloadingInvoice(false);
+    }
+  }, [downloadingInvoice, invoiceData]);
+
   return (
     <Drawer open={!!booking} onOpenChange={o => !o && onClose()} direction="right">
       <DrawerContent
+        key={booking?.id ?? "empty"}
         className="flex flex-col h-full"
         style={{ width: 440, background: "#fff", borderLeft: "1.5px solid #EAEAEA", boxShadow: "-8px 0 40px rgba(0,0,0,0.08)", fontFamily: FONT }}
       >
@@ -295,7 +695,7 @@ export function WebsiteBookingDetailSidebar({ booking, onClose }: {
                 </span>
               )}
               {booking.bookingCategory && (
-                <span style={{ display: "inline-block", background: "#F0FDF4", color: "#15803D", padding: "4px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+                <span style={{ display: "inline-block", background: "#F1F5F9", color: "#475569", padding: "4px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
                   {booking.bookingCategory}
                 </span>
               )}
@@ -304,9 +704,40 @@ export function WebsiteBookingDetailSidebar({ booking, onClose }: {
                   Return Trip
                 </span>
               )}
-              {booking.status && <StatusPill status={booking.status} />}
+              {booking.status && booking.status.toLowerCase() !== "new" && <StatusPill status={booking.status} />}
             </div>
           )}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 14, borderBottom: "1px solid #E2E8F0" }}>
+            {([
+              { key: "details", label: "Details" },
+              { key: "assign-driver", label: "Assign Driver" },
+            ] as const).map(tab => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    padding: "9px 14px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: "inherit",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: active ? "#2563EB" : "#64748B",
+                    borderBottom: active ? "2px solid #2563EB" : "2px solid transparent",
+                    marginBottom: -1,
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
         </div>
 
         <div
@@ -314,8 +745,43 @@ export function WebsiteBookingDetailSidebar({ booking, onClose }: {
           style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}
         >
           <style>{`.enquiry-sb-scroll::-webkit-scrollbar{width:4px}.enquiry-sb-scroll::-webkit-scrollbar-track{background:transparent}.enquiry-sb-scroll::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:99px}.enquiry-sb-scroll::-webkit-scrollbar-thumb:hover{background:#CBD5E1}`}</style>
-          {booking && <WebsiteBookingContent b={booking} />}
+          {booking && activeTab === "details" && (
+            <WebsiteBookingContent
+              b={booking}
+              invoiceData={invoiceData}
+              onDownloadInvoice={() => void handleDownloadInvoice()}
+              downloadingInvoice={downloadingInvoice}
+            />
+          )}
+          {booking && activeTab === "assign-driver" && (
+            <BookingDriverAssignContent
+              key={booking.id}
+              booking={booking}
+              onCancel={onClose}
+              onAssigned={() => {
+                onAssigned?.();
+                onClose();
+              }}
+            />
+          )}
         </div>
+
+        {renderInvoiceDoc && invoiceData && (
+          <div
+            style={{
+              position: "fixed",
+              left: -12000,
+              top: 0,
+              width: 860,
+              opacity: 0,
+              pointerEvents: "none",
+              overflow: "hidden",
+            }}
+            aria-hidden="true"
+          >
+            <TripInvoiceDocument ref={invoiceRef} inv={invoiceData} mode="trips-only" />
+          </div>
+        )}
       </DrawerContent>
     </Drawer>
   );

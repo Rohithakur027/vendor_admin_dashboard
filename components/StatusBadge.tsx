@@ -18,6 +18,7 @@ export const STATUS_STYLES: Record<string, StatusStyle> = {
   Approved:         { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
   Completed:        { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
   Available:        { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
+  Online:           { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
   Active:           { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
   Verified:         { bg: "#DCFCE7", text: "#15803D", dot: "#22C55E", border: "#BBF7D0" },
 

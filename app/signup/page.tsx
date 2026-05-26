@@ -234,12 +234,6 @@ export default function VendorSignupPage() {
           ))}
         </div>
 
-        {/* Bottom dots */}
-        <div style={{ marginTop: "auto", display: "flex", gap: 6, zIndex: 1 }}>
-          {[1,2,3].map(i => (
-            <div key={i} style={{ width: i === 2 ? 20 : 6, height: 6, borderRadius: 3, background: i === 2 ? "#fff" : "rgba(255,255,255,0.35)" }} />
-          ))}
-        </div>
       </div>
 
       {/* ── Right panel ── */}

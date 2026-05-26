@@ -1,7 +1,7 @@
 type XlsxValue = string | number | boolean | null | undefined;
 
 function normalizeCellText(v: XlsxValue): string {
-  return (v == null ? "" : String(v))
+  return (v == null || v === "" ? "null" : String(v))
     .replace(/\u060C/g, ",")
     .replace(/ØŒ/g, ",");
 }

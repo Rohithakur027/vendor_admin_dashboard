@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Plus, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText,
+  Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText,
   Loader2, Ban, ChevronDown, CalendarDays,
 } from "lucide-react";
-import { exportToCsv } from "@/lib/exportCsv";
+import TripInvoiceView from "../../dashboard/accounts/invoicing/TripInvoiceView";
+import { formatInvoiceNumber } from "@/lib/invoice-format";
 import {
   superadminInvoicesApi,
   vendorsApi,
   type SuperadminInvoiceListItem,
   type SuperadminInvoiceDetail,
+  type InvoiceDetail,
   type InvoiceSummary,
   type InvoiceTripItem,
   type InvoiceStatus,
@@ -38,16 +40,26 @@ const SC: Record<InvoiceStatus, { bg:string; text:string; border:string; dot:str
 };
 
 function fmt(n: number) { return "₹" + n.toLocaleString("en-IN"); }
+function ordinal(day: number) {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1: return `${day}st`;
+    case 2: return `${day}nd`;
+    case 3: return `${day}rd`;
+    default: return `${day}th`;
+  }
+}
+function fmtLongDate(d: string) {
+  const dt = new Date(d + "T12:00:00");
+  return `${ordinal(dt.getDate())} ${dt.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}`;
+}
 function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 function fmtPeriod(from: string, to: string) {
-  const fd = new Date(from + "T12:00:00");
-  const td = new Date(to   + "T12:00:00");
-  if (from === to) {
-    return fd.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  }
-  return `${fd.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} — ${td.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+  if (from === to) return fmtLongDate(from);
+  return `${fmtLongDate(from)} to ${fmtLongDate(to)}`;
 }
 
 function StatusBadge({ status }: { status: InvoiceStatus }) {
@@ -145,11 +157,11 @@ export default function SuperadminInvoicingPage() {
       const col = spec.columns.find(c => c.key === key);
       return col ? `${col.minWidth}px` : "100px";
     }).join(" ");
-    return `${dataCols} 70px`;
+    return `${dataCols} 110px`;
   }, [visibleCols, spec.columns]);
 
   const minTableWidth = useMemo(
-    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 70 + 40,
+    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 110 + 40,
     [visibleCols, spec.columns],
   );
 
@@ -166,8 +178,8 @@ export default function SuperadminInvoicingPage() {
   const [vendorOpen,  setVendorOpen]  = useState(false);
   const [vendorQuery, setVendorQuery] = useState("");
 
-  const [periodFrom,  setPeriodFrom]  = useState(todayStr);
-  const [periodTo,    setPeriodTo]    = useState(todayStr);
+  const [periodFrom,  setPeriodFrom]  = useState("");
+  const [periodTo,    setPeriodTo]    = useState("");
   const [pickerOpen,  setPickerOpen]  = useState(false);
 
   const [notes,         setNotes]         = useState("");
@@ -186,7 +198,10 @@ export default function SuperadminInvoicingPage() {
   const [voiding,     setVoiding]     = useState(false);
   const [hovRow,      setHovRow]      = useState<number|null>(null);
   const [statusMenu,    setStatusMenu]    = useState<string|null>(null);
+  const [exportMenu,    setExportMenu]    = useState<string|null>(null);
   const [changingStatus, setChangingStatus] = useState<string|null>(null);
+  const [previewInv,    setPreviewInv]    = useState<InvoiceDetail | null>(null);
+  const [previewMode,   setPreviewMode]   = useState<"summary" | "detailed" | "auto">("auto");
 
   const step1Valid = !!selVendor && !!periodFrom && !!periodTo;
 
@@ -208,11 +223,17 @@ export default function SuperadminInvoicingPage() {
     }
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void reload();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [reload]);
 
   function openNew() {
     setSelVendor(""); setVendorOpen(false); setVendorQuery("");
-    setPeriodFrom(todayStr); setPeriodTo(todayStr); setPickerOpen(false);
+    setPeriodFrom(""); setPeriodTo(""); setPickerOpen(false);
     setNotes("");
     setStep(1); setGenerateErr(null); setGeneratedInv(null);
     setPreviewTrips([]); setPreviewTotal(0); setPreviewErr(null);
@@ -222,6 +243,8 @@ export default function SuperadminInvoicingPage() {
     setDrawerMode(null);
     setVendorOpen(false); setVendorQuery(""); setPickerOpen(false);
     setViewInv(null); setViewError(null); setGeneratedInv(null); setGenerateErr(null);
+    setPreviewInv(null);
+    setPreviewMode("auto");
   }
 
   async function goToStep2() {
@@ -288,7 +311,7 @@ export default function SuperadminInvoicingPage() {
 
   async function handleVoid() {
     if (!viewInv || voiding) return;
-    if (!window.confirm(`Void invoice ${viewInv.invoiceNumber}? Its trips will become available for re-invoicing.`)) return;
+    if (!window.confirm(`Void invoice ${formatInvoiceNumber(viewInv.invoiceNumber)}? Its trips will become available for re-invoicing.`)) return;
     setVoiding(true);
     try {
       await superadminInvoicesApi.void(viewInv.id);
@@ -315,19 +338,18 @@ export default function SuperadminInvoicingPage() {
     }
   }
 
-  function handleExportCsv() {
-    const rows = invoices.map((inv) => ({
-      "Invoice Number": inv.invoiceNumber,
-      "Vendor":         inv.vendorName,
-      "Period From":    inv.periodFrom,
-      "Period To":      inv.periodTo,
-      "Amount":         inv.amount,
-      "Status":         inv.status,
-      "Issued At":      fmtDate(inv.issuedAt),
-      "Due Date":       fmtDate(inv.dueDate),
-      "Trip Count":     inv.tripCount,
-    }));
-    exportToCsv("vendor-invoices", rows);
+  async function viewInvoicePdf(id: string, mode: "summary" | "detailed") {
+    try {
+      const res = await superadminInvoicesApi.get(id);
+      setPreviewMode(mode);
+      setPreviewInv({
+        ...res.data,
+        companyName: res.data.vendorName,
+        companyAddress: res.data.vendorAddress,
+      });
+    } catch {
+      /* best-effort */
+    }
   }
 
   const selVendorName = vendors.find(v => v.id === selVendor)?.name ?? "";
@@ -335,9 +357,19 @@ export default function SuperadminInvoicingPage() {
     const q = vendorQuery.toLowerCase().trim();
     return !q ? vendors : vendors.filter(v => v.name.toLowerCase().includes(q));
   }, [vendors, vendorQuery]);
-  const periodLabel   = periodFrom === periodTo
-    ? new Date(periodFrom + "T12:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-    : fmtPeriod(periodFrom, periodTo);
+  const viewInvoicePreview = useMemo<InvoiceDetail | null>(() => {
+    if (!viewInv) return null;
+    return {
+      ...viewInv,
+      companyName: viewInv.vendorName,
+      companyAddress: viewInv.vendorAddress,
+    };
+  }, [viewInv]);
+  const periodLabel = periodFrom && periodTo
+    ? periodFrom === periodTo
+      ? fmtLongDate(periodFrom)
+      : fmtPeriod(periodFrom, periodTo)
+    : "Select billing period";
 
   return (
     <div style={{ fontFamily:FONT, color:"#0F172A", display:"flex", flexDirection:"column", gap:20 }}
@@ -393,12 +425,6 @@ export default function SuperadminInvoicingPage() {
               ? <Skeleton className="h-3 w-20" />
               : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
             <ColumnsPopover tableKey="superadminInvoices" visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
-            {!loading && invoices.length > 0 && (
-              <button onClick={handleExportCsv}
-                style={{ display:"flex", alignItems:"center", gap:5, padding:"6px 12px", border:"1.5px solid #E2E8F0", borderRadius:8, background:"#fff", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:FONT }}>
-                Export CSV
-              </button>
-            )}
           </div>
         </div>
         <div style={{ overflowX:"auto" }}>
@@ -442,7 +468,7 @@ export default function SuperadminInvoicingPage() {
             ) : invoices.map((inv, i) => {
               const cellFor = (k: string): React.ReactNode => {
                 switch (k) {
-                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{inv.invoiceNumber}</span>;
+                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{formatInvoiceNumber(inv.invoiceNumber)}</span>;
                   case "vendor":     return (
                     <div>
                       <p style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{inv.vendorName}</p>
@@ -521,15 +547,36 @@ export default function SuperadminInvoicingPage() {
                   {visibleCols.map(k => (
                     <div key={k}>{cellFor(k)}</div>
                   ))}
-                  {/* View button */}
-                  <div onClick={e => e.stopPropagation()}>
+                  {/* Export dropdown — always last, fixed 110px */}
+                  <div style={{ position:"relative" }} onClick={e => e.stopPropagation()}>
                     <button
-                      onClick={() => openView(inv.id)}
-                      style={{ fontSize:12, fontWeight:600, color:"#64748B",
+                      onClick={e => { e.stopPropagation(); setExportMenu(exportMenu === inv.id ? null : inv.id); }}
+                      style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:600, color:"#64748B",
                         background:"none", border:"1px solid #E8EEF4", borderRadius:7, padding:"5px 10px",
                         cursor:"pointer", fontFamily:FONT }}>
-                      View
+                      <Download className="h-3 w-3"/> Export <ChevronDown className="h-3 w-3"/>
                     </button>
+                    {exportMenu === inv.id && (
+                      <>
+                        <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setExportMenu(null)}/>
+                        <div style={{ position:"absolute", top:"calc(100% + 4px)", right:0, zIndex:99,
+                          background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
+                          boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden", minWidth:140 }}>
+                          {(["summary","detailed"] as const).map((mode, idx) => (
+                            <button
+                              key={mode}
+                              onClick={() => { void viewInvoicePdf(inv.id, mode); setExportMenu(null); }}
+                              style={{ display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
+                                border:"none", borderBottom: idx === 0 ? "1px solid #F1F5F9" : "none",
+                                cursor:"pointer", fontFamily:FONT, fontSize:13, background:"#fff", color:"#0F172A" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
+                              {mode === "summary" ? "Summary" : "Detailed"}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -546,7 +593,7 @@ export default function SuperadminInvoicingPage() {
           <div style={{ padding:"20px 24px 16px", borderBottom:"1.5px solid #F1F5F9", flexShrink:0 }}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
-                <div style={{ fontSize:17, fontWeight:800, color:"#0F172A" }}>New Vendor Invoice</div>
+                <div style={{ fontSize:17, fontWeight:800, color:"#0F172A" }}>Vendor Invoice</div>
                 <div style={{ fontSize:12, color:"#94A3B8", marginTop:2 }}>
                   Step {step} of 2 — {step===1 ? "Select vendor & period" : "Review & confirm"}
                 </div>
@@ -643,8 +690,8 @@ export default function SuperadminInvoicingPage() {
                   </button>
                   {pickerOpen && (
                     <DateRangePicker
-                      from={periodFrom}
-                      to={periodTo}
+                      from={periodFrom || todayStr}
+                      to={periodTo || todayStr}
                       onApply={(f, t) => { setPeriodFrom(f); setPeriodTo(t); }}
                       onClose={() => setPickerOpen(false)}
                       direction="past"
@@ -670,7 +717,7 @@ export default function SuperadminInvoicingPage() {
                   <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:"#DCFCE7", border:"1px solid #BBF7D0", borderRadius:10, marginBottom:16 }}>
                     <CheckCircle2 className="h-5 w-5" style={{ color:"#15803D", flexShrink:0 }}/>
                     <div style={{ fontSize:13, fontWeight:700, color:"#15803D" }}>
-                      Invoice {generatedInv.invoiceNumber} created · {generatedInv.tripCount} trip{generatedInv.tripCount===1?"":"s"} · {fmt(generatedInv.amount)}
+                      Invoice {formatInvoiceNumber(generatedInv.invoiceNumber)} created · {generatedInv.tripCount} trip{generatedInv.tripCount===1?"":"s"} · {fmt(generatedInv.amount)}
                     </div>
                   </div>
                   <TripsMiniTable rows={generatedInv.trips} total={generatedInv.amount}/>
@@ -766,7 +813,7 @@ export default function SuperadminInvoicingPage() {
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div>
                   <div style={{ fontSize:17, fontWeight:800, color:"#0F172A", fontFamily:"monospace" }}>
-                    {viewInv?.invoiceNumber ?? "Loading…"}
+                    {viewInv ? formatInvoiceNumber(viewInv.invoiceNumber) : "Loading…"}
                   </div>
                   <div style={{ fontSize:12, color:"#94A3B8", marginTop:2 }}>
                     {viewInv ? `Issued ${fmtDate(viewInv.issuedAt)}` : ""}
@@ -793,8 +840,8 @@ export default function SuperadminInvoicingPage() {
                   </button>
                 </div>
               ) : viewInv ? (
-                <>
-                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", border:"1px solid #E8EEF4", marginBottom:20 }}>
+                <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", border:"1px solid #E8EEF4" }}>
                     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
                       {[
                         { lbl:"Vendor",  val:viewInv.vendorName },
@@ -834,15 +881,33 @@ export default function SuperadminInvoicingPage() {
                     )}
                   </div>
 
-                  {viewInv.trips.length > 0 && (
-                    <>
-                      <div style={{ fontSize:11, fontWeight:700, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>
-                        Trips ({viewInv.trips.length})
-                      </div>
-                      <TripsMiniTable rows={viewInv.trips} total={viewInv.amount}/>
-                    </>
-                  )}
-                </>
+                  <div style={{ border:"1.5px solid #E8EEF4", borderRadius:12, padding:16, background:"#fff" }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:"#64748B", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:12 }}>
+                      Invoice preview
+                    </div>
+                    <div style={{ display:"grid", gap:10 }}>
+                      <button
+                        type="button"
+                        onClick={() => { if (viewInvoicePreview) { setPreviewMode("summary"); setPreviewInv(viewInvoicePreview); } }}
+                        style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 14px", border:"1.5px solid #C5CBF0", borderRadius:10, background:"#EEF0FB", color:"#1B2B7E", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:FONT }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Open Summary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (viewInvoicePreview) { setPreviewMode("detailed"); setPreviewInv(viewInvoicePreview); } }}
+                        style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 14px", border:"1.5px solid #E2E8F0", borderRadius:10, background:"#fff", color:"#475569", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:FONT }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Open Detailed
+                      </button>
+                    </div>
+                    <div style={{ fontSize:12, color:"#94A3B8", marginTop:10, lineHeight:1.5 }}>
+                      The shared invoice viewer provides the same summary and detailed PDF export used in the vendor dashboard.
+                    </div>
+                  </div>
+                </div>
               ) : null}
             </div>
 
@@ -865,6 +930,10 @@ export default function SuperadminInvoicingPage() {
           </>
         )}
       </DrawerPanel>
+
+      {previewInv && (
+        <TripInvoiceView inv={previewInv} mode={previewMode} onClose={() => setPreviewInv(null)} />
+      )}
     </div>
   );
 }

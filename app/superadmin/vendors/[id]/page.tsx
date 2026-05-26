@@ -1022,57 +1022,57 @@ export default function VendorProfilePage() {
                   const rendererExport = tripsRenderers as Record<string, { csv?: (b: Booking) => string | number }>;
 
                   const rows = filteredBookings.map((b) => {
-                    const out: Record<string, string | number> = {};
+                    const out: Record<string, string | number | null> = {};
 
                     tripsVisibleCols.forEach((key) => {
                       const col = tripsSpec.columns.find((c) => c.key === key);
                       if (!col) return;
 
                       if (key === "tripId") {
-                        out["Trip ID"]   = b.bookingRef ?? "";
-                        out["Trip Type"] = b.type ?? "";
+                        out["Trip ID"]   = b.bookingRef ?? null;
+                        out["Trip Type"] = b.type ?? null;
                         return;
                       }
 
                       if (key === "route") {
-                        out["Pickup Address"] = b.pickupLocation ?? "";
-                        out["Destination Address"] = b.dropLocation ?? "";
+                        out["Pickup Address"] = b.pickupLocation ?? null;
+                        out["Destination Address"] = b.dropLocation ?? null;
                         return;
                       }
 
                       if (key === "supervisorCompany") {
-                        out["Supervisor"] = tripSupervisorMap.get(b.supervisorId) ?? b.supervisorName ?? "";
-                        out["Company"]    = b.bookingSource ?? "";
+                        out["Supervisor"] = tripSupervisorMap.get(b.supervisorId) ?? b.supervisorName ?? null;
+                        out["Company"]    = b.bookingSource ?? null;
                         return;
                       }
 
                       if (key === "vehicle") {
                         const d = tripDriverMap.get(b.id);
-                        out["Vehicle Number"] = d?.vehicleReg ?? "";
-                        out["Vehicle Model"]  = d?.vehicle ?? "";
-                        out["Vehicle Type"]   = d?.vehicleType ?? "";
+                        out["Vehicle Number"] = d?.vehicleReg ?? null;
+                        out["Vehicle Model"]  = d?.vehicle ?? null;
+                        out["Vehicle Type"]   = d?.vehicleType ?? null;
                         return;
                       }
 
                       if (key === "pickupLatLng") {
-                        out["Pickup Latitude"]  = b.pickupLat ?? "";
-                        out["Pickup Longitude"] = b.pickupLng ?? "";
+                        out["Pickup Latitude"]  = b.pickupLat ?? null;
+                        out["Pickup Longitude"] = b.pickupLng ?? null;
                         return;
                       }
 
                       if (key === "dropLatLng") {
-                        out["Drop Latitude"]  = b.dropLat ?? "";
-                        out["Drop Longitude"] = b.dropLng ?? "";
+                        out["Drop Latitude"]  = b.dropLat ?? null;
+                        out["Drop Longitude"] = b.dropLng ?? null;
                         return;
                       }
 
                       if (key === "escort") {
                         const escort = b as Booking & { escortRequired?: boolean; escortPickup?: string | null };
-                        out["Escort Required"] = escort.escortRequired ? "Yes" : "";
+                        out["Escort Required"] = escort.escortRequired ? "Yes" : null;
                         return;
                       }
 
-                      out[col.label] = rendererExport[key]?.csv?.(b) ?? "";
+                      out[col.label] = rendererExport[key]?.csv?.(b) ?? null;
                     });
 
                     return out;

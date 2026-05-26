@@ -54,7 +54,6 @@ const TRIP_COLUMNS: ColumnDef[] = [
   { key: "distance",          label: "Distance",             dbFields: "distance_km",                      minWidth: 100 },
   { key: "escort",            label: "Escort",               dbFields: "escort_required + escort_pickup",  minWidth: 140 },
   { key: "notes",             label: "Notes",                dbFields: "notes",                            minWidth: 160 },
-  { key: "invoice",           label: "Invoice",              dbFields: "invoice_id",                       minWidth: 130 },
   { key: "pickupLatLng",      label: "Pickup Lat/Lng",       dbFields: "pickup_lat + pickup_lng",          minWidth: 140 },
   { key: "dropLatLng",        label: "Drop Lat/Lng",         dbFields: "drop_lat + drop_lng",              minWidth: 140 },
 ];

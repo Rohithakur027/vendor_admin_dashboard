@@ -1,6 +1,7 @@
 "use client";
 
 import { type InvoiceDetail } from "@/lib/api";
+import { formatInvoiceNumber } from "@/lib/invoice-format";
 
 const NAVY       = "#1B2B7E";
 const NAVY_LIGHT = "#EEF0FB";
@@ -109,7 +110,7 @@ export default function ConsolidatedInvoiceCard({ inv }: { inv: InvoiceDetail })
         </div>
         <div style={{ textAlign: "right" }}>
           <p style={{ fontSize: 22, fontWeight: 700, color: NAVY, margin: 0, letterSpacing: "-0.5px" }}>
-            {inv.invoiceNumber}
+            {formatInvoiceNumber(inv.invoiceNumber)}
           </p>
           <p style={meta}>Invoice date: {fmtDate(inv.issuedAt)}</p>
           <p style={meta}>Due date: {fmtDate(inv.dueDate)}</p>
@@ -196,7 +197,7 @@ export default function ConsolidatedInvoiceCard({ inv }: { inv: InvoiceDetail })
           ))}
           <div style={{ background: "#F8F9FE", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
             <p style={{ margin: 0, fontSize: 11, color: "#6B7280", lineHeight: 1.6 }}>
-              Please include <strong>{inv.invoiceNumber}</strong> in payment reference.<br />
+              Please include <strong>{formatInvoiceNumber(inv.invoiceNumber)}</strong> in payment reference.<br />
               This is a computer generated invoice — no signature required.
             </p>
           </div>
@@ -244,7 +245,7 @@ export default function ConsolidatedInvoiceCard({ inv }: { inv: InvoiceDetail })
         flexWrap: "wrap", gap: 8, borderTop: "1px solid #E8ECF4",
       }}>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>
-          {inv.invoiceNumber} · {fmtPeriod(inv.periodFrom, inv.periodTo)} · {VI.name}
+          {formatInvoiceNumber(inv.invoiceNumber)} · {fmtPeriod(inv.periodFrom, inv.periodTo)} · {VI.name}
         </span>
         <span style={{ fontSize: 11, color: "#9CA3AF" }}>Due {fmtDate(inv.dueDate)}</span>
       </div>

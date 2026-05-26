@@ -23,10 +23,11 @@ import type { Booking } from "@/modules/bookings/types";
 import { SearchBar } from "@/components/SearchBar";
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { ExportButton } from "@/components/ExportButton";
-import { exportToCsv } from "@/lib/exportCsv";
+import { exportToXlsx } from "@/lib/exportXlsx";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { getTableSpec } from "@/lib/columnConfig";
 import { TripsTable } from "@/modules/bookings/components/TripsTable";
-import { buildTripRenderers, formatIST } from "@/modules/bookings/tripRenderers";
+import { buildTripRenderers } from "@/modules/bookings/tripRenderers";
 import { TripDateFilter, type TripPeriod } from "@/components/TripDateFilter";
 import { toIsoDate } from "@/modules/reports/primitives";
 
@@ -174,6 +175,7 @@ export default function SupervisorDetailPage() {
     totalCount: tripsTotalCols,
     loading: tripsPrefsLoading,
   } = useColumnPreferences(SUPERVISOR_TRIPS_TABLE_KEY);
+  const tripsSpec = getTableSpec(SUPERVISOR_TRIPS_TABLE_KEY);
   const [deleteOpen,   setDeleteOpen]   = useState(false);
   const [settingsSection, setSettingsSection] = useState<"profile" | "security">("profile");
   const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", zone: "", status: "Active", shift: "Morning", companies: [] as { name: string; address: string | null; city: string | null; state: string | null; pincode: string | null }[] });
@@ -600,24 +602,21 @@ export default function SupervisorDetailPage() {
 
             <ExportButton
               onClick={() => {
-                const rows = filteredBookings.map(b => {
-                  const drv = b.driverId ? drivers.find(d => d.id === b.driverId) : null;
-                  return {
-                    "Trip ID":   b.bookingRef ?? "",
-                    "Trip Type": b.type ?? "",
-                    "Route":     `${b.pickupLocation} → ${b.dropLocation}`,
-                    "Company":   b.bookingSource ?? "",
-                    "Vehicle":   [drv?.vehicleReg, drv?.vehicle].filter(Boolean).join(" · "),
-                    "Driver":    drv?.name ?? "",
-                    "Status":    b.status,
-                    "Fare":      b.fare ?? "",
-                    "Created At": formatIST(b.createdAt) ?? "",
-                  };
+                const rows = filteredBookings.map((b) => {
+                  const row: Record<string, string | number | null> = {};
+                  for (const k of tripsVisibleCols) {
+                    const col = tripsSpec.columns.find((c) => c.key === k);
+                    if (!col) continue;
+                    const r = (tripsRenderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
+                    row[col.label] = r ? r.csv(b) : null;
+                  }
+                  return row;
                 });
-                exportToCsv(`supervisor-${id}-trips`, rows);
+                exportToXlsx(`supervisor-${id}-trips`, rows, "Recent Trips");
               }}
               disabled={isLoading || filteredBookings.length === 0}
               className="ml-auto"
+              label="Export XLSX"
             />
           </div>
 
@@ -642,7 +641,7 @@ export default function SupervisorDetailPage() {
           <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       ) : (
-        <PanelSupervisorReport supervisorId={supervisor.id} hideHeader hideSupervisorPicker />
+        <PanelSupervisorReport supervisorId={supervisor.id} hideHeader hideSupervisorPicker hideTripsTab />
       ))}
 
       {/* ══ TAB: TRANSACTIONS ══ */}

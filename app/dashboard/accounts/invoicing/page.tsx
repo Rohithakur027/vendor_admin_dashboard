@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import TripInvoiceView from "./TripInvoiceView";
 import { Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText, Loader2, Ban, ChevronDown, CalendarDays } from "lucide-react";
 import { exportToCsv } from "@/lib/exportCsv";
+import { formatInvoiceNumber } from "@/lib/invoice-format";
 import {
   invoicesApi,
   companiesApi,
@@ -227,7 +228,13 @@ export default function InvoicingPage() {
     }
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void reload();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [reload]);
 
   function openNew() {
     setSelCompany(""); setCompanyOpen(false);
@@ -344,7 +351,7 @@ export default function InvoicingPage() {
 
   function handleExportCsv() {
     const rows = invoices.map((inv) => ({
-      "Invoice Number": inv.invoiceNumber,
+      "Invoice Number": formatInvoiceNumber(inv.invoiceNumber),
       "Company":        inv.companyName,
       "Period From":    inv.periodFrom,
       "Period To":      inv.periodTo,
@@ -465,7 +472,7 @@ export default function InvoicingPage() {
               const status = effectiveStatus(inv);
               const cellFor = (k: string): React.ReactNode => {
                 switch (k) {
-                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{inv.invoiceNumber}</span>;
+                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{formatInvoiceNumber(inv.invoiceNumber)}</span>;
                   case "company":    return (
                     <div>
                       <p style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{inv.companyName}</p>
@@ -713,7 +720,7 @@ export default function InvoicingPage() {
                   <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:"#DCFCE7", border:"1px solid #BBF7D0", borderRadius:10, marginBottom:16 }}>
                     <CheckCircle2 className="h-5 w-5" style={{ color:"#15803D", flexShrink:0 }}/>
                     <div style={{ fontSize:13, fontWeight:700, color:"#15803D" }}>
-                      Invoice {generatedInv.invoiceNumber} created · {generatedInv.tripCount} trip{generatedInv.tripCount===1?"":"s"} · {fmt(generatedInv.amount)}
+                      Invoice {formatInvoiceNumber(generatedInv.invoiceNumber)} created · {generatedInv.tripCount} trip{generatedInv.tripCount===1?"":"s"} · {fmt(generatedInv.amount)}
                     </div>
                   </div>
                   <TripsMiniTable rows={generatedInv.trips} total={generatedInv.amount}/>
@@ -809,7 +816,7 @@ export default function InvoicingPage() {
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                 <div>
                   <div style={{ fontSize:17, fontWeight:800, color:"#0F172A", fontFamily:"monospace" }}>
-                    {viewInv?.invoiceNumber ?? "Loading…"}
+                    {viewInv ? formatInvoiceNumber(viewInv.invoiceNumber) : "Loading…"}
                   </div>
                   <div style={{ fontSize:12, color:"#94A3B8", marginTop:2 }}>
                     {viewInv ? `Issued ${fmtDate(viewInv.issuedAt)}` : ""}

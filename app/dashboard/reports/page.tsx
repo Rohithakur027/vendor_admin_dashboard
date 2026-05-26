@@ -173,13 +173,13 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
 
   function handleExportTrips() {
     const rows = filteredTrips.map((b) => {
-      const out: Record<string, string | number> = {};
+      const out: Record<string, string | number | null> = {};
       for (const k of visibleCols) {
         const col = tripsSpec.columns.find((c) => c.key === k);
         if (!col) continue;
 
         const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
-        out[col.label] = r ? r.csv(b) : "";
+        out[col.label] = r ? r.csv(b) : null;
       }
       return out;
     });

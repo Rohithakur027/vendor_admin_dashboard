@@ -152,12 +152,12 @@ export default function SuperAdminVendorsPage() {
     const exportCols = vendorTab === "verified" ? visibleCols : unverifiedVisibleCols;
     const colLabelMap: Record<string, string> = Object.fromEntries(exportSpec.columns.map(c => [c.key, c.label]));
     const rows = filtered.map(v => {
-      const row: Record<string, string | number> = {};
+      const row: Record<string, string | number | null> = {};
       exportCols.forEach(key => {
         const label = colLabelMap[key] ?? key;
         switch (key) {
           case "name":          row[label] = v.name; break;
-          case "city":          row[label] = v.city ?? ""; break;
+          case "city":          row[label] = v.city ?? null; break;
           case "email":         row[label] = v.email; break;
           case "phone":         row[label] = phoneExportValue(v.phone); break;
           case "contactPerson": row[label] = v.contactPerson; break;
@@ -165,9 +165,9 @@ export default function SuperAdminVendorsPage() {
           case "billingType":   row[label] = v.billing_type ?? "PREPAID"; break;
           case "creditLimit":   row[label] = v.credit_limit != null ? `₹${v.credit_limit}` : "—"; break;
           case "wallet":        row[label] = v.wallet_balance != null ? `₹${v.wallet_balance}` : "—"; break;
-          case "pan":           row[label] = ""; break;
-          case "gst":           row[label] = ""; break;
-          case "address":       row[label] = (v as Vendor & { address?: string }).address ?? ""; break;
+          case "pan":           row[label] = null; break;
+          case "gst":           row[label] = null; break;
+          case "address":       row[label] = (v as Vendor & { address?: string }).address ?? null; break;
           case "createdAt":     row[label] = fmtJoined(v.joinedAt); break;
           case "reviewStatus":  row[label] = "Pending"; break;
         }

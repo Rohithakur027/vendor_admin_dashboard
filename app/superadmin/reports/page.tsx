@@ -378,10 +378,10 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
   function handleTripsExport() {
     const tripsSpec = getTableSpec(VENDOR_REPORT_TRIPS_TABLE_KEY);
     const rows = filteredTripRows.map((b) => {
-      const out: Record<string, string | number> = {};
+      const out: Record<string, string | number | null> = {};
       for (const key of tripsVisibleCols) {
         const renderer = (tripsRenderers as Record<string, { csv: (b: Booking) => string | number }>)[key];
-        const value = renderer ? renderer.csv(b) : "";
+        const value = renderer ? renderer.csv(b) : null;
         const col = tripsSpec.columns.find((c) => c.key === key);
         if (col) out[col.label] = value;
       }
@@ -425,6 +425,55 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
         </div>
       </Card>
 
+      {/* Shared report toolbar */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+        <div style={{ position:"relative", flexShrink:0 }}>
+          <button
+            type="button"
+            onClick={() => setCalOpen(v => !v)}
+            title={dateLabel}
+            className="inline-flex items-center gap-2 h-[42px] px-4 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <CalendarDays size={14} className="text-slate-500" strokeWidth={1.8} />
+            <span className="max-w-[190px] truncate">{dateLabel}</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          {calOpen && (
+            <SharedDateRangePicker
+              from={dateFrom}
+              to={dateTo}
+              onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
+              onClose={() => setCalOpen(false)}
+            />
+          )}
+        </div>
+
+        {tab === "Trips" && (
+          <>
+            <SearchBar
+              value={tripSearch}
+              onChange={setTripSearch}
+              placeholder="Search by ID, route, supervisor, company, driver, vehicle..."
+            />
+
+            <ColumnsPopover
+              tableKey={VENDOR_REPORT_TRIPS_TABLE_KEY}
+              visible={tripsVisibleCols}
+              totalCount={tripsTotalCols}
+              onToggle={toggleTripsCol}
+              onReset={resetTripsCols}
+            />
+
+            <ExportButton
+              onClick={handleTripsExport}
+              disabled={bookingsLoading || filteredTripRows.length === 0}
+              className="ml-auto"
+              label="Export XLSX"
+            />
+          </>
+        )}
+      </div>
+
       {/* Tab bar */}
       <div style={{ display:"flex", borderBottom:"1.5px solid #E8EEF4" }}>
         {VENDOR_TABS.map(t => (
@@ -449,20 +498,6 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
       {/* ── Overview ─────────────────────────────────────────────── */}
       {tab === "Overview" && (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-          <div style={{ position:"relative", display:"inline-block" }}>
-            <button onClick={() => setCalOpen(v => !v)}
-              style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"7px 14px", background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:13, color:"#475569", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
-              <span style={{ fontFamily:"monospace", fontWeight:500 }}>{dateLabel}</span>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            {calOpen && (
-              <SharedDateRangePicker from={dateFrom} to={dateTo}
-                onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
-                onClose={() => setCalOpen(false)}/>
-            )}
-          </div>
-
           {reportLoading ? <SharedReportSkeleton hideHeader statCount={3}/> : (
             <>
               <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
@@ -569,24 +604,6 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
       {tab === "Wallet Passbook" && (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-            {/* Calendar — left */}
-            <div style={{ position:"relative", display:"inline-block" }}>
-              <button onClick={() => setCalOpen(v => !v)}
-                style={{ display:"inline-flex", alignItems:"center", gap:8, padding:"7px 14px", background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:9, cursor:"pointer", fontFamily:"inherit", fontSize:13, color:"#475569", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
-                <span style={{ fontFamily:"monospace", fontWeight:500 }}>{dateLabel}</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
-              {calOpen && (
-                <div style={{ position:"absolute", top:"100%", left:0, width:290, height:0, zIndex:200 }}>
-                  <div style={{ position:"relative", width:"100%", height:"100%" }}>
-                    <SharedDateRangePicker from={dateFrom} to={dateTo}
-                      onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
-                      onClose={() => setCalOpen(false)}/>
-                  </div>
-                </div>
-              )}
-            </div>
             {/* Title */}
             <div style={{ fontSize:13.5, fontWeight:700, color:"#0F172A" }}>
               {!walletLoading && <span style={{ fontSize:12, fontWeight:500, color:"#94A3B8" }}>{walletData.length} transactions</span>}
@@ -640,49 +657,6 @@ function PanelVendorReport({ vendor }: { vendor: VendorListItem }) {
       {/* ── Trips ────────────────────────────────────────────────── */}
       {tab === "Trips" && (
         <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-            <SearchBar
-              value={tripSearch}
-              onChange={setTripSearch}
-              placeholder="Search by ID, route, supervisor, company, driver, vehicle..."
-            />
-
-            <div style={{ position:"relative", flexShrink:0 }}>
-              <button
-                type="button"
-                onClick={() => setCalOpen(v => !v)}
-                title={dateLabel}
-                className="inline-flex items-center gap-2 h-[42px] px-4 rounded-xl border border-slate-200 bg-white text-[12.5px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <CalendarDays size={14} className="text-slate-500" strokeWidth={1.8} />
-                Date Range
-              </button>
-              {calOpen && (
-                <SharedDateRangePicker
-                  from={dateFrom}
-                  to={dateTo}
-                  onApply={(f,t) => { setDateFrom(f); setDateTo(t); }}
-                  onClose={() => setCalOpen(false)}
-                />
-              )}
-            </div>
-
-            <ColumnsPopover
-              tableKey={VENDOR_REPORT_TRIPS_TABLE_KEY}
-              visible={tripsVisibleCols}
-              totalCount={tripsTotalCols}
-              onToggle={toggleTripsCol}
-              onReset={resetTripsCols}
-            />
-
-            <ExportButton
-              onClick={handleTripsExport}
-              disabled={bookingsLoading || filteredTripRows.length === 0}
-              className="ml-auto"
-              label="Export XLSX"
-            />
-          </div>
-
           <div style={{ display:"flex", alignItems:"center", gap:8, color:"#64748B", fontSize:13 }}>
             <span style={{ fontWeight:700, color:"#94A3B8", fontSize:14 }}>{filteredTripRows.length}</span>
             <span>{filteredTripRows.length === 1 ? "trip" : "trips"}</span>

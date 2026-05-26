@@ -5,6 +5,8 @@ import { superadminApi, type LocationHistoryPoint } from "@/lib/api";
 
 // Mapbox loaded lazily to avoid SSR issues
 let mapboxgl: typeof import("mapbox-gl") | null = null;
+const CAR_ICON_SRC = "/car.png";
+const PLAYBACK_SPEEDS = [1, 2, 4] as const;
 
 async function loadMapbox() {
   if (mapboxgl) return mapboxgl;
@@ -78,6 +80,20 @@ function sampleHistoryPoints(points: LocationHistoryPoint[], maxPoints = 100): L
   return sampled;
 }
 
+function normalizeCoords(points: LocationHistoryPoint[] | [number, number][]): [number, number][] {
+  const coords: [number, number][] = [];
+  for (const point of points as Array<LocationHistoryPoint | [number, number]>) {
+    const lng = Array.isArray(point) ? point[0] : point.lng;
+    const lat = Array.isArray(point) ? point[1] : point.lat;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+    const next: [number, number] = [lng, lat];
+    const prev = coords[coords.length - 1];
+    if (prev && prev[0] === next[0] && prev[1] === next[1]) continue;
+    coords.push(next);
+  }
+  return coords;
+}
+
 async function fetchMatchedRoute(points: LocationHistoryPoint[], token: string): Promise<[number, number][] | null> {
   const cleaned = sampleHistoryPoints(dedupeHistoryPoints(points), 100);
   if (cleaned.length < 2) return null;
@@ -110,15 +126,59 @@ async function fetchMatchedRoute(points: LocationHistoryPoint[], token: string):
   return route.length >= 2 ? route : null;
 }
 
+function clearRouteLayers(map: import("mapbox-gl").Map) {
+  ["route-line", "route-line-outline"].forEach((id) => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+  if (map.getSource("route-line")) map.removeSource("route-line");
+}
+
+function drawRouteLayers(
+  map: import("mapbox-gl").Map,
+  coordsInput: [number, number][],
+) {
+  const coords = normalizeCoords(coordsInput);
+  if (coords.length < 2) return;
+
+  clearRouteLayers(map);
+
+  map.addSource("route-line", {
+    type: "geojson",
+    data: {
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: coords },
+      properties: {},
+    },
+  });
+
+  map.addLayer({
+    id: "route-line-outline",
+    type: "line",
+    source: "route-line",
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: { "line-color": "#ffffff", "line-width": 8, "line-opacity": 0.88 },
+  });
+  map.addLayer({
+    id: "route-line",
+    type: "line",
+    source: "route-line",
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: { "line-color": "#2563EB", "line-width": 5, "line-opacity": 0.98 },
+  });
+}
+
 export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rangeProp, fetchPoints = defaultFetchPoints }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef          = useRef<import("mapbox-gl").Map | null>(null);
+  const startMarkerRef  = useRef<import("mapbox-gl").Marker | null>(null);
+  const endMarkerRef    = useRef<import("mapbox-gl").Marker | null>(null);
   const markerRef       = useRef<import("mapbox-gl").Marker | null>(null);
   const animFrameRef    = useRef<number | null>(null);
 
   const [state,        setState]        = useState<HistoryState>({ loading: true, error: null, points: [], route: null });
   const [scrubIdx,     setScrubIdx]     = useState(0);
   const [isPlaying,    setIsPlaying]    = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<(typeof PLAYBACK_SPEEDS)[number]>(1);
   const [hoursFilter,  setHoursFilter]  = useState(hours);
   const [mapReady,     setMapReady]     = useState(false);
 
@@ -171,6 +231,9 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       map?.remove();
       mapRef.current = null;
+      startMarkerRef.current?.remove();
+      endMarkerRef.current?.remove();
+      markerRef.current?.remove();
       setMapReady(false);
     };
   }, [token]);
@@ -182,67 +245,87 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
     if (!map || !mapReady || points.length === 0) return;
 
     const rawCoords = points.map((p) => [p.lng, p.lat] as [number, number]);
-    const coords = state.route ?? rawCoords;
+    const coords = normalizeCoords(state.route ?? rawCoords);
 
-    // Remove previous layers/sources
-    ["route-line", "route-start", "route-end", "route-line-outline"].forEach((id) => {
-      if (map.getLayer(id))  map.removeLayer(id);
-      if (map.getSource(id)) map.removeSource(id);
-    });
+    // Keep the map readable even if route matching fails.
+    startMarkerRef.current?.remove();
+    endMarkerRef.current?.remove();
+    drawRouteLayers(map, coords);
 
-    // Line
-    map.addSource("route-line", {
-      type: "geojson",
-      data: { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} },
-    });
-    map.addLayer({
-      id:     "route-line-outline",
-      type:   "line",
-      source: "route-line",
-      layout: { "line-join": "round", "line-cap": "round" },
-      paint:  { "line-color": "#ffffff", "line-width": 8, "line-opacity": 0.8 },
-    });
-    map.addLayer({
-      id:     "route-line",
-      type:   "line",
-      source: "route-line",
-      layout: { "line-join": "round", "line-cap": "round" },
-      paint:  { "line-color": "#2563EB", "line-width": 5, "line-opacity": 0.95 },
-    });
+    if (coords.length >= 2) {
+      const startEl = document.createElement("div");
+      startEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#22C55E;border:3px solid #fff;box-shadow:0 0 0 2px #22C55E;";
+      startMarkerRef.current = new (mapboxgl!.default.Marker)({ element: startEl })
+        .setLngLat(coords[0])
+        .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`Start · ${formatTime(points[0].recorded_at)}`))
+        .addTo(map);
 
-    // Start marker (green)
-    const startEl = document.createElement("div");
-    startEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#22C55E;border:3px solid #fff;box-shadow:0 0 0 2px #22C55E;";
-    new (mapboxgl!.default.Marker)({ element: startEl })
-      .setLngLat(rawCoords[0])
-      .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`Start · ${formatTime(points[0].recorded_at)}`))
-      .addTo(map);
-
-    // End marker (red)
-    const endEl = document.createElement("div");
-    endEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#EF4444;border:3px solid #fff;box-shadow:0 0 0 2px #EF4444;";
-    new (mapboxgl!.default.Marker)({ element: endEl })
-      .setLngLat(rawCoords[rawCoords.length - 1])
-      .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`End · ${formatTime(points[points.length - 1].recorded_at)}`))
-      .addTo(map);
+      const endEl = document.createElement("div");
+      endEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#EF4444;border:3px solid #fff;box-shadow:0 0 0 2px #EF4444;";
+      endMarkerRef.current = new (mapboxgl!.default.Marker)({ element: endEl })
+        .setLngLat(coords[coords.length - 1])
+        .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`End · ${formatTime(points[points.length - 1].recorded_at)}`))
+        .addTo(map);
+    }
 
     // Animated playhead marker (blue)
+    markerRef.current?.remove();
     const headEl = document.createElement("div");
-    headEl.style.cssText = "width:18px;height:18px;border-radius:50%;background:#2563EB;border:3px solid #fff;box-shadow:0 2px 8px rgba(37,99,235,0.5);cursor:pointer;";
+    headEl.style.cssText = "width:46px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;transform:translateY(-8px);filter:drop-shadow(0 2px 8px rgba(37,99,235,0.35));";
+    headEl.innerHTML = `<img src="${CAR_ICON_SRC}" alt="" width="46" height="48" draggable="false" style="display:block;width:46px;height:48px;user-select:none;-webkit-user-drag:none;" />`;
     const headMarker = new (mapboxgl!.default.Marker)({ element: headEl })
       .setLngLat(rawCoords[0])
       .addTo(map);
     markerRef.current = headMarker;
 
     // Fit bounds
-    const lngs = coords.map(c => c[0]);
-    const lats  = coords.map(c => c[1]);
-    map.fitBounds(
-      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { padding: 60, maxZoom: 15, duration: 800 },
-    );
+    if (coords.length >= 2) {
+      const lngs = coords.map(c => c[0]);
+      const lats  = coords.map(c => c[1]);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 60, maxZoom: 15, duration: 800 },
+      );
+    }
 
     setScrubIdx(0);
+  }, [mapReady, state.points, state.route]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || state.points.length === 0) return;
+
+    const redraw = () => {
+      const coords = normalizeCoords(state.route ?? state.points.map((p) => [p.lng, p.lat] as [number, number]));
+      startMarkerRef.current?.remove();
+      endMarkerRef.current?.remove();
+      drawRouteLayers(map, coords);
+      if (coords.length >= 2) {
+        const startEl = document.createElement("div");
+        startEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#22C55E;border:3px solid #fff;box-shadow:0 0 0 2px #22C55E;";
+        startMarkerRef.current = new (mapboxgl!.default.Marker)({ element: startEl })
+          .setLngLat(coords[0])
+          .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`Start · ${formatTime(state.points[0].recorded_at)}`))
+          .addTo(map);
+
+        const endEl = document.createElement("div");
+        endEl.style.cssText = "width:14px;height:14px;border-radius:50%;background:#EF4444;border:3px solid #fff;box-shadow:0 0 0 2px #EF4444;";
+        endMarkerRef.current = new (mapboxgl!.default.Marker)({ element: endEl })
+          .setLngLat(coords[coords.length - 1])
+          .setPopup(new (mapboxgl!.default.Popup)({ offset: 14 }).setText(`End · ${formatTime(state.points[state.points.length - 1].recorded_at)}`))
+          .addTo(map);
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      redraw();
+      return;
+    }
+
+    map.once("style.load", redraw);
+    return () => {
+      map.off("style.load", redraw);
+    };
   }, [mapReady, state.points, state.route]);
 
   // ── Sync playhead marker to scrubIdx ────────────────────────────────────────
@@ -258,6 +341,7 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
     if (!isPlaying || state.points.length === 0) return;
 
     let idx = scrubIdx;
+    const intervalMs = 140 / playbackSpeed;
     const step = () => {
       idx += 1;
       if (idx >= state.points.length) {
@@ -265,15 +349,14 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
         return;
       }
       setScrubIdx(idx);
-      animFrameRef.current = setTimeout(() => step(), 80) as unknown as number;
+      animFrameRef.current = setTimeout(() => step(), intervalMs) as unknown as number;
     };
-    animFrameRef.current = setTimeout(() => step(), 80) as unknown as number;
+    animFrameRef.current = setTimeout(() => step(), intervalMs) as unknown as number;
 
     return () => {
       if (animFrameRef.current) clearTimeout(animFrameRef.current as unknown as number);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying]);
+  }, [isPlaying, playbackSpeed, scrubIdx, state.points.length]);
 
   if (!token) {
     return (
@@ -333,6 +416,35 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
           position: "absolute", top: 14, right: 14,
           display: "flex", alignItems: "center", gap: 8,
         }}>
+          {points.length > 0 && (
+            <div style={{
+              background: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)",
+              borderRadius: 20, padding: "4px 6px", boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+              border: "1px solid rgba(226,232,240,0.8)",
+              display: "flex", alignItems: "center", gap: 4,
+            }}>
+              {PLAYBACK_SPEEDS.map((speed) => (
+                <button
+                  key={speed}
+                  onClick={() => setPlaybackSpeed(speed)}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: 16,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: playbackSpeed === speed ? "#2563EB" : "transparent",
+                    color: playbackSpeed === speed ? "#fff" : "#64748B",
+                    border: "none",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  {speed}x
+                </button>
+              ))}
+            </div>
+          )}
+
           {!rangeProp && (
             <div style={{
               background: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)",

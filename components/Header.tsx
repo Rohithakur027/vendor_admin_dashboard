@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,12 +19,16 @@ const pageTitles: Record<string, string> = {
   "/dashboard/bookings/active": "Active Trips",
   "/dashboard/bookings/past": "Past Trips",
   "/dashboard/bookings/scheduled": "Scheduled Trips",
+  "/dashboard/settings": "Settings",
 };
 
 export function Header({ onMobileMenuClick }: { onMobileMenuClick: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { logout, user } = useAuth();
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title = pathname === "/dashboard/settings" && searchParams.get("tab") === "team"
+    ? "User Management"
+    : pageTitles[pathname] ?? "Dashboard";
   const vendorName  = user?.vendor_name?.trim() || "Vendor";
   const isMember    = user?.role === "vendor_member";
   const displayName = isMember ? (user?.full_name?.trim() || vendorName) : vendorName;

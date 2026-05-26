@@ -21,6 +21,7 @@ export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onRese
   const spec = getTableSpec(tableKey);
   const columns = availableColumns ?? spec.columns;
   const visibleSet = new Set(visible);
+  const allVisible = visible.length === totalCount;
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +52,20 @@ export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onRese
     onToggle(key);
   }
 
+  function handleSelectAll() {
+    if (allVisible) return;
+    if (onSelectAll) {
+      onSelectAll();
+      return;
+    }
+
+    // Fallback for callers that do not pass a dedicated bulk setter.
+    columns
+      .map(col => col.key)
+      .filter(key => !visibleSet.has(key))
+      .forEach(key => onToggle(key));
+  }
+
   return (
     <div ref={wrapRef} className="relative inline-block">
       <button
@@ -73,16 +88,14 @@ export function ColumnsPopover({ tableKey, visible, totalCount, onToggle, onRese
               <div className="text-[11px] text-slate-500 mt-0.5">Choose which to display</div>
             </div>
             <div className="flex items-center gap-2">
-              {onSelectAll && (
-                <button
-                  type="button"
-                  onClick={onSelectAll}
-                  disabled={visible.length === totalCount}
-                  className="text-[11.5px] font-medium text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline disabled:cursor-not-allowed whitespace-nowrap"
-                >
-                  Select all
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                disabled={allVisible}
+                className="text-[11.5px] font-medium text-blue-600 hover:underline disabled:text-slate-400 disabled:no-underline disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                Select all
+              </button>
               <button type="button" onClick={onReset} className="text-[11.5px] font-medium text-blue-600 hover:underline">
                 Reset
               </button>

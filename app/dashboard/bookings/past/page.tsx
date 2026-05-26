@@ -109,13 +109,19 @@ export default function PastBookingsPage() {
 
   function handleExport() {
     const rows = filtered.map(b => {
-      const out: Record<string, string | number> = {};
+      const out: Record<string, string | number | null> = {};
       for (const k of visibleCols) {
         const col = spec.columns.find(c => c.key === k);
         if (!col) continue;
 
         const r = (renderers as Record<string, { csv: (b: Booking) => string | number }>)[k];
-        out[col.label] = r ? r.csv(b) : "";
+        if (k === "supervisorCompany") {
+          const supervisor = supervisors.find(s => s.id === b.supervisorId)?.name || "Unknown";
+          out["Supervisor"] = supervisor;
+          out["Company"] = b.bookingSource || "";
+          continue;
+        }
+        out[col.label] = r ? r.csv(b) : null;
       }
       return out;
     });

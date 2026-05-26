@@ -553,7 +553,21 @@ export const superadminApi = {
       apiFetch<{ success: true; data: LiveDriver[] }>("/api/superadmin/live-map"),
   },
 
+  bookings: {
+    assignDriver: (id: string, driverId: string) =>
+      apiFetch<{ success: true; data: unknown }>(`/api/vendor/bookings/${id}/assign-driver`, {
+        method: "PATCH",
+        body: JSON.stringify({ driver_id: driverId }),
+      }),
+  },
+
   bookingEnquiries: {
+    assignWebsiteBookingDriver: (id: string, payload: { driver_id: string; estimated_fare: number }) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(`/api/superadmin/booking-enquiries/website-bookings/${id}/assign-driver`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+
     listGeneral: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
       const qs = new URLSearchParams();
       if (params?.page)   qs.set("page",   String(params.page));
@@ -663,6 +677,16 @@ export interface WebsiteBookingEnquiry {
   customerEmail:   string | null;
   customerMobile:  string;
   status:          string | null;
+  pickupLat:       number | null;
+  pickupLng:       number | null;
+  dropLat:         number | null;
+  dropLng:         number | null;
+  estimatedFare?:  number | null;
+  driverId?:       string | null;
+  driverName?:     string | null;
+  driverPhone?:    string | null;
+  vehicleReg?:     string | null;
+  vehicleModel?:   string | null;
 }
 
 export interface WebsiteGeneralEnquiry {
@@ -1210,6 +1234,10 @@ export interface InvoiceTripItem {
   distanceKm?:    number | null;
   tollCharges?:   number | null;
   bookingType?:   string | null;
+  pickupLat?:     number | null;
+  pickupLng?:     number | null;
+  dropLat?:       number | null;
+  dropLng?:       number | null;
 }
 
 export interface InvoiceDetail extends InvoiceListItem {

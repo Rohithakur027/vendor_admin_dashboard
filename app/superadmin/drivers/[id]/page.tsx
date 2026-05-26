@@ -1021,13 +1021,13 @@ export default function SuperAdminDriverProfilePage() {
     };
 
     const rows = filteredTrips.map(b => {
-      const out: Record<string, string | number> = {};
+      const out: Record<string, string | number | null> = {};
       for (const k of visibleCols) {
         const col = tripsColumns.find(c => c.key === k);
         if (!col) continue;
         if (k === "tripId") {
           out["Trip ID"]   = b.tripRef ?? b.id;
-          out["Trip Type"] = b.type ?? "";
+          out["Trip Type"] = b.type ?? null;
           continue;
         }
         if (k === "route") {
@@ -1036,29 +1036,29 @@ export default function SuperAdminDriverProfilePage() {
           continue;
         }
         if (k === "supervisorCompany") {
-          out["Supervisor"] = b.supervisorName ?? "";
-          out["Company"]    = b.companyName ?? "";
+          out["Supervisor"] = b.supervisorName ?? null;
+          out["Company"]    = b.companyName ?? null;
           continue;
         }
         if (k === "vehicle") {
-          out["Vehicle Number"] = driver?.vehicleReg ?? "";
-          out["Vehicle Model"]  = driver?.vehicle ?? "";
-          out["Vehicle Type"]   = driver?.vehicleType ?? "";
+          out["Vehicle Number"] = driver?.vehicleReg ?? null;
+          out["Vehicle Model"]  = driver?.vehicle ?? null;
+          out["Vehicle Type"]   = driver?.vehicleType ?? null;
           continue;
         }
         if (k === "escort") {
           out["Escort Required"] = b.escortRequired ? "Yes" : "No";
-          out["Escort Pickup"]   = b.escortPickup ?? "";
+          out["Escort Pickup"]   = b.escortPickup ?? null;
           continue;
         }
         if (k === "pickupLatLng") {
-          out["Pickup Latitude"]  = b.pickupLat ?? "";
-          out["Pickup Longitude"] = b.pickupLng ?? "";
+          out["Pickup Latitude"]  = b.pickupLat ?? null;
+          out["Pickup Longitude"] = b.pickupLng ?? null;
           continue;
         }
         if (k === "dropLatLng") {
-          out["Drop Latitude"]  = b.dropLat ?? "";
-          out["Drop Longitude"] = b.dropLng ?? "";
+          out["Drop Latitude"]  = b.dropLat ?? null;
+          out["Drop Longitude"] = b.dropLng ?? null;
           continue;
         }
         if (["pickupTime", "scheduledAt", "createdAt", "completedAt", "startedAt"].includes(k)) {
@@ -1069,7 +1069,7 @@ export default function SuperAdminDriverProfilePage() {
           continue;
         }
         const r = (tripRenderers as Record<string, { csv: (b: DriverTripItem) => string | number }>)[k];
-        out[col.label] = r ? r.csv(b) : "";
+        out[col.label] = r ? r.csv(b) : null;
       }
       return out;
     });

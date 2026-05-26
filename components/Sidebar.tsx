@@ -5,9 +5,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutGrid,
   User,
+  Users,
   Route,
   Truck,
   BarChart2,
+  FileText,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -63,6 +65,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
       { label: "Company Report",    href: "/dashboard/reports?type=company",    reportType: "company" },
     ],
   },
+  { label: "Invoices", href: "/dashboard/accounts/invoicing", icon: FileText, permission: "REPORT_MONITORING", adminOnly: true },
+  { label: "User Management", href: "/dashboard/settings?tab=team", icon: Users, permission: null, adminOnly: true },
   { label: "Settings",  href: "/dashboard/settings",           icon: Settings,  permission: null, adminOnly: true },
 ];
 
@@ -130,7 +134,7 @@ export function Sidebar({
     tabletTimer.current = setTimeout(() => setTabletExpanded(false), 200);
   }
 
-  const SidebarContent = ({
+  const sidebarContent = ({
     isCollapsed = false,
     onLinkClick,
   }: {
@@ -164,11 +168,14 @@ export function Sidebar({
           // Settings has a sibling /dashboard/profile route that should also
           // show as active; everything else is exact-match unless it has sub-items.
           const isSettings = baseHref === "/dashboard/settings";
+          const isUserManagement = href.includes("?tab=team");
           const active = subItems
             ? pathname.startsWith(baseHref)
-            : isSettings
-              ? pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/profile")
-              : pathname === baseHref;
+            : isUserManagement
+              ? pathname.startsWith("/dashboard/settings") && searchParams.get("tab") === "team"
+              : isSettings
+                ? (pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/profile")) && searchParams.get("tab") !== "team"
+                : pathname === baseHref;
 
           if (subItems) {
             const isExpanded = !!expanded[href];
@@ -319,7 +326,7 @@ export function Sidebar({
           collapsed ? "w-[60px]" : "w-56"
         )}
       >
-        <SidebarContent isCollapsed={collapsed} />
+        {sidebarContent({ isCollapsed: collapsed })}
 
         {/* Collapse toggle */}
         <button
@@ -343,7 +350,7 @@ export function Sidebar({
       >
         {/* Always-visible 60px icon strip */}
         <div className="w-[60px] h-full flex flex-col bg-white border-r">
-          <SidebarContent isCollapsed={true} />
+          {sidebarContent({ isCollapsed: true })}
         </div>
 
         {/* Expanded overlay on hover */}
@@ -353,10 +360,10 @@ export function Sidebar({
             onMouseEnter={handleTabletEnter}
             onMouseLeave={handleTabletLeave}
           >
-            <SidebarContent
-              isCollapsed={false}
-              onLinkClick={() => setTabletExpanded(false)}
-            />
+            {sidebarContent({
+              isCollapsed: false,
+              onLinkClick: () => setTabletExpanded(false),
+            })}
           </div>
         )}
       </aside>
@@ -365,7 +372,7 @@ export function Sidebar({
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="w-56 bg-white border-r h-full shadow-xl flex flex-col">
-            <SidebarContent onLinkClick={() => onMobileOpenChange(false)} />
+            {sidebarContent({ onLinkClick: () => onMobileOpenChange(false) })}
           </div>
           <div
             className="flex-1 bg-black/40"
