@@ -56,7 +56,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
   }, [activeTab, booking?.driverId]);
 
   const driver     = booking?.driverId
-    ? drivers.find((d) => d.id === booking.driverId || d.userId === booking.driverId)
+    ? drivers.find((d) => d.id === booking.driverId)
     : null;
   const supervisor = booking?.supervisorId ? supervisors.find((s) => s.id === booking.supervisorId) : null;
   const ss         = booking ? (STATUS_STYLES[booking.status] ?? null) : null;

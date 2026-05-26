@@ -115,7 +115,9 @@ function toneClass(tone: "blue" | "green" | "amber" | "red" | "slate") {
   }
 }
 
-function StatusPill({ label, tone = "slate" }: { label: string; tone?: "blue" | "green" | "amber" | "red" | "slate" }) {
+type KpiTone = "blue" | "green" | "amber" | "red" | "slate";
+
+function StatusPill({ label, tone = "slate" }: { label: string; tone?: KpiTone }) {
   const c = toneClass(tone);
   return (
     <span
@@ -191,7 +193,7 @@ function KpiCard({
   value: string | number;
   sub: string;
   icon: React.ElementType;
-  tone?: "blue" | "green" | "amber" | "red" | "slate";
+  tone?: KpiTone;
 }) {
   const c = toneClass(tone);
   return (
@@ -422,6 +424,9 @@ export default function SuperAdminNewDashboardPage() {
 
   const vendorTrendValues = useMemo(() => vendorRows.slice(0, 6).map((row) => row.spendToday), [vendorRows]);
   const driverTrendValues = useMemo(() => driverRows.slice(0, 6).map((row) => row.earningsToday), [driverRows]);
+  const lowWalletTone: KpiTone = lowWalletVendors.length > 0 ? "red" : "green";
+  const idleDriversTone: KpiTone = idleDrivers.length > 0 ? "amber" : "green";
+  const overspentVendorsTone: KpiTone = overspentVendors.length > 0 ? "red" : "green";
 
   const kpis = [
     { label: "Total vendors", value: overview?.totalVendors ?? vendorRows.length, sub: `${overview?.activeVendors ?? 0} active · ${overview?.inactiveVendors ?? 0} inactive`, icon: Building2, tone: "blue" as const },
@@ -433,9 +438,9 @@ export default function SuperAdminNewDashboardPage() {
     { label: "Driver earnings today", value: fmtCurrency(driverEarningsToday), sub: "Completed-trip earnings credited", icon: IndianRupee, tone: "amber" as const },
     { label: "Withdrawals today", value: driverWithdrawalsToday == null ? "—" : fmtCurrency(driverWithdrawalsToday), sub: `${pendingPayoutDrivers.length} drivers waiting for payout feed`, icon: Wallet, tone: "slate" as const },
     { label: "Platform wallet", value: fmtCurrency(platformWalletBalance), sub: "Total vendor wallet balance", icon: Gauge, tone: "blue" as const },
-    { label: "Low wallet vendors", value: lowWalletVendors.length, sub: `Below ${fmtCurrency(LOW_WALLET_THRESHOLD)}`, icon: AlertTriangle, tone: lowWalletVendors.length > 0 ? "red" : "green" as const },
-    { label: "Idle drivers", value: idleDrivers.length, sub: "No trips today", icon: Clock3, tone: idleDrivers.length > 0 ? "amber" : "green" as const },
-    { label: "Overspent vendors", value: overspentVendors.length, sub: "Spend higher than recharge today", icon: Activity, tone: overspentVendors.length > 0 ? "red" : "green" as const },
+    { label: "Low wallet vendors", value: lowWalletVendors.length, sub: `Below ${fmtCurrency(LOW_WALLET_THRESHOLD)}`, icon: AlertTriangle, tone: lowWalletTone },
+    { label: "Idle drivers", value: idleDrivers.length, sub: "No trips today", icon: Clock3, tone: idleDriversTone },
+    { label: "Overspent vendors", value: overspentVendors.length, sub: "Spend higher than recharge today", icon: Activity, tone: overspentVendorsTone },
   ];
 
   return (
