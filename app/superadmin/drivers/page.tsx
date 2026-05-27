@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { superadminApi, type DriverApiItem } from "@/lib/api";
 import { useDriverStatusFeed, type DriverStatusEvent } from "@/lib/useDriverStatusFeed";
-import { Users, Navigation, CircleCheck, WifiOff } from "lucide-react";
+import { Users, Navigation, CircleCheck, WifiOff, GripVertical } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,11 +184,11 @@ export default function SuperAdminDriversPage() {
   const spec = getTableSpec(TABLE_KEY);
 
   const gridTemplate = useMemo(
-    () => visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" "),
+    () => `24px ${visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" ")}`,
     [visibleCols, spec.columns],
   );
   const minTableWidth = useMemo(
-    () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 56,
+    () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 80,
     [visibleCols, spec.columns],
   );
 
@@ -199,7 +199,47 @@ export default function SuperAdminDriversPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [filterOpen,   setFilterOpen]   = useState(false);
 
+  // Custom ordering lists of IDs saved in localStorage
+  const [driverOrder, setDriverOrder] = useState<(string | number)[]>([]);
+
+  // Drag and drop local states
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Load order from localStorage on client-side mount
+  useEffect(() => {
+    try {
+      const savedDrivers = localStorage.getItem("superadmin_all_drivers_order");
+      if (savedDrivers) {
+        setDriverOrder(JSON.parse(savedDrivers));
+      }
+    } catch (e) {
+      console.error("Failed to load table orders from localStorage", e);
+    }
+  }, []);
+
   const activeFilterCount = statusFilter !== "All" ? 1 : 0;
+
+  // Sort helper to apply saved custom order lists
+  const applyCustomOrder = useCallback(
+    <T extends { id: string | number }>(items: T[], orderIds: (string | number)[]): T[] => {
+      if (!orderIds || orderIds.length === 0) return items;
+      const orderMap = new Map<string | number, number>();
+      orderIds.forEach((id, idx) => orderMap.set(id, idx));
+
+      return [...items].sort((a, b) => {
+        const aHas = orderMap.has(a.id);
+        const bHas = orderMap.has(b.id);
+        if (aHas && bHas) {
+          return orderMap.get(a.id)! - orderMap.get(b.id)!;
+        }
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return 0;
+      });
+    },
+    []
+  );
 
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
@@ -242,6 +282,10 @@ export default function SuperAdminDriversPage() {
   }, [statusFilter, fetchDrivers]);
   useDriverStatusFeed(onDriverStatus);
 
+  const sortedDrivers = useMemo(() => {
+    return applyCustomOrder(drivers, driverOrder);
+  }, [drivers, driverOrder, applyCustomOrder]);
+
   const totalCt     = drivers.length;
   const onTripCt    = drivers.filter(d => d.status === "On Trip").length;
   const availableCt = drivers.filter(d => d.isOnline).length;
@@ -249,8 +293,8 @@ export default function SuperAdminDriversPage() {
 
   const filteredDrivers = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return drivers;
-    return drivers.filter(d =>
+    if (!q) return sortedDrivers;
+    return sortedDrivers.filter(d =>
       d.name.toLowerCase().includes(q) ||
       d.phone.includes(q) ||
       (d.driverRef ?? "").toLowerCase().includes(q) ||
@@ -259,7 +303,62 @@ export default function SuperAdminDriversPage() {
       (d.vehicle?.plateNumber ?? "").toLowerCase().includes(q) ||
       (d.vehicle?.model ?? "").toLowerCase().includes(q)
     );
-  }, [drivers, search]);
+  }, [sortedDrivers, search]);
+
+  // Drag-and-drop event handlers
+  const handleDragStart = (
+    e: React.DragEvent,
+    index: number
+  ) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (
+    e: React.DragEvent,
+    index: number
+  ) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetIndex: number
+  ) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const updatedFiltered = [...filteredDrivers];
+    const [movedItem] = updatedFiltered.splice(draggedIndex, 1);
+    updatedFiltered.splice(targetIndex, 0, movedItem);
+
+    // Merge custom indices with remaining items
+    const reorderedIds = updatedFiltered.map((item) => item.id);
+    const remainingIds = drivers
+      .map((item) => item.id)
+      .filter((id) => !reorderedIds.includes(id));
+    const newOrder = [...reorderedIds, ...remainingIds];
+
+    setDriverOrder(newOrder);
+    localStorage.setItem("superadmin_all_drivers_order", JSON.stringify(newOrder));
+
+    handleDragEnd();
+  };
 
   function handleExport() {
     const rows = filteredDrivers.map((d) => {
@@ -277,6 +376,23 @@ export default function SuperAdminDriversPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .drag-row {
+          transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease;
+        }
+        .drag-row:hover {
+          background-color: #f8fafc !important;
+        }
+        .drag-row:hover .drag-handle {
+          opacity: 1;
+        }
+        .drag-handle {
+          opacity: 0.4;
+          transition: opacity 0.2s ease;
+        }
+        .drag-handle:hover {
+          opacity: 1;
+          color: #2563EB;
+        }
       `}</style>
 
       {/* ── Stat cards ── */}
@@ -332,6 +448,7 @@ export default function SuperAdminDriversPage() {
 
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "10px 28px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+              <div />
               {visibleCols.map(key => {
                 const col = spec.columns.find(c => c.key === key);
                 return (
@@ -347,6 +464,7 @@ export default function SuperAdminDriversPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "14px 28px" }}>
+                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                     {visibleCols.map(k => <Skeleton key={k} className="h-3.5 w-3/4" />)}
                   </div>
                 ))
@@ -357,19 +475,50 @@ export default function SuperAdminDriversPage() {
                   <p className="text-sm font-medium text-slate-500">No drivers found.</p>
                 </div>
               ) : (
-                filteredDrivers.map(d => (
-                  <div
-                    key={d.id}
-                    onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
-                    style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 16, padding: "13px 28px", alignItems: "center", cursor: "pointer", transition: "background 0.15s" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                  >
-                    {visibleCols.map(key => (
-                      <div key={key}>{renderCell(key, d)}</div>
-                    ))}
-                  </div>
-                ))
+                filteredDrivers.map((d, i) => {
+                  const isDragged = draggedIndex === i;
+                  const isDragOver = dragOverIndex === i;
+
+                  return (
+                    <div
+                      key={d.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, i)}
+                      onDragOver={(e) => handleDragOver(e, i)}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, i)}
+                      onClick={() => router.push(`/superadmin/drivers/${d.id}`)}
+                      className="drag-row"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: gridTemplate,
+                        gap: 16,
+                        padding: "13px 28px",
+                        alignItems: "center",
+                        cursor: "grab",
+                        userSelect: "none",
+                        backgroundColor: isDragOver
+                          ? "rgba(37, 99, 235, 0.06)"
+                          : isDragged
+                          ? "rgba(241, 245, 249, 0.5)"
+                          : "transparent",
+                        opacity: isDragged ? 0.45 : 1,
+                        outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
+                        outlineOffset: "-2px",
+                        transform: isDragOver ? "scale(1.005)" : "none",
+                        boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
+                      }}
+                    >
+                      <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
+                        <GripVertical size={13} style={{ cursor: "grab" }} />
+                      </div>
+                      {visibleCols.map(key => (
+                        <div key={key}>{renderCell(key, d)}</div>
+                      ))}
+                    </div>
+                  );
+                })
               )}
             </div>
 

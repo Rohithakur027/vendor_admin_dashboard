@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Users, UserCheck, UserX, Plus, Pencil, Trash2,
   X, ChevronLeft, ChevronRight, Building2, Car, Map, BarChart2,
   CheckCircle2, Shield, Check, Mail, Phone, Calendar,
-  Clock, AlertCircle, Eye, EyeOff, KeyRound,
+  Clock, AlertCircle, Eye, EyeOff, KeyRound, GripVertical,
 } from "lucide-react";
 import { TeamMemberFilters } from "@/app/dashboard/settings/TeamMemberFilters";
 import { Switch } from "@/components/ui/switch";
@@ -76,6 +76,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Format date and time
 function formatDateTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -457,11 +458,12 @@ function MemberDialog({
 
 // ─── Table skeleton ───────────────────────────────────────────────────────────
 
-function TableSkeleton() {
+function TableSkeleton({ cols }: { cols: string }) {
   return (
     <>
       {[1, 2, 3].map(i => (
-        <div key={i} className="grid grid-cols-[minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_100px_110px_60px_76px] items-center gap-4 px-5 py-4 border-b border-slate-100">
+        <div key={i} className={`grid ${cols} items-center gap-4 px-5 py-4 border-b border-slate-100`}>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
           <div className="space-y-1.5">
             <Skeleton className="h-3.5 w-36 rounded" />
             <Skeleton className="h-3 w-48 rounded" />
@@ -527,6 +529,23 @@ export default function SuperAdminSettingsPage() {
   const [showPw,         setShowPw]         = useState(false);
   const [showConfirm,    setShowConfirm]    = useState(false);
 
+  // Custom DND state variables
+  const [membersOrder, setMembersOrder] = useState<(string | number)[]>([]);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Load order from localStorage on client-side mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("superadmin_members_order");
+      if (saved) {
+        setMembersOrder(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load table orders from localStorage", e);
+    }
+  }, []);
+
   function addToast(message: string, error = false) {
     const id = Date.now();
     setToasts(ts => [...ts, { id, message, error }]);
@@ -546,6 +565,78 @@ export default function SuperAdminSettingsPage() {
   }, []);
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  // Sort helper to apply saved custom order lists
+  const applyCustomOrder = useCallback(
+    <T extends { id: string | number }>(itemsList: T[], orderIds: (string | number)[]): T[] => {
+      if (!orderIds || orderIds.length === 0) return itemsList;
+      const orderMap: Record<string | number, number> = {};
+      orderIds.forEach((id, idx) => {
+        orderMap[id] = idx;
+      });
+
+      return [...itemsList].sort((a, b) => {
+        const aHas = a.id in orderMap;
+        const bHas = b.id in orderMap;
+        if (aHas && bHas) {
+          return orderMap[a.id] - orderMap[b.id];
+        }
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return 0;
+      });
+    },
+    []
+  );
+
+  const sortedMembers = useMemo(() => {
+    return applyCustomOrder(members, membersOrder);
+  }, [members, membersOrder, applyCustomOrder]);
+
+  // Drag-and-drop event handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const updatedFiltered = [...filtered];
+    const [movedItem] = updatedFiltered.splice(draggedIndex, 1);
+    updatedFiltered.splice(targetIndex, 0, movedItem);
+
+    const reorderedIds = updatedFiltered.map((item) => item.id);
+    const remainingIds = members
+      .map((item) => item.id)
+      .filter((id) => !reorderedIds.includes(id));
+    const newOrder = [...reorderedIds, ...remainingIds];
+
+    setMembersOrder(newOrder);
+    localStorage.setItem("superadmin_members_order", JSON.stringify(newOrder));
+
+    handleDragEnd();
+  };
 
   function openAdd() {
     setDialogMode("add"); setDialogForm(blankForm()); setEditingId(null); setDialogOpen(true);
@@ -569,6 +660,14 @@ export default function SuperAdminSettingsPage() {
           permissions:   form.permissions,
         });
         setMembers(ms => [member, ...ms]);
+        setMembersOrder(prev => [member.id, ...prev]);
+        try {
+          const saved = localStorage.getItem("superadmin_members_order");
+          const parsed = saved ? JSON.parse(saved) : [];
+          localStorage.setItem("superadmin_members_order", JSON.stringify([member.id, ...parsed]));
+        } catch (e) {
+          console.error(e);
+        }
         addToast(`${member.full_name} added successfully`);
       } else {
         const member = await superadminTeamApi.update(editingId!, {
@@ -651,20 +750,41 @@ export default function SuperAdminSettingsPage() {
     }
   }
 
-  const filtered = members.filter(m => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || m.full_name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role_label.toLowerCase().includes(q);
-    const matchFilter = filter === "all" || (filter === "active" ? m.is_active : !m.is_active);
-    return matchSearch && matchFilter;
-  });
+  const filtered = useMemo(() => {
+    return sortedMembers.filter(m => {
+      const q = search.toLowerCase();
+      const matchSearch = !q || m.full_name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role_label.toLowerCase().includes(q);
+      const matchFilter = filter === "all" || (filter === "active" ? m.is_active : !m.is_active);
+      return matchSearch && matchFilter;
+    });
+  }, [sortedMembers, search, filter]);
 
   const totalActive   = members.filter(m =>  m.is_active).length;
   const totalInactive = members.filter(m => !m.is_active).length;
 
-  const COLS = "grid-cols-[minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_100px_110px_60px_108px]";
+  const COLS = "grid-cols-[24px_minmax(0,1.8fr)_minmax(0,1.3fr)_minmax(0,1.6fr)_100px_110px_60px_108px]";
 
   return (
     <div style={{ fontFamily: FONT }} className="space-y-5">
+      <style>{`
+        .drag-row {
+          transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease;
+        }
+        .drag-row:hover {
+          background-color: #f8fafc !important;
+        }
+        .drag-row:hover .drag-handle {
+          opacity: 1;
+        }
+        .drag-handle {
+          opacity: 0.4;
+          transition: opacity 0.2s ease;
+        }
+        .drag-handle:hover {
+          opacity: 1;
+          color: #2563EB;
+        }
+      `}</style>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -717,13 +837,14 @@ export default function SuperAdminSettingsPage() {
       {/* Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className={`grid ${COLS} items-center gap-4 px-5 py-3 bg-slate-50/50 border-b border-slate-100`}>
+          <div />
           {["MEMBER", "ROLE / DESIGNATION", "PERMISSIONS", "STATUS", "ADDED", "ACTIVE", ""].map((h, i) => (
             <span key={i} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{h}</span>
           ))}
         </div>
 
         {loading ? (
-          <TableSkeleton />
+          <TableSkeleton cols={COLS} />
         ) : loadError ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <AlertCircle className="w-10 h-10 mb-3 opacity-30 text-red-400" />
@@ -736,50 +857,76 @@ export default function SuperAdminSettingsPage() {
             <p className="text-sm font-medium">No team members found</p>
           </div>
         ) : (
-          filtered.map(m => (
-            <div
-              key={m.id}
-              onClick={() => setSelectedMember(m)}
-              className="grid items-center gap-4 px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: "minmax(0,1.8fr) minmax(0,1.3fr) minmax(0,1.6fr) 100px 110px 60px 76px" }}
-            >
-              <div className="min-w-0">
-                <p className="text-[13px] font-bold text-slate-800 truncate">{m.full_name}</p>
-                <p className="text-[11px] text-slate-400 truncate">{m.email}</p>
+          filtered.map((m, i) => {
+            const isDragged = draggedIndex === i;
+            const isDragOver = dragOverIndex === i;
+
+            return (
+              <div
+                key={m.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, i)}
+                onDragOver={(e) => handleDragOver(e, i)}
+                onDragLeave={handleDragLeave}
+                onDragEnd={handleDragEnd}
+                onDrop={(e) => handleDrop(e, i)}
+                onClick={() => setSelectedMember(m)}
+                className={`grid ${COLS} items-center gap-4 px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer drag-row`}
+                style={{
+                  backgroundColor: isDragOver
+                    ? "rgba(37, 99, 235, 0.06)"
+                    : isDragged
+                    ? "rgba(241, 245, 249, 0.5)"
+                    : "transparent",
+                  opacity: isDragged ? 0.45 : 1,
+                  outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
+                  outlineOffset: "-2px",
+                  transform: isDragOver ? "scale(1.005)" : "none",
+                  boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
+                }}
+              >
+                <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
+                  <GripVertical size={13} style={{ cursor: "grab" }} />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="text-[13px] font-bold text-slate-800 truncate">{m.full_name}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{m.email}</p>
+                </div>
+
+                <p className="text-[12px] text-slate-600 font-medium truncate">{m.role_label}</p>
+
+                <PermissionChips permissions={m.permissions} />
+
+                <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-semibold w-fit ${
+                  m.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {m.is_active ? "Active" : "Inactive"}
+                </span>
+
+                <p className="text-[11px] text-slate-500">{formatDate(m.created_at)}</p>
+
+                <div onClick={e => e.stopPropagation()}>
+                  <Switch checked={m.is_active} onCheckedChange={() => toggleActive(m.id)} size="sm" />
+                </div>
+
+                <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => openEdit(m)} title="Edit member"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => openPwDialog(m)} title="Update password"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
+                    <KeyRound className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => setDeleteDialog({ open: true, member: m })} title="Remove member"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-
-              <p className="text-[12px] text-slate-600 font-medium truncate">{m.role_label}</p>
-
-              <PermissionChips permissions={m.permissions} />
-
-              <span className={`px-2.5 py-1 rounded-full text-[10.5px] font-semibold w-fit ${
-                m.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-              }`}>
-                {m.is_active ? "Active" : "Inactive"}
-              </span>
-
-              <p className="text-[11px] text-slate-500">{formatDate(m.created_at)}</p>
-
-              <div onClick={e => e.stopPropagation()}>
-                <Switch checked={m.is_active} onCheckedChange={() => toggleActive(m.id)} size="sm" />
-              </div>
-
-              <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                <button onClick={() => openEdit(m)} title="Edit member"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => openPwDialog(m)} title="Update password"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-colors">
-                  <KeyRound className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => setDeleteDialog({ open: true, member: m })} title="Remove member"
-                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
