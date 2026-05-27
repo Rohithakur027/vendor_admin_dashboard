@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { vendorsApi, type CreateVendorPayload, type VendorBillingCycle, type VendorBillingType } from "@/lib/api";
 import type { Vendor } from "@/lib/mock-data";
 import {
   Plus, X, RefreshCw,
   Eye, EyeOff, Wallet, Check, Loader2, AlertCircle, CheckCircle2,
-  ChevronRight, ChevronLeft, Upload, FileText,
+  ChevronRight, ChevronLeft, Upload, FileText, GripVertical,
 } from "lucide-react";
 import { FilterPanel, FilterSection, FilterPill, FilterTrigger } from "@/components/FilterPanel";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -43,13 +43,6 @@ function fmtPhone(phone: string) {
   return phone;
 }
 
-function phoneExportValue(phone: string): string | number {
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) return "";
-  const value = Number(digits);
-  return Number.isSafeInteger(value) ? value : digits;
-}
-
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
@@ -71,19 +64,19 @@ export default function SuperAdminVendorsPage() {
   const unverifiedSpec = getTableSpec(UNVERIFIED_TABLE_KEY);
 
   const gridTemplate = useMemo(
-    () => visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" "),
+    () => `24px ${visibleCols.map(k => { const c = spec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" ")}`,
     [visibleCols, spec.columns],
   );
   const minTableWidth = useMemo(
-    () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 48,
+    () => visibleCols.reduce((s, k) => s + (spec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 72,
     [visibleCols, spec.columns],
   );
   const unverifiedGridTemplate = useMemo(
-    () => `${unverifiedVisibleCols.map(k => { const c = unverifiedSpec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" ")} 110px`,
+    () => `24px ${unverifiedVisibleCols.map(k => { const c = unverifiedSpec.columns.find(x => x.key === k); return c ? `minmax(${c.minWidth}px,1fr)` : "1fr"; }).join(" ")} 110px`,
     [unverifiedVisibleCols, unverifiedSpec.columns],
   );
   const unverifiedMinTableWidth = useMemo(
-    () => unverifiedVisibleCols.reduce((s, k) => s + (unverifiedSpec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 158,
+    () => unverifiedVisibleCols.reduce((s, k) => s + (unverifiedSpec.columns.find(x => x.key === k)?.minWidth ?? 100), 0) + 182,
     [unverifiedVisibleCols, unverifiedSpec.columns],
   );
 
@@ -96,6 +89,30 @@ export default function SuperAdminVendorsPage() {
   const [drawerOpen,   setDrawerOpen]  = useState(false);
   const [step,         setStep]        = useState<1 | 2 | 3>(1);
   const [filterOpen,   setFilterOpen]  = useState(false);
+
+  // Custom ordering lists of IDs saved in localStorage
+  const [verifiedOrder, setVerifiedOrder] = useState<(string | number)[]>([]);
+  const [unverifiedOrder, setUnverifiedOrder] = useState<(string | number)[]>([]);
+
+  // Drag and drop local states
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Load order from localStorage on client-side mount
+  useEffect(() => {
+    try {
+      const savedVerified = localStorage.getItem("superadmin_verified_vendors_order");
+      if (savedVerified) {
+        setVerifiedOrder(JSON.parse(savedVerified));
+      }
+      const savedUnverified = localStorage.getItem("superadmin_unverified_vendors_order");
+      if (savedUnverified) {
+        setUnverifiedOrder(JSON.parse(savedUnverified));
+      }
+    } catch (e) {
+      console.error("Failed to load table orders from localStorage", e);
+    }
+  }, []);
 
   // Step 1 fields
   const [form, setForm] = useState({ name: "", contactPerson: "", email: "", phone: "", city: "", address: "" });
@@ -147,6 +164,101 @@ export default function SuperAdminVendorsPage() {
 
   const activeVendorFilterCount = statusFilter !== "All" ? 1 : 0;
 
+  // Drag-and-drop event handlers
+  const handleDragStart = (
+    e: React.DragEvent,
+    index: number
+  ) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleDragOver = (
+    e: React.DragEvent,
+    index: number
+  ) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // Sort helper to apply saved custom order lists
+  const applyCustomOrder = useCallback(
+    <T extends { id: string | number }>(items: T[], orderIds: (string | number)[]): T[] => {
+      if (!orderIds || orderIds.length === 0) return items;
+      const orderMap = new Map<string | number, number>();
+      orderIds.forEach((id, idx) => orderMap.set(id, idx));
+
+      return [...items].sort((a, b) => {
+        const aHas = orderMap.has(a.id);
+        const bHas = orderMap.has(b.id);
+        if (aHas && bHas) {
+          return orderMap.get(a.id)! - orderMap.get(b.id)!;
+        }
+        if (aHas) return -1;
+        if (bHas) return 1;
+        return 0;
+      });
+    },
+    []
+  );
+
+  const rawVerified = vendors.filter(v => v.is_verified !== false);
+  const rawUnverified = vendors.filter(v => v.is_verified === false);
+
+  const verifiedVendors   = applyCustomOrder(rawVerified, verifiedOrder);
+  const unverifiedVendors = applyCustomOrder(rawUnverified, unverifiedOrder);
+
+  const sourceList = vendorTab === "verified" ? verifiedVendors : unverifiedVendors;
+
+  const filtered = sourceList.filter((v) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || v.name.toLowerCase().includes(q) || v.contactPerson.toLowerCase().includes(q) || v.city.toLowerCase().includes(q);
+    return matchSearch && (statusFilter === "All" || v.status === statusFilter);
+  });
+
+  const handleDrop = (
+    e: React.DragEvent,
+    targetIndex: number
+  ) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const updatedFiltered = [...filtered];
+    const [movedItem] = updatedFiltered.splice(draggedIndex, 1);
+    updatedFiltered.splice(targetIndex, 0, movedItem);
+
+    // Merge custom indices with remaining items
+    const reorderedIds = updatedFiltered.map((item) => item.id);
+    const remainingIds = vendors
+      .map((item) => item.id)
+      .filter((id) => !reorderedIds.includes(id));
+    const newOrder = [...reorderedIds, ...remainingIds];
+
+    if (vendorTab === "verified") {
+      setVerifiedOrder(newOrder);
+      localStorage.setItem("superadmin_verified_vendors_order", JSON.stringify(newOrder));
+    } else {
+      setUnverifiedOrder(newOrder);
+      localStorage.setItem("superadmin_unverified_vendors_order", JSON.stringify(newOrder));
+    }
+
+    handleDragEnd();
+  };
+
   function handleExport() {
     const exportSpec = vendorTab === "verified" ? spec : unverifiedSpec;
     const exportCols = vendorTab === "verified" ? visibleCols : unverifiedVisibleCols;
@@ -177,16 +289,12 @@ export default function SuperAdminVendorsPage() {
     exportToXlsx(vendorTab === "verified" ? "vendors" : "unverified-vendors", rows, vendorTab === "verified" ? "Vendors" : "Unverified Vendors");
   }
 
-  const verifiedVendors   = vendors.filter(v => v.is_verified !== false);
-  const unverifiedVendors = vendors.filter(v => v.is_verified === false);
-
-  const sourceList = vendorTab === "verified" ? verifiedVendors : unverifiedVendors;
-
-  const filtered = sourceList.filter((v) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || v.name.toLowerCase().includes(q) || v.contactPerson.toLowerCase().includes(q) || v.city.toLowerCase().includes(q);
-    return matchSearch && (statusFilter === "All" || v.status === statusFilter);
-  });
+  function phoneExportValue(phone: string): string | number {
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) return "";
+    const value = Number(digits);
+    return Number.isSafeInteger(value) ? value : digits;
+  }
 
   function field(key: keyof typeof form, val: string) {
     setForm((p) => ({ ...p, [key]: val }));
@@ -311,6 +419,22 @@ export default function SuperAdminVendorsPage() {
       }
 
       setVendors((prev) => [res.data, ...prev]);
+
+      // Prepend to order lists so it stays at the top immediately
+      if (res.data.is_verified !== false) {
+        setVerifiedOrder((prev) => {
+          const next = [vendorId, ...prev];
+          localStorage.setItem("superadmin_verified_vendors_order", JSON.stringify(next));
+          return next;
+        });
+      } else {
+        setUnverifiedOrder((prev) => {
+          const next = [vendorId, ...prev];
+          localStorage.setItem("superadmin_unverified_vendors_order", JSON.stringify(next));
+          return next;
+        });
+      }
+
       setSubmitSuccess(true);
       setTimeout(closeModal, 1400);
     } catch (err) {
@@ -347,6 +471,25 @@ export default function SuperAdminVendorsPage() {
 
   return (
     <div className="space-y-4">
+      <style>{`
+        .drag-row {
+          transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease;
+        }
+        .drag-row:hover {
+          background-color: #f8fafc !important;
+        }
+        .drag-row:hover .drag-handle {
+          opacity: 1;
+        }
+        .drag-handle {
+          opacity: 0.4;
+          transition: opacity 0.2s ease;
+        }
+        .drag-handle:hover {
+          opacity: 1;
+          color: #2563EB;
+        }
+      `}</style>
 
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-3">
@@ -458,6 +601,7 @@ export default function SuperAdminVendorsPage() {
           {vendorTab === "unverified" && (
             <div className="w-fit min-w-full" style={{ minWidth: unverifiedMinTableWidth }}>
               <div className="grid items-center gap-6 px-6 py-3.5 border-b border-slate-100 bg-slate-50/50" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
+                <div />
                 {unverifiedVisibleCols.map(key => {
                   const col = unverifiedSpec.columns.find(c => c.key === key);
                   return (
@@ -470,39 +614,76 @@ export default function SuperAdminVendorsPage() {
                 {loadingList ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="grid items-center gap-6 px-6 py-3.5" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                       {unverifiedVisibleCols.map(k => <Skeleton key={k} className="h-3.5 w-3/4" />)}
                       <Skeleton className="h-7 w-20 rounded-lg" />
                     </div>
                   ))
                 ) : filtered.length === 0 ? (
                   <div className="text-center py-14 text-slate-500"><p className="text-sm font-medium">No unverified vendors.</p></div>
-                ) : filtered.map(v => (
-                  <div key={v.id} className="grid items-center gap-6 px-6 py-3.5 hover:bg-slate-50 transition-colors" style={{ gridTemplateColumns: unverifiedGridTemplate }}>
-                    {unverifiedVisibleCols.map(key => {
-                      switch (key) {
-                        case "name": return (
-                          <div key={key} className="flex flex-col min-w-0">
-                            <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
-                          </div>
-                        );
-                        case "email":         return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>;
-                        case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
-                        case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
-                        case "reviewStatus":  return (
-                          <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#FEF3C7", color:"#92400E", border:"1px solid #FDE68A", borderRadius:20, fontSize:11, fontWeight:700, padding:"3px 10px", whiteSpace:"nowrap", width:"fit-content" }}>
-                            <span style={{ width:6, height:6, borderRadius:"50%", background:"#F59E0B", flexShrink:0 }} /> Pending
-                          </span>
-                        );
-                        default: return <span key={key} className="text-[13px] text-slate-400">—</span>;
-                      }
-                    })}
-                    <div>
-                      <button onClick={() => router.push(`/superadmin/vendors/review/${v.id}`)} style={{ fontSize:12, fontWeight:700, color:"#2563EB", background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
-                        Review
-                      </button>
+                ) : filtered.map((v, i) => {
+                  const isDragged = draggedIndex === i;
+                  const isDragOver = dragOverIndex === i;
+
+                  return (
+                    <div
+                      key={v.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, i)}
+                      onDragOver={(e) => handleDragOver(e, i)}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, i)}
+                      className="drag-row"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: unverifiedGridTemplate,
+                        gap: 24,
+                        padding: "14px 24px",
+                        alignItems: "center",
+                        cursor: "grab",
+                        userSelect: "none",
+                        backgroundColor: isDragOver
+                          ? "rgba(37, 99, 235, 0.06)"
+                          : isDragged
+                          ? "rgba(241, 245, 249, 0.5)"
+                          : "#fff",
+                        opacity: isDragged ? 0.45 : 1,
+                        outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
+                        outlineOffset: "-2px",
+                        transform: isDragOver ? "scale(1.005)" : "none",
+                        boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
+                      }}
+                    >
+                      <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
+                        <GripVertical size={13} style={{ cursor: "grab" }} />
+                      </div>
+                      {unverifiedVisibleCols.map(key => {
+                        switch (key) {
+                          case "name": return (
+                            <div key={key} className="flex flex-col min-w-0">
+                              <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
+                            </div>
+                          );
+                          case "email":         return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>;
+                          case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
+                          case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
+                          case "reviewStatus":  return (
+                            <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, background:"#FEF3C7", color:"#92400E", border:"1px solid #FDE68A", borderRadius:20, fontSize:11, fontWeight:700, padding:"3px 10px", whiteSpace:"nowrap", width:"fit-content" }}>
+                              <span style={{ width:6, height:6, borderRadius:"50%", background:"#F59E0B", flexShrink:0 }} /> Pending
+                            </span>
+                          );
+                          default: return <span key={key} className="text-[13px] text-slate-400">—</span>;
+                        }
+                      })}
+                      <div>
+                        <button onClick={() => router.push(`/superadmin/vendors/review/${v.id}`)} style={{ fontSize:12, fontWeight:700, color:"#2563EB", background:"#EFF6FF", border:"1px solid #BFDBFE", borderRadius:8, padding:"5px 12px", cursor:"pointer", fontFamily:"inherit", whiteSpace:"nowrap" }}>
+                          Review
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -512,6 +693,7 @@ export default function SuperAdminVendorsPage() {
             <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
               {/* Header */}
               <div style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:16, padding:"10px 24px", background:"#f8fafc", borderBottom:"1px solid #e2e8f0" }}>
+                <div />
                 {visibleCols.map(key => {
                   const col = spec.columns.find(c => c.key === key);
                   return (
@@ -526,44 +708,76 @@ export default function SuperAdminVendorsPage() {
                 {loadingList ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:16, padding:"14px 24px" }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                       {visibleCols.map(k => <Skeleton key={k} className="h-3.5 w-3/4" />)}
                     </div>
                   ))
                 ) : filtered.length === 0 ? (
                   <div className="text-center py-14 text-slate-500"><p className="text-sm font-medium">No vendors found.</p></div>
                 ) : (
-                  filtered.map(v => (
-                    <div
-                      key={v.id}
-                      onClick={() => router.push(`/superadmin/vendors/${v.id}`)}
-                      style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:16, padding:"12px 24px", alignItems:"center", cursor:"pointer", transition:"background 0.15s" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                    >
-                      {visibleCols.map(key => {
-                        switch (key) {
-                          case "name": return (
-                            <div key={key} className="flex flex-col min-w-0">
-                              <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
-                            </div>
-                          );
-                          case "city":          return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.city ?? "—"}</span>;
-                          case "email":         return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>;
-                          case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
-                          case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
-                          case "status":        return <div key={key}><StatusBadge status={v.status} size="sm" /></div>;
-                          case "billingType":   return <span key={key} className="text-[12px] text-slate-700 font-bold">{v.billing_type ?? "PREPAID"}</span>;
-                          case "creditLimit":   return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.credit_limit != null ? `₹${Number(v.credit_limit).toLocaleString("en-IN")}` : "—"}</span>;
-                          case "wallet":        return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.wallet_balance != null ? `₹${Number(v.wallet_balance).toLocaleString("en-IN")}` : "—"}</span>;
-                          case "pan":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
-                          case "gst":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
-                          case "address":       return <span key={key} className="text-[12.5px] text-slate-500 truncate">{(v as Vendor & { address?: string }).address ?? "—"}</span>;
-                          case "createdAt":     return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtJoined(v.joinedAt)}</span>;
-                          default:              return <span key={key} className="text-[13px] text-slate-400">—</span>;
-                        }
-                      })}
-                    </div>
-                  ))
+                  filtered.map((v, i) => {
+                    const isDragged = draggedIndex === i;
+                    const isDragOver = dragOverIndex === i;
+
+                    return (
+                      <div
+                        key={v.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, i)}
+                        onDragOver={(e) => handleDragOver(e, i)}
+                        onDragLeave={handleDragLeave}
+                        onDragEnd={handleDragEnd}
+                        onDrop={(e) => handleDrop(e, i)}
+                        onClick={() => router.push(`/superadmin/vendors/${v.id}`)}
+                        className="drag-row"
+                        style={{
+                          display:"grid",
+                          gridTemplateColumns: gridTemplate,
+                          gap:16,
+                          padding:"12px 24px",
+                          alignItems:"center",
+                          cursor:"grab",
+                          userSelect:"none",
+                          backgroundColor: isDragOver
+                            ? "rgba(37, 99, 235, 0.06)"
+                            : isDragged
+                            ? "rgba(241, 245, 249, 0.5)"
+                            : "transparent",
+                          opacity: isDragged ? 0.45 : 1,
+                          outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
+                          outlineOffset: "-2px",
+                          transform: isDragOver ? "scale(1.005)" : "none",
+                          boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
+                        }}
+                      >
+                        <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
+                          <GripVertical size={13} style={{ cursor: "grab" }} />
+                        </div>
+                        {visibleCols.map(key => {
+                          switch (key) {
+                            case "name": return (
+                              <div key={key} className="flex flex-col min-w-0">
+                                <span className="font-extrabold text-[#111827] text-[13px] truncate">{v.name}</span>
+                              </div>
+                            );
+                            case "city":          return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.city ?? "—"}</span>;
+                            case "email":         return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.email}</span>;
+                            case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
+                            case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
+                            case "status":        return <div key={key}><StatusBadge status={v.status} size="sm" /></div>;
+                            case "billingType":   return <span key={key} className="text-[12px] text-slate-700 font-bold">{v.billing_type ?? "PREPAID"}</span>;
+                            case "creditLimit":   return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.credit_limit != null ? `₹${Number(v.credit_limit).toLocaleString("en-IN")}` : "—"}</span>;
+                            case "wallet":        return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.wallet_balance != null ? `₹${Number(v.wallet_balance).toLocaleString("en-IN")}` : "—"}</span>;
+                            case "pan":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
+                            case "gst":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;
+                            case "address":       return <span key={key} className="text-[12.5px] text-slate-500 truncate">{(v as Vendor & { address?: string }).address ?? "—"}</span>;
+                            case "createdAt":     return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtJoined(v.joinedAt)}</span>;
+                            default:              return <span key={key} className="text-[13px] text-slate-400">—</span>;
+                          }
+                        })}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -571,6 +785,7 @@ export default function SuperAdminVendorsPage() {
 
         </div>
       </div>
+
 
       {/* ── Onboard Vendor Modal ── */}
       <Dialog open={drawerOpen} onOpenChange={(o) => !o && closeModal()}>
