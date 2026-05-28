@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, Download, IndianRupee, CheckCircle2, Clock, X, ChevronLeft, FileText,
-  Loader2, Ban, ChevronDown, CalendarDays, GripVertical,
+  Loader2, Ban, ChevronDown, CalendarDays,
 } from "lucide-react";
 import TripInvoiceView from "../../dashboard/accounts/invoicing/TripInvoiceView";
 import { formatInvoiceNumber } from "@/lib/invoice-format";
@@ -157,11 +157,11 @@ export default function SuperadminInvoicingPage() {
       const col = spec.columns.find(c => c.key === key);
       return col ? `${col.minWidth}px` : "100px";
     }).join(" ");
-    return `24px ${dataCols} 110px`;
+    return `${dataCols} 110px`;
   }, [visibleCols, spec.columns]);
 
   const minTableWidth = useMemo(
-    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 110 + 40 + 24,
+    () => visibleCols.reduce((sum, k) => sum + (spec.columns.find(c => c.key === k)?.minWidth ?? 100), 0) + 110 + 40,
     [visibleCols, spec.columns],
   );
 
@@ -203,25 +203,6 @@ export default function SuperadminInvoicingPage() {
   const [previewInv,    setPreviewInv]    = useState<InvoiceDetail | null>(null);
   const [previewMode,   setPreviewMode]   = useState<"summary" | "detailed" | "auto">("auto");
 
-  // Custom ordering lists of IDs saved in localStorage
-  const [invoicesOrder, setInvoicesOrder] = useState<(string | number)[]>([]);
-
-  // Drag and drop local states
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  // Load order from localStorage on client-side mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("superadmin_invoices_order");
-      if (saved) {
-        setInvoicesOrder(JSON.parse(saved));
-      }
-    } catch (e) {
-      console.error("Failed to load table orders from localStorage", e);
-    }
-  }, []);
-
   const step1Valid = !!selVendor && !!periodFrom && !!periodTo;
 
   const reload = useCallback(async () => {
@@ -249,76 +230,6 @@ export default function SuperadminInvoicingPage() {
 
     return () => window.clearTimeout(timer);
   }, [reload]);
-
-  // Sort helper to apply saved custom order lists
-  const applyCustomOrder = useCallback(
-    <T extends { id: string | number }>(itemsList: T[], orderIds: (string | number)[]): T[] => {
-      if (!orderIds || orderIds.length === 0) return itemsList;
-      const orderMap = new Map<string | number, number>();
-      orderIds.forEach((id, idx) => orderMap.set(id, idx));
-
-      return [...itemsList].sort((a, b) => {
-        const aHas = orderMap.has(a.id);
-        const bHas = orderMap.has(b.id);
-        if (aHas && bHas) {
-          return orderMap.get(a.id)! - orderMap.get(b.id)!;
-        }
-        if (aHas) return -1;
-        if (bHas) return 1;
-        return 0;
-      });
-    },
-    []
-  );
-
-  const sortedInvoices = useMemo(() => {
-    return applyCustomOrder(invoices, invoicesOrder);
-  }, [invoices, invoicesOrder, applyCustomOrder]);
-
-  // Drag-and-drop event handlers
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString());
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-    setDragOverIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === targetIndex) {
-      handleDragEnd();
-      return;
-    }
-
-    const updatedInvoices = [...sortedInvoices];
-    const [movedItem] = updatedInvoices.splice(draggedIndex, 1);
-    updatedInvoices.splice(targetIndex, 0, movedItem);
-
-    const reorderedIds = updatedInvoices.map((item) => item.id);
-    const remainingIds = invoices
-      .map((item) => item.id)
-      .filter((id) => !reorderedIds.includes(id));
-    const newOrder = [...reorderedIds, ...remainingIds];
-
-    setInvoicesOrder(newOrder);
-    localStorage.setItem("superadmin_invoices_order", JSON.stringify(newOrder));
-
-    handleDragEnd();
-  };
 
   function openNew() {
     setSelVendor(""); setVendorOpen(false); setVendorQuery("");
@@ -362,16 +273,6 @@ export default function SuperadminInvoicingPage() {
         notes: notes.trim() || undefined,
       });
       setGeneratedInv(res.data);
-      if (res.data && res.data.id) {
-        setInvoicesOrder(prev => [res.data.id, ...prev]);
-        try {
-          const saved = localStorage.getItem("superadmin_invoices_order");
-          const parsed = saved ? JSON.parse(saved) : [];
-          localStorage.setItem("superadmin_invoices_order", JSON.stringify([res.data.id, ...parsed]));
-        } catch (e) {
-          console.error(e);
-        }
-      }
       void reload();
     } catch (err) {
       setGenerateErr(err instanceof Error ? err.message : "Failed to generate invoice");
@@ -473,25 +374,6 @@ export default function SuperadminInvoicingPage() {
   return (
     <div style={{ fontFamily:FONT, color:"#0F172A", display:"flex", flexDirection:"column", gap:20 }}
          onClick={() => { setStatusMenu(null); }}>
-      <style>{`
-        .drag-row {
-          transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease;
-        }
-        .drag-row:hover {
-          background-color: #f8fafc !important;
-        }
-        .drag-row:hover .drag-handle {
-          opacity: 1;
-        }
-        .drag-handle {
-          opacity: 0.4;
-          transition: opacity 0.2s ease;
-        }
-        .drag-handle:hover {
-          opacity: 1;
-          color: #2563EB;
-        }
-      `}</style>
 
       {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -549,7 +431,6 @@ export default function SuperadminInvoicingPage() {
           <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
             <div style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
               padding:"10px 20px", borderBottom:"1px solid #F1F5F9", background:"#FAFBFC" }}>
-              <div />
               {prefsLoading
                 ? Array.from({ length: visibleCols.length + 1 }).map((_, i) => (
                     <Skeleton key={i} className="h-3 w-16" />
@@ -567,7 +448,6 @@ export default function SuperadminInvoicingPage() {
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
                     padding:"13px 20px", borderBottom: i < 4 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
-                    <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                     {visibleCols.map(k => <Skeleton key={k} className="h-3.5 w-20" />)}
                     <Skeleton className="h-6 w-10 rounded-md" />
                   </div>
@@ -585,9 +465,7 @@ export default function SuperadminInvoicingPage() {
               <div style={{ padding:"48px 0", textAlign:"center", color:"#94A3B8", fontSize:13 }}>
                 No vendor invoices yet. Click <strong style={{ color:"#475569" }}>New Invoice</strong> to generate one.
               </div>
-            ) : sortedInvoices.map((inv, i) => {
-              const isDragged = draggedIndex === i;
-              const isDragOver = dragOverIndex === i;
+            ) : invoices.map((inv, i) => {
               const cellFor = (k: string): React.ReactNode => {
                 switch (k) {
                   case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{formatInvoiceNumber(inv.invoiceNumber)}</span>;
@@ -660,34 +538,12 @@ export default function SuperadminInvoicingPage() {
               };
               return (
                 <div key={inv.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, i)}
-                  onDragOver={(e) => handleDragOver(e, i)}
-                  onDragLeave={handleDragLeave}
-                  onDragEnd={handleDragEnd}
-                  onDrop={(e) => handleDrop(e, i)}
                   onClick={() => openView(inv.id)}
                   onMouseEnter={() => setHovRow(i)} onMouseLeave={() => setHovRow(null)}
-                  className="drag-row"
                   style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
                     padding:"13px 20px", borderBottom:"1px solid #F1F5F9",
-                    backgroundColor: isDragOver
-                      ? "rgba(37, 99, 235, 0.06)"
-                      : isDragged
-                      ? "rgba(241, 245, 249, 0.5)"
-                      : hovRow===i?"#F8FAFC":"#fff",
-                    cursor:"pointer",
-                    transition:"background-color 0.2s ease, transform 0.2s ease, border 0.2s ease",
-                    alignItems:"center",
-                    opacity: isDragged ? 0.45 : 1,
-                    outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
-                    outlineOffset: "-2px",
-                    transform: isDragOver ? "scale(1.005)" : "none",
-                    boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
-                  }}>
-                  <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
-                    <GripVertical size={13} style={{ cursor: "grab" }} />
-                  </div>
+                    background:hovRow===i?"#F8FAFC":"#fff", cursor:"pointer",
+                    transition:"background 0.12s", alignItems:"center" }}>
                   {visibleCols.map(k => (
                     <div key={k}>{cellFor(k)}</div>
                   ))}
@@ -821,7 +677,7 @@ export default function SuperadminInvoicingPage() {
                   <button
                     onClick={() => { setPickerOpen(o => !o); setVendorOpen(false); }}
                     style={{
-                      width:"100%", display:"flex", alignItems:"center", justifyContent: "space-between",
+                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
                       height:42, padding:"0 14px", border:"1.5px solid #E2E8F0", borderRadius:10,
                       background:"#fff", cursor:"pointer", fontFamily:FONT, fontSize:14,
                       color: "#0F172A", textAlign:"left",
@@ -1058,7 +914,7 @@ export default function SuperadminInvoicingPage() {
             {viewInv && (viewInv.status === "Pending" || viewInv.status === "Overdue") && (
               <div style={{ padding:"16px 24px", borderTop:"1.5px solid #F1F5F9", display:"flex", gap:10, flexShrink:0 }}>
                 <button onClick={handleVoid} disabled={voiding || marking}
-                  style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 14px", border:"1.5px solid #FECACA", borderRadius:10, background:"#fff", color:"B91C1C", fontSize:13, fontWeight:600, cursor:(voiding||marking)?"default":"pointer", fontFamily:FONT, opacity:(voiding||marking)?0.6:1 }}>
+                  style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 14px", border:"1.5px solid #FECACA", borderRadius:10, background:"#fff", color:"#B91C1C", fontSize:13, fontWeight:600, cursor:(voiding||marking)?"default":"pointer", fontFamily:FONT, opacity:(voiding||marking)?0.6:1 }}>
                   {voiding ? <Loader2 className="h-4 w-4 animate-spin"/> : <Ban className="h-4 w-4"/>}
                   Void
                 </button>
