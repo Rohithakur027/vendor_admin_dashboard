@@ -562,11 +562,83 @@ export const superadminApi = {
   },
 
   bookingEnquiries: {
-    assignWebsiteBookingDriver: (id: string, payload: { driver_id: string; estimated_fare: number }) =>
+    createWebsiteBookingEnquiry: (payload: {
+      customer_name: string;
+      customer_email?: string;
+      customer_mobile: string;
+      pickup_location: string;
+      destination: string;
+      pickup_lat?: number;
+      pickup_lng?: number;
+      destination_lat?: number;
+      destination_lng?: number;
+      booking_type?: "Instant" | "Scheduled";
+      booking_category?: string;
+      vehicle_type?: string;
+      passengers?: number;
+      is_scheduled?: boolean;
+      scheduled_date_time?: string;
+      is_return_trip?: boolean;
+      return_date_time?: string;
+      distance_km?: number;
+      estimated_fare?: number;
+      assigned_driver_user_id?: string | null;
+    }) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>("/api/superadmin/booking-enquiries/website-bookings", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+
+    autocompletePlaces: (query: string, limit = 4) =>
+      apiFetch<{ success: true; data: AddressSuggestion[] }>(
+        `/api/superadmin/booking-enquiries/places/autocomplete?q=${encodeURIComponent(query)}&limit=${limit}`,
+      ),
+
+    assignWebsiteBookingDriver: (id: string, payload: { driver_id: string }) =>
       apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(`/api/superadmin/booking-enquiries/website-bookings/${id}/assign-driver`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       }),
+
+    cancelDriverAssignment: (id: string) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(`/api/superadmin/booking-enquiries/website-bookings/${id}/cancel-assignment`, {
+        method: "POST",
+      }),
+
+    publishRide: (id: string) =>
+      apiFetch<{ success: true; data: { id: string; bookingRef: string | null; status: string; publishedAt: string | null } }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${id}/publish`,
+        { method: "POST" },
+      ),
+
+    unpublishTrip: (id: string) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${id}/unpublish`,
+        { method: "POST" },
+      ),
+
+    listInterests: (websiteBookingId: string) =>
+      apiFetch<{ success: true; data: DriverInterest[] }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${websiteBookingId}/interests`,
+      ),
+
+    acceptInterest: (enquiryId: string, interestId: string) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${enquiryId}/interests/${interestId}/accept`,
+        { method: "POST" },
+      ),
+
+    rejectInterest: (enquiryId: string, interestId: string) =>
+      apiFetch<{ success: true; data: { id: string; status: string } }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${enquiryId}/interests/${interestId}/reject`,
+        { method: "POST" },
+      ),
+
+    undoRejectInterest: (enquiryId: string, interestId: string) =>
+      apiFetch<{ success: true; data: { id: string; status: string } }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${enquiryId}/interests/${interestId}/undo-reject`,
+        { method: "POST" },
+      ),
 
     listGeneral: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
       const qs = new URLSearchParams();
@@ -596,6 +668,19 @@ export const superadminApi = {
       }>(`/api/superadmin/booking-enquiries/special${q ? `?${q}` : ""}`);
     },
 
+    listEnquiries: (params?: { page?: number; limit?: number; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page)   qs.set("page",   String(params.page));
+      if (params?.limit)  qs.set("limit",  String(params.limit));
+      if (params?.search) qs.set("search", params.search);
+      const q = qs.toString();
+      return apiFetch<{
+        success: true;
+        data: WebsiteBookingEnquiry[];
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/superadmin/booking-enquiries/enquiries${q ? `?${q}` : ""}`);
+    },
+
     listWebsiteBookings: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
       const qs = new URLSearchParams();
       if (params?.page)   qs.set("page",   String(params.page));
@@ -609,6 +694,46 @@ export const superadminApi = {
         pagination: { page: number; limit: number; total: number; pages: number };
       }>(`/api/superadmin/booking-enquiries/website-bookings${q ? `?${q}` : ""}`);
     },
+
+    createWebsiteBooking: (payload: {
+      customer_name: string;
+      customer_email?: string;
+      customer_mobile: string;
+      pickup_location: string;
+      destination: string;
+      pickup_lat?: number;
+      pickup_lng?: number;
+      destination_lat?: number;
+      destination_lng?: number;
+      booking_type?: "Instant" | "Scheduled";
+      booking_category?: string;
+      vehicle_type?: string;
+      passengers?: number;
+      is_scheduled?: boolean;
+      scheduled_date_time?: string;
+      is_return_trip?: boolean;
+      return_date_time?: string;
+      distance_km?: number;
+      estimated_fare?: number;
+      driver_id?: string | null;
+      status?: "published" | "driver_assigned";
+    }) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(
+        `/api/superadmin/booking-enquiries/website-bookings/direct`,
+        { method: "POST", body: JSON.stringify(payload) },
+      ),
+
+    assignWebsiteBookingDriverDirect: (id: string, payload: { driver_id: string }) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${id}/direct-assign-driver`,
+        { method: "PATCH", body: JSON.stringify(payload) },
+      ),
+
+    cancelAssignment: (id: string) =>
+      apiFetch<{ success: true; data: WebsiteBookingEnquiry }>(
+        `/api/superadmin/booking-enquiries/website-bookings/${id}/direct-cancel-assignment`,
+        { method: "POST" },
+      ),
 
     listWebsiteEnquiries: (params?: { page?: number; limit?: number; status?: string; search?: string }) => {
       const qs = new URLSearchParams();
@@ -681,12 +806,41 @@ export interface WebsiteBookingEnquiry {
   pickupLng:       number | null;
   dropLat:         number | null;
   dropLng:         number | null;
-  estimatedFare?:  number | null;
-  driverId?:       string | null;
-  driverName?:     string | null;
-  driverPhone?:    string | null;
-  vehicleReg?:     string | null;
-  vehicleModel?:   string | null;
+  estimatedFare?:     number | null;
+  driverId?:          string | null;
+  driverName?:        string | null;
+  driverPhone?:       string | null;
+  vehicleReg?:        string | null;
+  vehicleModel?:      string | null;
+  isPublished:           boolean;
+  websiteBookingId:      string | null;
+  websiteBookingRef:     string | null;
+  websiteBookingStatus:  string | null;
+}
+
+export interface AddressSuggestion {
+  id: string;
+  placeName: string;
+  text: string;
+  placeType: string[];
+  center: [number, number];
+  relevance: number;
+  context: string | null;
+}
+
+export interface DriverInterest {
+  id:           string;
+  bookingId:    string;
+  driverId:     string;
+  driverUserId: string;
+  driverName:   string;
+  driverPhone:  string;
+  vehicleReg:   string | null;
+  vehicleModel: string | null;
+  vehicleType:  string | null;
+  status:       string | null;
+  expressedAt:  string | null;
+  respondedAt:  string | null;
 }
 
 export interface WebsiteGeneralEnquiry {

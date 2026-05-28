@@ -552,7 +552,16 @@ export default function SuperAdminVendorsPage() {
                           case "phone":         return <span key={key} className="text-[13px] text-slate-600 font-medium">{fmtPhone(v.phone)}</span>;
                           case "contactPerson": return <span key={key} className="text-[13px] text-slate-600 font-medium truncate">{v.contactPerson}</span>;
                           case "status":        return <div key={key}><StatusBadge status={v.status} size="sm" /></div>;
-                          case "billingType":   return <span key={key} className="text-[12px] text-slate-700 font-bold">{v.billing_type ?? "PREPAID"}</span>;
+                          case "billingType": {
+                            const bt = (v.billing_type ?? "PREPAID").toUpperCase();
+                            const isPost = bt === "POSTPAID";
+                            return (
+                              <span key={key} style={{ display:"inline-flex", alignItems:"center", gap:5, background: isPost ? "#F3E8FF" : "#DCFCE7", color: isPost ? "#7E22CE" : "#15803D", border: `1px solid ${isPost ? "#E9D5FF" : "#BBF7D0"}`, borderRadius:20, fontSize:11, fontWeight:700, padding:"3px 10px", whiteSpace:"nowrap", width:"fit-content" }}>
+                                <span style={{ width:6, height:6, borderRadius:"50%", background: isPost ? "#A855F7" : "#22C55E", flexShrink:0 }} />
+                                {bt}
+                              </span>
+                            );
+                          }
                           case "creditLimit":   return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.credit_limit != null ? `₹${Number(v.credit_limit).toLocaleString("en-IN")}` : "—"}</span>;
                           case "wallet":        return <span key={key} className="text-[13px] text-slate-700 font-semibold">{v.wallet_balance != null ? `₹${Number(v.wallet_balance).toLocaleString("en-IN")}` : "—"}</span>;
                           case "pan":           return <span key={key} className="text-[12px] text-slate-500 font-mono">—</span>;

@@ -86,7 +86,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
 
   /* ── Section label ── */
   const SLabel = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 }}>
+    <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.8px] mb-3">
       {children}
     </div>
   );
@@ -109,20 +109,20 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
         const drop   = splitAddr(booking?.dropLocation   ?? "");
 
         return (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
         <SLabel>Route</SLabel>
 
         {/* Continuous vertical track + markers */}
         <div>
           {/* ── Pickup ── */}
-          <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
-            <div style={{ width: 10, flexShrink: 0, position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #0F172A", background: "#fff", marginTop: 4, zIndex: 1 }} />
-              <div style={{ position: "absolute", top: 14, bottom: -4, width: 2, background: "#D1D5DB", zIndex: 0 }} />
+          <div className="flex gap-3 items-stretch">
+            <div className="w-[10px] shrink-0 relative flex flex-col items-center">
+              <div className="w-[10px] h-[10px] rounded-full border-2 border-slate-900 bg-white mt-1 z-[1]" />
+              <div className="absolute top-[14px] bottom-[-4px] w-[2px] bg-[#D1D5DB] z-0" />
             </div>
-            <div style={{ flex: 1, paddingBottom: 14 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{pickup.main}</div>
-              {pickup.sub && <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2, lineHeight: 1.4 }}>{pickup.sub}</div>}
+            <div className="flex-1 pb-[14px]">
+              <div className="text-[13.5px] font-bold text-slate-900 leading-[1.3]">{pickup.main}</div>
+              {pickup.sub && <div className="text-[11.5px] text-slate-400 mt-0.5 leading-[1.4]">{pickup.sub}</div>}
             </div>
           </div>
 
@@ -130,35 +130,35 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           {hasStops && stops.map((s, i) => {
             const sa = splitAddr(s.address);
             return (
-              <div key={s.id} style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
-                <div style={{ width: 10, flexShrink: 0, position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", border: "1.5px solid #94A3B8", background: "#fff", marginTop: 5, zIndex: 1 }} />
-                  <div style={{ position: "absolute", top: 13, bottom: -4, width: 2, background: "#D1D5DB", zIndex: 0 }} />
+              <div key={s.id} className="flex gap-3 items-stretch">
+                <div className="w-[10px] shrink-0 relative flex flex-col items-center">
+                  <div className="w-2 h-2 rounded-full border-[1.5px] border-slate-400 bg-white mt-[5px] z-[1]" />
+                  <div className="absolute top-[13px] bottom-[-4px] w-[2px] bg-[#D1D5DB] z-0" />
                 </div>
-                <div style={{ flex: 1, paddingBottom: 14 }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>
+                <div className="flex-1 pb-[14px]">
+                  <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.5px] mb-0.5">
                     Stop {i + 1}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", lineHeight: 1.3 }}>{sa.main}</div>
-                  {sa.sub && <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{sa.sub}</div>}
+                  <div className="text-[13px] font-semibold text-slate-700 leading-[1.3]">{sa.main}</div>
+                  {sa.sub && <div className="text-[11px] text-slate-400 mt-px">{sa.sub}</div>}
                 </div>
               </div>
             );
           })}
 
           {/* ── Drop ── */}
-          <div style={{ display: "flex", gap: 12, alignItems: "stretch" }}>
-            <div style={{ width: 10, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{ width: 10, height: 10, borderRadius: 2, background: "#0F172A", marginTop: 4, zIndex: 1 }} />
+          <div className="flex gap-3 items-stretch">
+            <div className="w-[10px] shrink-0 flex flex-col items-center">
+              <div className="w-[10px] h-[10px] rounded-[2px] bg-slate-900 mt-1 z-[1]" />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A", lineHeight: 1.3 }}>{drop.main}</div>
-              {drop.sub && <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2, lineHeight: 1.4 }}>{drop.sub}</div>}
+            <div className="flex-1">
+              <div className="text-[13.5px] font-bold text-slate-900 leading-[1.3]">{drop.main}</div>
+              {drop.sub && <div className="text-[11.5px] text-slate-400 mt-0.5 leading-[1.4]">{drop.sub}</div>}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
+        <div className="grid grid-cols-2 gap-2 mt-[14px]">
           {[
             { label: "Created",    value: booking?.createdAt ? new Date(booking.createdAt).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—" },
             ...(booking?.status === "Completed" ? [{ label: "Completed", value: booking?.completedAt ? new Date(booking.completedAt).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—" }] : []),
@@ -166,9 +166,9 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             { label: "Fare",       value: booking?.fare ? `₹${booking.fare}` : "—" },
             { label: "Passengers", value: booking?.passengers != null ? `${booking.passengers}` : "—" },
           ].map((d) => (
-            <div key={d.label} style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 10.5, color: "#9CA3AF", marginBottom: 3, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>{d.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{d.value}</div>
+            <div key={d.label} className="bg-white border-[1.5px] border-slate-200 rounded-[9px] px-3 py-[9px] text-center">
+              <div className="text-[10.5px] text-slate-400 mb-[3px] font-semibold uppercase tracking-[0.4px]">{d.label}</div>
+              <div className="text-[14px] font-extrabold text-slate-900">{d.value}</div>
             </div>
           ))}
         </div>
@@ -178,19 +178,19 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
 
       {/* ── Scheduled date/time (Scheduled bookings only) ── */}
       {booking?.type === "Scheduled" && booking.scheduledTime && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
           <SLabel>Scheduled For</SLabel>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div className="flex items-center gap-4">
             <div>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#94A3B8", marginBottom: 3 }}>Date</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>
+              <div className="text-[10.5px] font-semibold text-slate-400 mb-[3px]">Date</div>
+              <div className="text-[13.5px] font-bold text-slate-900">
                 {new Date(booking.scheduledTime).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </div>
             </div>
-            <div style={{ width: 1, height: 28, background: "#E5E7EB" }} />
+            <div className="w-px h-7 bg-slate-200" />
             <div>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#94A3B8", marginBottom: 3 }}>Time</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>
+              <div className="text-[10.5px] font-semibold text-slate-400 mb-[3px]">Time</div>
+              <div className="text-[13.5px] font-bold text-slate-900">
                 {new Date(booking.scheduledTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
               </div>
             </div>
@@ -199,52 +199,52 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
       )}
 
       {/* ── Driver & Supervisor ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 12, padding: 13 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>Driver</div>
+      <div className="grid grid-cols-2 gap-[9px]">
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[12px] p-[13px]">
+          <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.6px] mb-[10px]">Driver</div>
           {booking?.driverName ? (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
+              <div className="text-[13px] font-bold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">
                 {booking.driverName}
               </div>
-              <div style={{ display: "flex", alignItems: "center", height: 26 }}>
-                <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, background: "#F1F5F9", border: "1px solid #E2E8F0", flexShrink: 0 }}>
+              <div className="flex items-center h-[26px]">
+                <div className="inline-flex items-center justify-center w-[26px] h-[26px] rounded-[7px] bg-slate-100 border border-slate-200 shrink-0">
                   <Phone size={12} color="#64748B" />
                 </div>
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic" }}>Awaiting</div>
+            <div className="text-[13px] text-slate-400 italic">Awaiting</div>
           )}
         </div>
 
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 12, padding: 13 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 }}>Supervisor</div>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[12px] p-[13px]">
+          <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.6px] mb-[10px]">Supervisor</div>
           {booking?.supervisorName ? (
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 6 }}>
+              <div className="text-[13px] font-bold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap mb-[6px]">
                 {booking.supervisorName}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, height: 26 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, background: "#F1F5F9", border: "1px solid #E2E8F0", flexShrink: 0 }}>
+              <div className="flex items-center gap-[6px] h-[26px]">
+                <div className="flex items-center justify-center w-[26px] h-[26px] rounded-[7px] bg-slate-100 border border-slate-200 shrink-0">
                   <Phone size={12} color="#64748B" />
                 </div>
-                <span style={{ fontSize: 11.5, color: "#475569", fontWeight: 600 }}>
+                <span className="text-[11.5px] text-slate-600 font-semibold">
                   {supervisor?.phone ?? "—"}
                 </span>
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic" }}>Unassigned</div>
+            <div className="text-[13px] text-slate-400 italic">Unassigned</div>
           )}
         </div>
       </div>
 
       {/* ── Vehicle Details ── */}
       {driver && (driver.vehicle || driver.vehicleReg) && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: "#F1F5F9", border: "1.5px solid #E5E7EB", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
+          <div className="flex items-center gap-[9px] mb-[14px]">
+            <div className="w-[30px] h-[30px] rounded-[8px] bg-slate-100 border-[1.5px] border-slate-200 flex items-center justify-center shrink-0">
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
                 <path d="M3 13h14M5 13l1.5-5h7L15 13" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="6.5" cy="14.5" r="1.5" stroke="#374151" strokeWidth="1.4"/>
@@ -252,33 +252,33 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>Vehicle Details</div>
-              <div style={{ fontSize: 11, color: "#94A3B8" }}>Assigned vehicle info</div>
+              <div className="text-[13.5px] font-bold text-slate-900">Vehicle Details</div>
+              <div className="text-[11px] text-slate-400">Assigned vehicle info</div>
             </div>
           </div>
 
           {driver.vehicleReg && (
-            <div style={{ background: "#0F172A", borderRadius: 11, padding: "14px 16px", marginBottom: 11, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="bg-slate-900 rounded-[11px] px-4 py-[14px] mb-[11px] flex items-center justify-between">
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 5 }}>Registration No.</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", letterSpacing: 2.5, fontVariantNumeric: "tabular-nums" }}>{driver.vehicleReg}</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.8px] mb-[5px]">Registration No.</div>
+                <div className="text-[16px] font-extrabold text-white tracking-[2.5px] tabular-nums">{driver.vehicleReg}</div>
               </div>
-              <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div className="w-[34px] h-[34px] rounded-[9px] bg-white/10 flex items-center justify-center">
                 <CarFront size={18} color="#fff" strokeWidth={1.8} opacity={0.8} />
               </div>
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div className="grid grid-cols-2 gap-2">
             {[
               { label: "Model",     value: driver.vehicle?.split(" ").slice(0, 2).join(" ") ?? "—" },
               { label: "Type",      value: driver.vehicleType      ?? "—" },
               { label: "Color",     value: driver.vehicleColor     ?? "—" },
               { label: "Make Year", value: driver.vehicleMakeYear ? String(driver.vehicleMakeYear) : "—" },
             ].map((d) => (
-              <div key={d.label} style={{ background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 9, padding: "9px 11px" }}>
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>{d.label}</div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>{d.value}</div>
+              <div key={d.label} className="bg-white border-[1.5px] border-slate-200 rounded-[9px] px-[11px] py-[9px]">
+                <div className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-[0.4px] mb-1">{d.label}</div>
+                <div className="text-[12.5px] font-bold text-slate-900">{d.value}</div>
               </div>
             ))}
           </div>
@@ -287,10 +287,10 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
 
       {/* ── Driver Request — Scheduled ── */}
       {booking?.type === "Scheduled" && booking.interestedDrivers !== undefined && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
           <SLabel>Driver Request</SLabel>
           {booking.interestedDrivers.length === 0 ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94A3B8", fontSize: 13, background: "#fff", borderRadius: 10, padding: "12px 14px", border: "1.5px solid #EBEBEB" }}>
+            <div className="flex items-center gap-2 text-slate-400 text-[13px] bg-white rounded-[10px] px-[14px] py-3 border-[1.5px] border-slate-200">
               <Loader2 size={14} className="animate-spin" />
               Waiting for a driver to request this trip…
             </div>
@@ -304,8 +304,8 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
             return (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: dStyle.bg, border: `1.5px solid ${dStyle.border}`, borderRadius: 11, padding: "12px 14px", opacity: d.status === "Rejected" ? 0.7 : 1 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{d.driverName}</div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
+                  <div className="text-[13px] font-bold text-slate-900">{d.driverName}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
                     Requested {new Date(d.requestedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
@@ -332,9 +332,9 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     ];
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         {docsError && (
-          <div style={{ background: "#FEF2F2", border: "1.5px solid #FECACA", borderRadius: 10, padding: "10px 12px", color: "#DC2626", fontSize: 12 }}>
+          <div className="bg-[#FEF2F2] border-[1.5px] border-[#FECACA] rounded-[10px] px-3 py-[10px] text-[#DC2626] text-[12px]">
             {docsError}
           </div>
         )}
@@ -344,11 +344,11 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           const submitted = doc?.submitted   ?? false;
           const fileUrl   = doc?.file_url    ?? null;
           return (
-            <div key={key} style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{label}</div>
-                  <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
+            <div key={key} className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
+              <div className="flex items-start justify-between mb-3">
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-slate-900">{label}</div>
+                  <div className="text-[11.5px] text-slate-400 mt-0.5">
                     {docsLoading ? "Loading…" : submitted ? (verified ? "Verified" : "Pending review") : "Not submitted"}
                   </div>
                 </div>
@@ -356,7 +356,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
                 <button
                   onClick={() => setExpandedDoc({ label, url: fileUrl })}
                   title="Expand"
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, border: "1.5px solid #E2E8F0", background: "#fff", cursor: "pointer", color: "#475569", flexShrink: 0 }}
+                  className="inline-flex items-center justify-center w-[30px] h-[30px] rounded-[8px] border-[1.5px] border-slate-200 bg-white cursor-pointer text-slate-600 shrink-0"
                   onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F1F5F9"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
                 >
@@ -364,24 +364,20 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
                 </button>
               </div>
 
-              <div style={{
-                background: "#fff", border: "1.5px dashed #E5E7EB", borderRadius: 10,
-                padding: "18px 14px", display: "flex", alignItems: "center", justifyContent: "center",
-                minHeight: 78,
-              }}>
+              <div className="bg-white border-[1.5px] border-dashed border-slate-200 rounded-[10px] px-[14px] py-[18px] flex items-center justify-center min-h-[78px]">
                 {docsLoading ? (
-                  <Loader2 size={16} className="animate-spin" style={{ color: "#94A3B8" }} />
+                  <Loader2 size={16} className="animate-spin text-slate-400" />
                 ) : fileUrl ? (
                   <a
                     href={fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: ACCENT, textDecoration: "none" }}
+                    className="inline-flex items-center gap-[6px] text-[12.5px] font-semibold text-blue-600 no-underline"
                   >
                     <ExternalLink size={13} /> View document
                   </a>
                 ) : (
-                  <span style={{ fontSize: 12, color: "#94A3B8" }}>No file uploaded yet</span>
+                  <span className="text-[12px] text-slate-400">No file uploaded yet</span>
                 )}
               </div>
             </div>
@@ -408,12 +404,12 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
 
       {/* Timeline */}
       {timelineSteps && (
-        <div style={{ background: "#FAFAFA", border: "1.5px solid #EBEBEB", borderRadius: 13, padding: 15 }}>
+        <div className="bg-slate-50 border-[1.5px] border-slate-200 rounded-[13px] p-[15px]">
           <SLabel>Trip Timeline</SLabel>
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div className="flex flex-col">
             {timelineSteps.map((step, i) => (
-              <div key={step.label} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+              <div key={step.label} className="flex gap-3 items-start">
+                <div className="flex flex-col items-center shrink-0">
                   <div style={{
                     width: 10, height: 10, borderRadius: "50%", marginTop: 2, flexShrink: 0,
                     background: step.active ? "#0F172A" : step.done ? "#374151" : "#E5E7EB",
@@ -421,15 +417,15 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
                     boxShadow: step.active ? "0 0 0 3px #0F172A25" : "none",
                   }} />
                   {i < timelineSteps.length - 1 && (
-                    <div style={{ width: 1.5, height: 22, background: step.done ? "#D1D5DB" : "#F3F4F6" }} />
+                    <div className="w-[1.5px] h-[22px]" style={{ background: step.done ? "#D1D5DB" : "#F3F4F6" }} />
                   )}
                 </div>
-                <div style={{ paddingBottom: 14 }}>
+                <div className="pb-[14px]">
                   <div style={{ fontSize: 12.5, fontWeight: step.active ? 800 : step.done ? 600 : 400, color: step.active ? "#0F172A" : step.done ? "#374151" : "#9CA3AF" }}>
                     {step.label}
                   </div>
                   {step.time && (
-                    <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 1 }}>{step.time}</div>
+                    <div className="text-[11px] text-slate-400 mt-px">{step.time}</div>
                   )}
                 </div>
               </div>
@@ -444,29 +440,26 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     <>
     <Drawer open={!!booking} onOpenChange={(o) => !o && onClose()} direction="right">
       <DrawerContent
-        className="flex flex-col h-full"
+        className="flex flex-col h-full border-l-[1.5px] border-[#EAEAEA] shadow-[-8px_0_40px_rgba(0,0,0,0.08)] font-['Plus_Jakarta_Sans',system-ui,sans-serif]"
         style={{
           width: 440,
-          background: "#fff",
-          borderLeft: "1.5px solid #EAEAEA",
-          boxShadow: "-8px 0 40px rgba(0,0,0,0.08)",
-          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         }}
       >
         <DrawerTitle className="sr-only">Booking Details</DrawerTitle>
         {/* ── Header ── */}
-        <div style={{ padding: "18px 20px 0", borderBottom: "1.5px solid #F1F5F9", flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="px-5 pt-[18px] border-b-[1.5px] border-slate-100 shrink-0">
+          <div className="flex justify-between items-center mb-3">
             <div>
               {booking?.bookingRef && (
-                <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, letterSpacing: 0.5, marginBottom: 4 }}>
+                <div className="text-[11px] text-slate-400 font-bold tracking-[0.5px] mb-1">
                   {booking.bookingRef}
                 </div>
               )}
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Trip Details</div>
+              <div className="text-[18px] font-extrabold text-slate-900">Trip Details</div>
             </div>
             <DrawerClose asChild>
-              <button style={{ width: 32, height: 32, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", flexShrink: 0, transition: "background 0.15s, border-color 0.15s" }}
+              <button
+                className="w-8 h-8 rounded-[9px] border-[1.5px] border-slate-200 bg-slate-50 cursor-pointer flex items-center justify-center text-slate-500 shrink-0 transition-[background,border-color] duration-150"
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F1F5F9"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#CBD5E1"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#F8FAFC"; (e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0"; }}
               >
@@ -478,25 +471,25 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
           </div>
 
           {/* Badges */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: isOngoing ? 0 : 16 }}>
+          <div className={`flex gap-[6px] flex-wrap ${isOngoing ? "" : "mb-4"}`}>
             {ss && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: ss.bg, color: ss.text, border: `1px solid ${ss.border}`, padding: "4px 11px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: ss.dot, flexShrink: 0 }} />
                 {booking!.status}
               </span>
             )}
-            <span style={{ display: "inline-block", background: "#DBEAFE", color: "#1D4ED8", padding: "4px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+            <span className="inline-block bg-blue-100 text-blue-700 px-[11px] py-1 rounded-full text-[12px] font-semibold">
               {booking?.type}
             </span>
             {booking?.bookingSource && booking.bookingSource !== "Individual" && (
-              <span style={{ display: "inline-block", background: "#F1F5F9", color: "#475569", padding: "4px 11px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>
+              <span className="inline-block bg-slate-100 text-slate-600 px-[11px] py-1 rounded-full text-[12px] font-semibold">
                 {booking.bookingSource}
               </span>
             )}
           </div>
 
           {/* Tab bar — always visible */}
-          <div style={{ display: "flex", marginTop: 14 }}>
+          <div className="flex mt-[14px]">
             {(["details", "documents", ...(isOngoing ? ["live"] : [])] as const).map((tab) => {
               const active = activeTab === tab;
               const label = tab === "live" ? "Live" : tab === "documents" ? "Documents" : "Details";
@@ -504,20 +497,11 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as typeof activeTab)}
-                  style={{
-                    padding: "8px 18px",
-                    fontSize: 13,
-                    fontWeight: active ? 700 : 500,
-                    color: active ? ACCENT : "#64748B",
-                    background: "none",
-                    border: "none",
-                    outline: "none",
-                    borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
-                    marginBottom: -1.5,
-                    cursor: "pointer",
-                    transition: "color 0.15s",
-                    fontFamily: "inherit",
-                  }}
+                  className={`px-[18px] py-2 text-[13px] bg-transparent border-none outline-none cursor-pointer transition-colors duration-150 font-[inherit] -mb-[1.5px] ${
+                    active
+                      ? "font-bold text-blue-600 border-b-[2.5px] border-blue-600"
+                      : "font-medium text-slate-500 border-b-[2.5px] border-transparent"
+                  }`}
                 >
                   {label}
                 </button>
@@ -528,8 +512,7 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
 
         {/* ── Scrollable body ── */}
         <div
-          className="booking-sidebar-scroll"
-          style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}
+          className="booking-sidebar-scroll flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3"
         >
           <style>{`
             .booking-sidebar-scroll::-webkit-scrollbar { width: 4px; }
@@ -549,52 +532,45 @@ export function BookingDetailModal({ booking, onClose }: BookingDetailModalProps
     {expandedDoc && (
       <div
         onClick={() => setExpandedDoc(null)}
-        style={{
-          position: "fixed", inset: 0, background: "rgba(15,23,42,0.65)",
-          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-        }}
+        className="fixed inset-0 bg-[rgba(15,23,42,0.65)] z-[100] flex items-center justify-center p-6"
       >
         <div
           onClick={e => e.stopPropagation()}
-          style={{
-            background: "#fff", borderRadius: 16, width: "100%", maxWidth: 960, maxHeight: "92vh",
-            display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.25)",
-            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-          }}
+          className="bg-white rounded-2xl w-full max-w-[960px] max-h-[92vh] flex flex-col shadow-[0_24px_80px_rgba(0,0,0,0.25)] font-['Plus_Jakarta_Sans',system-ui,sans-serif]"
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 22px", borderBottom: "1.5px solid #F1F5F9" }}>
+          <div className="flex items-center justify-between px-[22px] py-4 border-b-[1.5px] border-slate-100">
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.6 }}>Document</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#0F172A", marginTop: 2 }}>{expandedDoc.label}</div>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.6px]">Document</div>
+              <div className="text-[16px] font-extrabold text-slate-900 mt-0.5">{expandedDoc.label}</div>
             </div>
             <button
               onClick={() => setExpandedDoc(null)}
-              style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}
+              className="w-[34px] h-[34px] rounded-[9px] border-[1.5px] border-slate-200 bg-slate-50 cursor-pointer text-slate-500 flex items-center justify-center"
             >
               <XIcon size={16} />
             </button>
           </div>
-          <div style={{ flex: 1, minHeight: 360, padding: 18, display: "flex", alignItems: "center", justifyContent: "center", background: "#F8FAFC" }}>
+          <div className="flex-1 min-h-[360px] p-[18px] flex items-center justify-center bg-slate-50">
             {expandedDoc.url
               ? (() => {
                   const u = expandedDoc.url.toLowerCase().split("?")[0];
                   if (/\.(jpe?g|png|webp|gif|bmp|svg)$/.test(u)) {
                     // eslint-disable-next-line @next/next/no-img-element
-                    return <img src={expandedDoc.url} alt={expandedDoc.label} style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />;
+                    return <img src={expandedDoc.url} alt={expandedDoc.label} className="max-w-full max-h-[70vh] object-contain" />;
                   }
                   if (/\.pdf$/.test(u)) {
-                    return <iframe src={expandedDoc.url} title={expandedDoc.label} style={{ width: "100%", height: "70vh", border: "none", background: "#fff" }} />;
+                    return <iframe src={expandedDoc.url} title={expandedDoc.label} className="w-full h-[70vh] border-none bg-white" />;
                   }
                   return (
-                    <a href={expandedDoc.url!} target="_blank" rel="noopener noreferrer" style={{ padding: "10px 18px", borderRadius: 9, background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
+                    <a href={expandedDoc.url!} target="_blank" rel="noopener noreferrer" className="px-[18px] py-[10px] rounded-[9px] bg-blue-600 text-white text-[13px] font-bold no-underline">
                       Open file
                     </a>
                   );
                 })()
               : (
-                <div style={{ textAlign: "center" as const, color: "#94A3B8" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>No file uploaded yet</div>
-                  <div style={{ fontSize: 11.5, marginTop: 4 }}>Document will appear here once provided.</div>
+                <div className="text-center text-slate-400">
+                  <div className="text-[13px] font-semibold">No file uploaded yet</div>
+                  <div className="text-[11.5px] mt-1">Document will appear here once provided.</div>
                 </div>
               )
             }

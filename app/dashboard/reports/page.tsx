@@ -187,26 +187,26 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {/* Company identity card */}
-      <Card style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 50, height: 50, borderRadius: 12, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, color: A, flexShrink: 0, letterSpacing: 0.5 }}>
+      <Card style={{ padding: "20px 24px" }} className="flex items-center gap-4 flex-wrap justify-between">
+        <div className="flex items-center gap-3.5">
+          <div className="w-[50px] h-[50px] rounded-xl bg-[#EFF6FF] flex items-center justify-center font-extrabold text-[15px] shrink-0 tracking-[0.5px]" style={{ color: A }}>
             {initials}
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>{title}</div>
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 3 }}>Corporate account</div>
+            <div className="text-[18px] font-extrabold text-slate-900">{title}</div>
+            <div className="text-[12px] text-slate-500 mt-[3px]">Corporate account</div>
           </div>
         </div>
         <Badge label="Corporate" color="#1D4ED8" bg="#EFF6FF" dot="#3B82F6" />
       </Card>
 
       {/* Filters row */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <div style={{ position: "relative" }}>
+      <div className="flex gap-[10px] items-center">
+        <div className="relative">
           <button onClick={() => setShowPicker((v) => !v)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 12px", background: "#fff", border: "1.5px solid #E2E8F0", borderRadius: 9, fontSize: 12.5, color: "#475569", fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
+            className="inline-flex items-center gap-[7px] px-3 py-[7px] bg-white border-[1.5px] border-[#E2E8F0] rounded-[9px] text-[12.5px] text-slate-600 font-[inherit] cursor-pointer outline-none">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round">
               <rect x="3" y="5" width="18" height="16" rx="2" />
               <path d="M3 9h18M8 3v4M16 3v4" />
@@ -248,17 +248,17 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: "flex", borderBottom: "1.5px solid #E8EEF4" }}>
+      <div className="flex border-b-[1.5px] border-[#E8EEF4]">
         {COMPANY_TABS.map((t) => (
           <button key={t} onClick={() => {
             setTab(t);
           }}
+            className="px-5 py-[10px] border-none font-[inherit] text-[14px] bg-transparent transition-colors duration-[150ms] cursor-pointer"
             style={{
-              padding: "10px 20px", border: "none",
               borderBottom: tab === t ? `2.5px solid ${A}` : "2.5px solid transparent",
-              marginBottom: -1.5, cursor: "pointer", fontFamily: "inherit", fontSize: 14,
-              fontWeight: tab === t ? 700 : 500, background: "transparent",
-              color: tab === t ? A : "#64748B", transition: "color 0.15s",
+              marginBottom: -1.5,
+              fontWeight: tab === t ? 700 : 500,
+              color: tab === t ? A : "#64748B",
             }}>
             {t}
           </button>
@@ -268,8 +268,8 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
       {/* ── Overview tab ── */}
       {tab === "Overview" && (
         isReportLoading ? <ReportSkeleton statCount={3} /> : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <StatCard label="Total Trips" value={String(totalBookings)} sub="In selected period" iconBg="#F1F5F9"
                 icon={<Route size={17} color="#64748B" strokeWidth={1.4} />} />
               <StatCard label="Total Fare" value={totalSpend > 0 ? fmt(totalSpend) : "—"} sub="Across all trips" iconBg="#F1F5F9"
@@ -278,41 +278,41 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
                 icon={<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 8l3 3 5-7" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+            <div className="grid grid-cols-[2fr_1fr] gap-4">
               <Card style={{ padding: "20px 22px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+                <div className="flex justify-between items-start mb-[18px]">
                   <div>
-                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0F172A", marginBottom: 4 }}>Trips over time</div>
-                    <div style={{ fontSize: 11.5, color: "#94A3B8" }}>Daily trip volume</div>
+                    <div className="text-[13.5px] font-semibold text-slate-900 mb-1">Trips over time</div>
+                    <div className="text-[11.5px] text-slate-400">Daily trip volume</div>
                   </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right" }}>
-                    <strong style={{ display: "block", fontSize: 18, color: "#0F172A", fontWeight: 600, fontVariantNumeric: "tabular-nums", marginBottom: 2 }}>{totalBookings}</strong>
+                  <div className="text-[11px] text-slate-400 text-right">
+                    <strong className="block text-[18px] text-slate-900 font-semibold tabular-nums mb-0.5">{totalBookings}</strong>
                     trips
                   </div>
                 </div>
                 {dailyData.length > 0
-                  ? <div style={{ height: 220 }}><SvgBarChart data={dailyData as Record<string, unknown>[]} xKey="d" yKey="bookings" color={A} yLabel="Trips" /></div>
+                  ? <div className="h-[220px]"><SvgBarChart data={dailyData as Record<string, unknown>[]} xKey="d" yKey="bookings" color={A} yLabel="Trips" /></div>
                   : <EmptyState msg="No daily data for this period" />}
               </Card>
               <Card style={{ padding: "20px 22px" }}>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0F172A", marginBottom: 4 }}>Instant vs Scheduled</div>
-                  <div style={{ fontSize: 11.5, color: "#94A3B8" }}>Trip type split</div>
+                <div className="mb-2">
+                  <div className="text-[13.5px] font-semibold text-slate-900 mb-1">Instant vs Scheduled</div>
+                  <div className="text-[11.5px] text-slate-400">Trip type split</div>
                 </div>
-                <div style={{ position: "relative" }}>
+                <div className="relative">
                   <SvgDonut data={bookingTypeData} colors={[A, "#93C5FD"]} size={190} thickness={26} valueFormat={(v) => `${v} trip${v === 1 ? "" : "s"}`} />
-                  <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", textAlign: "center", pointerEvents: "none" }}>
-                    <div style={{ fontSize: 26, fontWeight: 600, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{totalBookings}</div>
-                    <div style={{ fontSize: 10.5, color: "#94A3B8", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>Total</div>
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                    <div className="text-[26px] font-semibold text-slate-900 tabular-nums">{totalBookings}</div>
+                    <div className="text-[10.5px] text-slate-400 mt-0.5 uppercase tracking-[0.06em] font-medium">Total</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+                <div className="flex flex-col gap-3 mt-3.5">
                   {bookingTypeData.map((b, i) => (
-                    <div key={b.name} style={{ display: "grid", gridTemplateColumns: "14px 1fr auto auto", gap: 10, alignItems: "center", fontSize: 12.5 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: 3, background: i === 0 ? A : "#93C5FD" }} />
-                      <span style={{ color: "#475569", fontWeight: 500 }}>{b.name}</span>
-                      <span style={{ color: "#94A3B8", fontVariantNumeric: "tabular-nums", fontSize: 11.5 }}>{b.pct}%</span>
-                      <span style={{ color: "#0F172A", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{b.value}</span>
+                    <div key={b.name} className="grid grid-cols-[14px_1fr_auto_auto] items-center gap-[10px] text-[12.5px]">
+                      <div className="w-[10px] h-[10px] rounded-[3px]" style={{ background: i === 0 ? A : "#93C5FD" }} />
+                      <span className="text-slate-600 font-medium">{b.name}</span>
+                      <span className="text-slate-400 tabular-nums text-[11.5px]">{b.pct}%</span>
+                      <span className="text-slate-900 font-semibold tabular-nums">{b.value}</span>
                     </div>
                   ))}
                 </div>
@@ -320,18 +320,18 @@ function PanelCompanyReport({ companyName }: { companyName: string }) {
             </div>
 
             <Card style={{ padding: "20px 22px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+              <div className="flex justify-between items-start mb-[18px]">
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0F172A", marginBottom: 4 }}>Daily spend breakdown</div>
-                  <div style={{ fontSize: 11.5, color: "#94A3B8" }}>Daily fare totals</div>
+                  <div className="text-[13.5px] font-semibold text-slate-900 mb-1">Daily spend breakdown</div>
+                  <div className="text-[11.5px] text-slate-400">Daily fare totals</div>
                 </div>
-                <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right" }}>
-                  <strong style={{ display: "block", fontSize: 18, color: "#0F172A", fontWeight: 600, fontVariantNumeric: "tabular-nums", marginBottom: 2 }}>{totalSpend > 0 ? fmtINRk(totalSpend) : "—"}</strong>
+                <div className="text-[11px] text-slate-400 text-right">
+                  <strong className="block text-[18px] text-slate-900 font-semibold tabular-nums mb-0.5">{totalSpend > 0 ? fmtINRk(totalSpend) : "—"}</strong>
                   total
                 </div>
               </div>
               {dailyData.length > 0
-                ? <div style={{ height: 220 }}><SvgBarChart data={dailyData as Record<string, unknown>[]} xKey="d" yKey="spend" color={A} yFormat={fmtINRk} yLabel="Spend" /></div>
+                ? <div className="h-[220px]"><SvgBarChart data={dailyData as Record<string, unknown>[]} xKey="d" yKey="spend" color={A} yFormat={fmtINRk} yLabel="Spend" /></div>
                 : <EmptyState msg="No spend data for this period" />}
             </Card>
           </div>
@@ -423,38 +423,38 @@ export default function ReportsPage() {
       : (selId === "all" ? "All Companies"   : selId);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: FONT }}>
+    <div className="flex flex-col h-full" style={{ fontFamily: FONT }}>
 
       {!hasReport ? (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ textAlign: "center", maxWidth: 380 }}>
-            <div style={{ width: 64, height: 64, borderRadius: 20, background: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-[380px]">
+            <div className="w-16 h-16 rounded-[20px] bg-[#EFF6FF] flex items-center justify-center mx-auto mb-5">
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
                 <rect x="4" y="4" width="20" height="20" rx="4" stroke={A} strokeWidth="1.8" />
                 <path d="M9 10h10M9 14h7M9 18h5" stroke={A} strokeWidth="1.6" strokeLinecap="round" />
               </svg>
             </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A", marginBottom: 8 }}>No report selected</div>
-            <div style={{ fontSize: 13.5, color: "#94A3B8", lineHeight: 1.7, marginBottom: 24 }}>
+            <div className="text-[20px] font-extrabold text-slate-900 mb-2">No report selected</div>
+            <div className="text-[13.5px] text-slate-400 leading-[1.7] mb-6">
               Choose a supervisor or company to view trips, spend breakdown and analytics
             </div>
-            <button onClick={() => openModal()} style={{ padding: "11px 28px", background: A, color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => openModal()} className="px-7 py-[11px] text-white border-none rounded-[10px] text-[14px] font-bold cursor-pointer font-[inherit]" style={{ background: A }}>
               Generate Report
             </button>
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: "#64748B" }}>
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between mb-5">
+            <div className="text-[13px] text-slate-600">
               Showing report for{" "}
-              <span style={{ fontWeight: 700, color: "#0F172A" }}>{reportLabel}</span>
-              <span style={{ marginLeft: 6, fontSize: 12, color: "#94A3B8" }}>
+              <span className="font-bold text-slate-900">{reportLabel}</span>
+              <span className="ml-1.5 text-[12px] text-slate-400">
                 ({reportType === "supervisor" ? "Supervisor" : "Company"})
               </span>
             </div>
             <button onClick={() => openModal()}
-              style={{ padding: "7px 16px", background: "#fff", color: "#475569", border: "1.5px solid #E2E8F0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              className="px-4 py-[7px] bg-white text-slate-600 border-[1.5px] border-[#E2E8F0] rounded-lg text-[13px] font-semibold cursor-pointer font-[inherit]">
               Change Report
             </button>
           </div>
@@ -467,20 +467,20 @@ export default function ReportsPage() {
       {/* ── MODAL ── */}
       {modalOpen && (
         <div onClick={(e) => { if (e.target === e.currentTarget && hasReport) setModalOpen(false); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 20, width: 480, maxWidth: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.20)", overflow: "hidden" }}>
+          className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-slate-900/45">
+          <div className="bg-white rounded-[20px] w-[480px] max-w-full max-h-[88vh] flex flex-col overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.20)]">
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", padding: "18px 22px 0", flexShrink: 0 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Generate Report</div>
-                <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 1 }}>
+            <div className="flex items-center px-[22px] pt-[18px] shrink-0">
+              <div className="flex-1">
+                <div className="text-[15px] font-extrabold text-slate-900">Generate Report</div>
+                <div className="text-[11.5px] text-slate-400 mt-px">
                   {reportType === "supervisor" ? "Select a supervisor to view their report" : "Select a company to view their report"}
                 </div>
               </div>
               {hasReport && (
                 <button onClick={() => setModalOpen(false)}
-                  style={{ width: 34, height: 34, borderRadius: 9, border: "1.5px solid #E2E8F0", background: "#F8FAFC", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  className="w-[34px] h-[34px] rounded-[9px] border-[1.5px] border-[#E2E8F0] bg-slate-50 cursor-pointer flex items-center justify-center shrink-0">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5l10 10M11.5 1.5l-10 10" stroke="#64748B" strokeWidth="1.8" strokeLinecap="round" /></svg>
                 </button>
               )}
@@ -489,30 +489,30 @@ export default function ReportsPage() {
             {/* Supervisor panel */}
             {reportType === "supervisor" && (
               <>
-                <div style={{ padding: "14px 22px 8px", flexShrink: 0 }}>
-                  <div style={{ position: "relative" }}>
-                    <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 15 15" fill="none">
+                <div className="px-[22px] pt-[14px] pb-2 shrink-0">
+                  <div className="relative">
+                    <svg className="absolute left-[10px] top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 15 15" fill="none">
                       <circle cx="6.5" cy="6.5" r="4.5" stroke="#94A3B8" strokeWidth="1.4" />
                       <path d="M10.5 10.5L13 13" stroke="#94A3B8" strokeWidth="1.4" strokeLinecap="round" />
                     </svg>
                     <input value={supQ} onChange={(e) => setSupQ(e.target.value)}
                       placeholder="Search supervisor or zone…" autoFocus
-                      style={{ width: "100%", padding: "9px 14px 9px 32px", border: "1.5px solid #E2E8F0", borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#FAFBFC", color: "#374151", outline: "none", boxSizing: "border-box" }} />
+                      className="w-full py-[9px] pr-[14px] pl-8 border-[1.5px] border-[#E2E8F0] rounded-[10px] text-[13px] font-[inherit] bg-[#FAFBFC] text-[#374151] outline-none box-border" />
                     {supQ && (
                       <button onClick={() => setSupQ("")}
-                        style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 0, lineHeight: 1 }}>
+                        className="absolute right-[10px] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-slate-400 p-0 leading-none">
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5l10 10M11.5 1.5l-10 10" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round" /></svg>
                       </button>
                     )}
                   </div>
                 </div>
-                <div style={{ overflowY: "auto", flex: 1 }}>
+                <div className="overflow-y-auto flex-1">
                   <div onClick={() => pickEntity("supervisor", "all")}
                     onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
                     onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                    style={{ padding: "13px 22px", cursor: "pointer", borderBottom: "1px solid #F1F5F9", transition: "background 0.12s" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>All Supervisors</div>
-                    <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 1 }}>Aggregated report across all supervisors</div>
+                    className="px-[22px] py-[13px] cursor-pointer border-b border-[#F1F5F9] transition-[background] duration-[120ms]">
+                    <div className="text-[14px] font-bold text-slate-900">All Supervisors</div>
+                    <div className="text-[11.5px] text-slate-400 mt-px">Aggregated report across all supervisors</div>
                   </div>
                   {filteredSupervisors.length === 0
                     ? <EmptyState msg="No supervisors found" />
@@ -520,10 +520,10 @@ export default function ReportsPage() {
                       <div key={i} onClick={() => pickEntity("supervisor", s.id)}
                         onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
                         onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                        style={{ padding: "13px 22px", cursor: "pointer", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 12, transition: "background 0.12s" }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{s.name}</div>
-                          <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 1 }}>{s.zone}</div>
+                        className="px-[22px] py-[13px] cursor-pointer border-b border-[#F1F5F9] flex items-center gap-3 transition-[background] duration-[120ms]">
+                        <div className="flex-1">
+                          <div className="text-[14px] font-bold text-slate-900">{s.name}</div>
+                          <div className="text-[11.5px] text-slate-400 mt-px">{s.zone}</div>
                         </div>
                         <Badge label={s.status}
                           color={s.status === "Active" ? "#15803D" : "#64748B"}
@@ -538,30 +538,30 @@ export default function ReportsPage() {
             {/* Company panel */}
             {reportType === "company" && (
               <>
-                <div style={{ padding: "14px 22px 8px", flexShrink: 0 }}>
-                  <div style={{ position: "relative" }}>
-                    <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="14" height="14" viewBox="0 0 15 15" fill="none">
+                <div className="px-[22px] pt-[14px] pb-2 shrink-0">
+                  <div className="relative">
+                    <svg className="absolute left-[10px] top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 15 15" fill="none">
                       <circle cx="6.5" cy="6.5" r="4.5" stroke="#94A3B8" strokeWidth="1.4" />
                       <path d="M10.5 10.5L13 13" stroke="#94A3B8" strokeWidth="1.4" strokeLinecap="round" />
                     </svg>
                     <input value={compQ} onChange={(e) => setCompQ(e.target.value)}
                       placeholder="Search company…" autoFocus
-                      style={{ width: "100%", padding: "9px 14px 9px 32px", border: "1.5px solid #E2E8F0", borderRadius: 10, fontSize: 13, fontFamily: "inherit", background: "#FAFBFC", color: "#374151", outline: "none", boxSizing: "border-box" }} />
+                      className="w-full py-[9px] pr-[14px] pl-8 border-[1.5px] border-[#E2E8F0] rounded-[10px] text-[13px] font-[inherit] bg-[#FAFBFC] text-[#374151] outline-none box-border" />
                     {compQ && (
                       <button onClick={() => setCompQ("")}
-                        style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#94A3B8", padding: 0, lineHeight: 1 }}>
+                        className="absolute right-[10px] top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-slate-400 p-0 leading-none">
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 1.5l10 10M11.5 1.5l-10 10" stroke="#94A3B8" strokeWidth="1.6" strokeLinecap="round" /></svg>
                       </button>
                     )}
                   </div>
                 </div>
-                <div style={{ overflowY: "auto", flex: 1 }}>
+                <div className="overflow-y-auto flex-1">
                   <div onClick={() => pickEntity("company", "all")}
                     onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
                     onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                    style={{ padding: "13px 22px", cursor: "pointer", borderBottom: "1px solid #F1F5F9", transition: "background 0.12s" }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>All Companies</div>
-                    <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 1 }}>Aggregated report across all corporate accounts</div>
+                    className="px-[22px] py-[13px] cursor-pointer border-b border-[#F1F5F9] transition-[background] duration-[120ms]">
+                    <div className="text-[14px] font-bold text-slate-900">All Companies</div>
+                    <div className="text-[11.5px] text-slate-400 mt-px">Aggregated report across all corporate accounts</div>
                   </div>
                   {filteredCompanies.length === 0
                     ? <EmptyState msg="No companies found for this vendor" />
@@ -569,9 +569,9 @@ export default function ReportsPage() {
                       <div key={c.id} onClick={() => pickEntity("company", c.name)}
                         onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "#F8FAFC"}
                         onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                        style={{ padding: "13px 22px", cursor: "pointer", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 12, transition: "background 0.12s" }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{c.name}</div>
+                        className="px-[22px] py-[13px] cursor-pointer border-b border-[#F1F5F9] flex items-center gap-3 transition-[background] duration-[120ms]">
+                        <div className="flex-1">
+                          <div className="text-[14px] font-bold text-slate-900">{c.name}</div>
                         </div>
                         <Badge label={c.status === "Active" ? "Corporate" : c.status} color="#1D4ED8" bg="#EFF6FF" dot="#3B82F6" />
                       </div>

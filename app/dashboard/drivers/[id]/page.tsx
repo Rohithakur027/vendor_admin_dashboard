@@ -22,12 +22,6 @@ const DocumentViewer = dynamic(
 
 // ── constants ────────────────────────────────────────────────────────────────
 const ACCENT = "#2563EB";
-const CARD_STYLE: React.CSSProperties = {
-  background: "#fff",
-  border: "1.5px solid #E8EEF4",
-  borderRadius: 16,
-  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-};
 
 const DUMMY_WEEKLY = [320, 0, 480, 750, 210, 680, 540];
 const DRIVER_DOCS: { doc_type: string; name: string }[] = [
@@ -71,12 +65,15 @@ function StatCard({ label, value, icon: Icon, iconBg, iconColor }: {
   icon: React.ElementType; iconBg: string; iconColor: string;
 }) {
   return (
-    <div style={CARD_STYLE} className="p-5 flex items-center justify-between gap-3">
+    <div className="p-5 flex items-center justify-between gap-3 bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
       <div>
-        <p style={{ fontSize: 11, color: "#64748B", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>{label}</p>
-        <p style={{ fontSize: 36, fontWeight: 800, color: "#0F172A", lineHeight: 1.1, marginTop: 4 }}>{value}</p>
+        <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-[0.06em]">{label}</p>
+        <p className="text-[36px] font-extrabold text-slate-900 leading-[1.1] mt-1">{value}</p>
       </div>
-      <div style={{ background: iconBg, borderRadius: 11, width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div
+        style={{ background: iconBg, borderRadius: 11 }}
+        className="w-[38px] h-[38px] flex items-center justify-center shrink-0"
+      >
         <Icon style={{ color: iconColor }} className="h-5 w-5" />
       </div>
     </div>
@@ -86,8 +83,11 @@ function StatCard({ label, value, icon: Icon, iconBg, iconColor }: {
 function TripStatusBadge({ status }: { status: string }) {
   const c = STATUS_STYLES[status] ?? STATUS_STYLES["Pending"];
   return (
-    <span style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}`, borderRadius: 20, fontSize: 11, fontWeight: 700, padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" as const }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
+    <span
+      style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}
+      className="rounded-[20px] text-[11px] font-bold py-[3px] px-[10px] inline-flex items-center gap-[5px] whitespace-nowrap"
+    >
+      <span style={{ background: c.dot }} className="w-[6px] h-[6px] rounded-full shrink-0" />
       {status}
     </span>
   );
@@ -100,19 +100,22 @@ function BarChart({ days }: { days: { label: string; date: string; total: number
   useEffect(() => { const t = setTimeout(() => setMounted(true), 80); return () => clearTimeout(t); }, []);
 
   return (
-    <div style={{ padding: "0 4px" }}>
-      <div style={{ position: "relative", height: 160 }}>
+    <div className="px-1">
+      <div className="relative h-40">
         {[0, 33, 66, 100].map(pct => (
-          <div key={pct} style={{ position: "absolute", bottom: `${pct}%`, left: 0, right: 0, borderTop: "1px dashed #F1F5F9" }} />
+          <div key={pct} style={{ bottom: `${pct}%` }} className="absolute left-0 right-0 border-t border-dashed border-slate-100" />
         ))}
-        <div style={{ display: "flex", alignItems: "flex-end", height: "100%", gap: 8 }}>
+        <div className="flex items-end h-full gap-2">
           {days.map((day, i) => {
             const isToday = day.date === today;
             const pct     = day.total > 0 ? (day.total / max) * 100 : 0;
             return (
-              <div key={day.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+              <div key={day.date} className="flex-1 flex flex-col items-center h-full justify-end">
                 {day.total > 0 && (
-                  <span style={{ fontSize: 10, color: isToday ? ACCENT : "#94A3B8", fontWeight: 700, marginBottom: 4, whiteSpace: "nowrap" as const }}>
+                  <span
+                    style={{ color: isToday ? ACCENT : undefined }}
+                    className={`text-[10px] font-bold mb-1 whitespace-nowrap ${isToday ? "" : "text-slate-400"}`}
+                  >
                     ₹{day.total}
                   </span>
                 )}
@@ -128,10 +131,13 @@ function BarChart({ days }: { days: { label: string; date: string; total: number
           })}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+      <div className="flex gap-2 mt-2">
         {days.map(day => (
-          <div key={day.date} style={{ flex: 1, textAlign: "center" as const }}>
-            <span style={{ fontSize: 11, fontWeight: day.date === today ? 800 : 500, color: day.date === today ? ACCENT : "#94A3B8" }}>
+          <div key={day.date} className="flex-1 text-center">
+            <span
+              style={{ color: day.date === today ? ACCENT : undefined, fontWeight: day.date === today ? 800 : 500 }}
+              className={`text-[11px] ${day.date === today ? "" : "text-slate-400"}`}
+            >
               {day.label}
             </span>
           </div>
@@ -241,27 +247,33 @@ export default function DriverProfilePage() {
   if (!isLoading && !driver) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <p style={{ color: "#64748B" }}>Driver not found.</p>
-        <button onClick={() => router.back()} style={{ fontSize: 13, color: ACCENT, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Go back</button>
+        <p className="text-slate-500">Driver not found.</p>
+        <button
+          onClick={() => router.back()}
+          className="text-[13px] text-blue-600 bg-transparent border-none cursor-pointer underline"
+        >
+          Go back
+        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: font, color: "#0F172A" }}>
+    <div style={{ fontFamily: font }} className="text-slate-900">
 
       {/* ── Page Header ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+      <div className="flex items-center gap-[14px] mb-5">
         <button
           onClick={() => router.back()}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1.5px solid #E8EEF4", borderRadius: 10, background: "#fff", color: "#334155", fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: font }}
+          style={{ fontFamily: font }}
+          className="flex items-center gap-[6px] py-[7px] px-[14px] border-[1.5px] border-[#E8EEF4] rounded-[10px] bg-white text-[#334155] font-semibold text-[13px] cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <div style={{ width: 1, height: 28, background: "#E8EEF4" }} />
+        <div className="w-px h-7 bg-[#E8EEF4]" />
         <div>
-          <p style={{ fontSize: 17, fontWeight: 800, color: "#0F172A" }}>Driver Profile</p>
-          <p style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
+          <p className="text-[17px] font-extrabold text-slate-900">Driver Profile</p>
+          <p className="text-[12px] text-slate-500 mt-[1px]">
             {isLoading || !driver ? (
               <SkeletonInline className="h-3 w-32" />
             ) : (
@@ -272,8 +284,8 @@ export default function DriverProfilePage() {
       </div>
 
       {/* ── Tab Bar — left-aligned underline style matching Supervisor Profile ── */}
-      <div style={{ borderBottom: "1.5px solid #E8EEF4", marginBottom: 20 }}>
-        <div style={{ display: "flex" }}>
+      <div className="border-b-[1.5px] border-[#E8EEF4] mb-5">
+        <div className="flex">
           {TABS.map(tab => {
             const active = activeTab === tab.value;
             return (
@@ -281,20 +293,12 @@ export default function DriverProfilePage() {
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 style={{
-                  padding: "10px 18px",
-                  fontSize: 14,
-                  fontWeight: active ? 700 : 500,
-                  color: active ? ACCENT : "#64748B",
-                  background: "none",
-                  outline: "none",
-                  border: "none",
+                  fontFamily: font,
+                  color: active ? ACCENT : undefined,
                   borderBottom: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
                   marginBottom: -1.5,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap" as const,
-                  transition: "color 0.15s",
-                  fontFamily: font,
                 }}
+                className={`px-[18px] py-[10px] text-[14px] bg-transparent outline-none border-none cursor-pointer whitespace-nowrap transition-colors duration-150 ${active ? "font-bold" : "font-medium text-slate-500"}`}
               >
                 {tab.label}
               </button>
@@ -305,8 +309,8 @@ export default function DriverProfilePage() {
 
       {/* ══ TAB: OVERVIEW ══ */}
       {activeTab === "overview" && (isLoading || !driver ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ ...CARD_STYLE, padding: "20px 24px", display: "flex", alignItems: "center", gap: 18 }}>
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] px-6 py-5 flex items-center gap-[18px]">
             <Skeleton className="h-[60px] w-[60px] rounded-full shrink-0" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-5 w-48" />
@@ -314,9 +318,9 @@ export default function DriverProfilePage() {
             </div>
             <Skeleton className="h-3 w-32 shrink-0" />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+          <div className="grid grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} style={CARD_STYLE} className="p-5 flex items-center justify-between gap-3">
+              <div key={i} className="p-5 flex items-center justify-between gap-3 bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <div className="space-y-2">
                   <Skeleton className="h-3 w-20" />
                   <Skeleton className="h-8 w-16" />
@@ -325,14 +329,14 @@ export default function DriverProfilePage() {
               </div>
             ))}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "1.1fr 1fr" }}>
             <Skeleton className="h-[120px] rounded-2xl" />
             <div className="space-y-3.5">
-              <div style={CARD_STYLE} className="p-4 space-y-2">
+              <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-4 space-y-2">
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-3 w-28" />
               </div>
-              <div style={CARD_STYLE} className="p-4 space-y-2.5">
+              <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-4 space-y-2.5">
                 <Skeleton className="h-4 w-32" />
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-3 w-full" />
@@ -342,57 +346,66 @@ export default function DriverProfilePage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="flex flex-col gap-4">
 
           {/* ── Profile card — identical layout to Supervisor Profile ── */}
-          <div style={{ ...CARD_STYLE, padding: "20px 24px", display: "flex", alignItems: "center", gap: 18 }}>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] px-6 py-5 flex items-center gap-[18px]">
             {/* Avatar + online dot */}
-            <div style={{ position: "relative", flexShrink: 0 }}>
-              <div style={{ width: 60, height: 60, borderRadius: "50%", background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 800 }}>
+            <div className="relative shrink-0">
+              <div className="w-[60px] h-[60px] rounded-full bg-blue-600 flex items-center justify-center text-white text-[22px] font-extrabold">
                 {drvInitials}
               </div>
-              <span style={{ position: "absolute", bottom: 2, right: 2, width: 13, height: 13, borderRadius: "50%", background: isOnline ? "#22C55E" : "#94A3B8", border: "2px solid #fff" }} />
+              <span
+                style={{ background: isOnline ? "#22C55E" : "#94A3B8" }}
+                className="absolute bottom-[2px] right-[2px] w-[13px] h-[13px] rounded-full border-2 border-white"
+              />
             </div>
 
             {/* Name + badges + contact row */}
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex-1 min-w-0">
               {/* Row 1: name + status badge + online text */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" as const }}>
-                <span style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>{driver.name}</span>
-                <span style={{ background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}`, fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20 }}>
+              <div className="flex items-center gap-[10px] flex-wrap">
+                <span className="text-[18px] font-extrabold text-slate-900">{driver.name}</span>
+                <span
+                  style={{ background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}` }}
+                  className="text-[11px] font-bold py-[2px] px-[10px] rounded-[20px]"
+                >
                   {driver.status}
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: isOnline ? "#22C55E" : "#94A3B8" }}>
+                <span
+                  style={{ color: isOnline ? "#22C55E" : undefined }}
+                  className={`flex items-center gap-1 text-[11px] font-semibold ${isOnline ? "" : "text-slate-400"}`}
+                >
                   <Circle className="h-2 w-2 fill-current" />{isOnline ? "Online" : "Offline"}
                 </span>
               </div>
 
               {/* Row 2: contact details with icons */}
-              <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" as const }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
-                  <Phone className="h-3.5 w-3.5" style={{ color: "#94A3B8" }} />{driver.phone}
+              <div className="flex gap-5 mt-2 flex-wrap">
+                <span className="flex items-center gap-[5px] text-[12.5px] text-[#334155]">
+                  <Phone className="h-3.5 w-3.5 text-slate-400" />{driver.phone}
                 </span>
                 {driver.vehicle && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
-                    <Car className="h-3.5 w-3.5" style={{ color: "#94A3B8" }} />{driver.vehicle}
+                  <span className="flex items-center gap-[5px] text-[12.5px] text-[#334155]">
+                    <Car className="h-3.5 w-3.5 text-slate-400" />{driver.vehicle}
                   </span>
                 )}
                 {driver.assignedSupervisorName && (
-                  <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#334155" }}>
-                    <User className="h-3.5 w-3.5" style={{ color: "#94A3B8" }} />{driver.assignedSupervisorName}
+                  <span className="flex items-center gap-[5px] text-[12.5px] text-[#334155]">
+                    <User className="h-3.5 w-3.5 text-slate-400" />{driver.assignedSupervisorName}
                   </span>
                 )}
               </div>
             </div>
 
             {/* Last active — far right */}
-            <p style={{ fontSize: 12, color: "#94A3B8", flexShrink: 0 }}>
+            <p className="text-[12px] text-slate-400 shrink-0">
               Last active {new Date(driver.lastActive).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
             </p>
           </div>
 
           {/* ── 4 stat cards ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+          <div className="grid grid-cols-4 gap-3">
             <StatCard label="Total Trips"       value={driver.totalTrips}    icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Today's Trips"  value={todayBookings.length} icon={Route}        iconBg="#F1F5F9" iconColor="#0F172A" />
             <StatCard label="Today's Completed" value={completedToday}       icon={CheckCircle2} iconBg="#F1F5F9" iconColor="#0F172A" />
@@ -400,25 +413,22 @@ export default function DriverProfilePage() {
           </div>
 
           {/* ── Earnings card (left) + right column — same split as Supervisor's Wallet section ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16 }}>
+          <div className="grid gap-4" style={{ gridTemplateColumns: "1.1fr 1fr" }}>
 
             {/* Solid blue earnings card — matches Supervisor "Wallet Balance" card exactly */}
-            <div style={{
-              background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)",
-              borderRadius: 18, padding: "16px 20px 14px",
-              display: "flex", flexDirection: "column", justifyContent: "space-between",
-              position: "relative", overflow: "hidden", minHeight: 120,
-            }}>
-              <div style={{ position: "absolute", top: -24, right: -24, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.07)" }} />
-              <div style={{ position: "absolute", bottom: -30, right: 30, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
+            <div className="rounded-[18px] px-5 pt-4 pb-[14px] flex flex-col justify-between relative overflow-hidden min-h-[120px]"
+              style={{ background: "linear-gradient(135deg, #1e40af 0%, #2563EB 60%, #3b82f6 100%)" }}
+            >
+              <div className="absolute -top-6 -right-6 w-[120px] h-[120px] rounded-full bg-white/[0.07]" />
+              <div className="absolute -bottom-[30px] right-[30px] w-[90px] h-[90px] rounded-full bg-white/[0.05]" />
 
-              <p style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(255,255,255,0.75)", textTransform: "uppercase" as const, letterSpacing: 0.8 }}>
+              <p className="text-[10.5px] font-bold text-white/75 uppercase tracking-[0.8px]">
                 Trip Earnings
               </p>
-              <p style={{ fontSize: 32, fontWeight: 800, color: "#fff", lineHeight: 1, letterSpacing: -1, margin: "8px 0" }}>
+              <p className="text-[32px] font-extrabold text-white leading-none tracking-[-1px] my-2">
                 ₹{displayEarned.toLocaleString("en-IN")}
               </p>
-              <div style={{ display: "flex", gap: 16, fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
+              <div className="flex gap-4 text-[12px] text-white/70 font-medium">
                 <span>{completedTrips || driver.totalTrips} trips completed</span>
                 <span>·</span>
                 <span>Avg ₹{displayAvg} / trip</span>
@@ -426,45 +436,49 @@ export default function DriverProfilePage() {
             </div>
 
             {/* Right column: Assigned Supervisor card + Recent Activity card */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-[14px]">
 
               {/* Assigned Supervisor — same structure as Supervisor's "Assigned Companies" card */}
-              <div style={CARD_STYLE}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px 12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ background: "#F1F5F9", border: "1px solid #E2E8F0", borderRadius: 9, padding: 7 }}>
-                      <Building2 className="h-4 w-4" style={{ color: "#0F172A" }} />
+              <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center justify-between px-[18px] pt-4 pb-3">
+                  <div className="flex items-center gap-[10px]">
+                    <div className="bg-slate-100 border border-slate-200 rounded-[9px] p-[7px]">
+                      <Building2 className="h-4 w-4 text-slate-900" />
                     </div>
                     <div>
-                      <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Assigned Supervisor</p>
-                      <p style={{ fontSize: 11, color: "#94A3B8" }}>Current assignment</p>
+                      <p className="text-[14px] font-extrabold text-slate-900">Assigned Supervisor</p>
+                      <p className="text-[11px] text-slate-400">Current assignment</p>
                     </div>
                   </div>
-                  <span style={{ background: "#F1F5F9", color: "#64748B", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20 }}>
+                  <span className="bg-slate-100 text-slate-500 text-[11px] font-bold py-[2px] px-[10px] rounded-[20px]">
                     {driver.assignedSupervisorName ? "1 assigned" : "None"}
                   </span>
                 </div>
-                <div style={{ padding: "0 16px 16px", display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
+                <div className="px-4 pb-4 flex flex-wrap gap-2">
                   {driver.assignedSupervisorName ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", background: ACCENT, color: "#fff", fontSize: 12, fontWeight: 700, padding: "6px 14px", borderRadius: 8 }}>
+                    <span className="inline-flex items-center bg-blue-600 text-white text-[12px] font-bold py-[6px] px-[14px] rounded-lg">
                       {driver.assignedSupervisorName}
                     </span>
                   ) : (
-                    <p style={{ color: "#94A3B8", fontSize: 12.5, padding: "6px 0" }}>No supervisor assigned.</p>
+                    <p className="text-slate-400 text-[12.5px] py-[6px]">No supervisor assigned.</p>
                   )}
                   {driver.vehicle && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#F8FAFC", border: "1px solid #E8EEF4", color: "#334155", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8 }}>
-                      <Car className="h-3 w-3" style={{ color: "#94A3B8" }} /> {driver.vehicle}
+                    <span className="inline-flex items-center gap-[5px] bg-slate-50 border border-[#E8EEF4] text-[#334155] text-[12px] font-semibold py-[6px] px-3 rounded-lg">
+                      <Car className="h-3 w-3 text-slate-400" /> {driver.vehicle}
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Recent Activity — same structure as Supervisor's "Recent Activity" card */}
-              <div style={{ ...CARD_STYLE, flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 18px 12px" }}>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Recent Activity</p>
-                  <button onClick={() => setActiveTab("trips")} style={{ fontSize: 12, fontWeight: 700, color: ACCENT, background: "none", border: "none", cursor: "pointer", fontFamily: font }}>
+              <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex-1">
+                <div className="flex items-center justify-between px-[18px] pt-4 pb-3">
+                  <p className="text-[14px] font-extrabold text-slate-900">Recent Activity</p>
+                  <button
+                    onClick={() => setActiveTab("trips")}
+                    style={{ fontFamily: font }}
+                    className="text-[12px] font-bold text-blue-600 bg-transparent border-none cursor-pointer"
+                  >
                     View all →
                   </button>
                 </div>
@@ -472,38 +486,38 @@ export default function DriverProfilePage() {
                   {(drvBookings.length > 0 ? drvBookings : []).slice(0, 4).map(booking => {
                     const sc = STATUS_STYLES[booking.status] ?? STATUS_STYLES["Pending"];
                     return (
-                      <div key={booking.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: "1px solid #F8FAFC" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flex: 1, minWidth: 0 }}>
-                          <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: "50%", background: sc.dot, flexShrink: 0 }} />
-                          <div style={{ minWidth: 0 }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                      <div key={booking.id} className="flex items-center justify-between px-[18px] py-[10px] border-t border-slate-50">
+                        <div className="flex items-start gap-[10px] flex-1 min-w-0">
+                          <span style={{ background: sc.dot }} className="mt-[5px] w-2 h-2 rounded-full shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">
                               {booking.pickupLocation} → {booking.dropLocation}
                             </p>
-                            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{fmtDate(booking.createdAt)}</p>
+                            <p className="text-[11px] text-slate-400 mt-[2px]">{fmtDate(booking.createdAt)}</p>
                           </div>
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", flexShrink: 0, marginLeft: 16 }}>
+                        <span className="text-[13px] font-extrabold text-slate-900 shrink-0 ml-4">
                           {booking.fare ? `₹${booking.fare.toLocaleString()}` : "—"}
                         </span>
                       </div>
                     );
                   })}
                   {drvBookings.length === 0 && driver.recentTrips.slice(0, 4).map(trip => (
-                    <div key={trip.bookingId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: "1px solid #F8FAFC" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flex: 1, minWidth: 0 }}>
-                        <span style={{ marginTop: 5, width: 8, height: 8, borderRadius: "50%", background: "#22C55E", flexShrink: 0 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>
+                    <div key={trip.bookingId} className="flex items-center justify-between px-[18px] py-[10px] border-t border-slate-50">
+                      <div className="flex items-start gap-[10px] flex-1 min-w-0">
+                        <span className="mt-[5px] w-2 h-2 rounded-full shrink-0 bg-[#22C55E]" />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">
                             {trip.from} → {trip.to}
                           </p>
-                          <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>{trip.date}</p>
+                          <p className="text-[11px] text-slate-400 mt-[2px]">{trip.date}</p>
                         </div>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: "#0F172A", flexShrink: 0, marginLeft: 16 }}>—</span>
+                      <span className="text-[13px] font-extrabold text-slate-900 shrink-0 ml-4">—</span>
                     </div>
                   ))}
                   {drvBookings.length === 0 && driver.recentTrips.length === 0 && (
-                    <p style={{ textAlign: "center" as const, color: "#94A3B8", fontSize: 12.5, padding: "16px 0 20px" }}>No recent trips.</p>
+                    <p className="text-center text-slate-400 text-[12.5px] py-4 pb-5">No recent trips.</p>
                   )}
                 </div>
               </div>
@@ -515,18 +529,28 @@ export default function DriverProfilePage() {
 
       {/* ══ TAB: RECENT TRIPS ══ */}
       {activeTab === "trips" && (
-        <div style={CARD_STYLE}>
+        <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           {/* Header — matches Active Trips table column scheme */}
-          <div style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "12px 20px", borderBottom: "1px solid #F1F5F9", background: "#F8FAFC", borderRadius: "14px 14px 0 0" }}>
+          <div
+            className="grid gap-4 px-5 py-3 border-b border-slate-100 bg-slate-50 rounded-t-[14px]"
+            style={{ gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px" }}
+          >
             {["TRIP ID & TYPE", "ROUTE", "SUPERVISOR", "VEHICLE", "STATUS", "CREATED AT"].map(h => (
-              <span key={h} style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
+              <span key={h} className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.07em]">{h}</span>
             ))}
           </div>
 
           {isLoading ? (
             <div>
               {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: i < 4 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}>
+                <div
+                  key={i}
+                  className="grid gap-4 px-5 py-[14px] items-center"
+                  style={{
+                    gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px",
+                    borderBottom: i < 4 ? "1px solid #F8FAFC" : "none",
+                  }}
+                >
                   <div className="space-y-1.5">
                     <Skeleton className="h-3.5 w-16" />
                     <Skeleton className="h-4 w-12 rounded" />
@@ -559,43 +583,56 @@ export default function DriverProfilePage() {
                 return (
                   <div
                     key={booking.id}
-                    style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: idx < drvBookings.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
+                    className="grid gap-4 px-5 py-[14px] items-center"
+                    style={{
+                      gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px",
+                      borderBottom: idx < drvBookings.length - 1 ? "1px solid #F8FAFC" : "none",
+                    }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#F8FAFC"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                   >
                     {/* TRIP ID & TYPE */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <span style={{ fontWeight: 800, color: "#0F172A", fontSize: 13 }}>{booking.bookingRef ?? "—"}</span>
-                      <span style={{ background: booking.type === "Instant" ? "#EEF2FF" : "#FEF3C7", color: booking.type === "Instant" ? "#2563EB" : "#B45309", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, display: "inline-block", width: "fit-content" }}>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-extrabold text-slate-900 text-[13px]">{booking.bookingRef ?? "—"}</span>
+                      <span
+                        style={{
+                          background: booking.type === "Instant" ? "#EEF2FF" : "#FEF3C7",
+                          color: booking.type === "Instant" ? "#2563EB" : "#B45309",
+                        }}
+                        className="text-[10px] font-bold py-[2px] px-[7px] rounded-[4px] inline-block w-fit"
+                      >
                         {booking.type}
                       </span>
                     </div>
 
                     {/* ROUTE */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.pickupLocation}</p>
-                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                        <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
+                    <div className="flex flex-col gap-[1px] min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">{booking.pickupLocation}</p>
+                      <div className="flex items-center gap-[3px]">
+                        <div
+                          className="w-[42px] h-[2px] rounded-[2px]"
+                          style={{ background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }}
+                        />
                         <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
                       </div>
-                      <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.dropLocation}</p>
+                      <p className="text-[12px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">{booking.dropLocation}</p>
                     </div>
 
                     {/* SUPERVISOR */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{booking.supervisorName}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[13px] text-[#334155] font-medium overflow-hidden text-ellipsis whitespace-nowrap">{booking.supervisorName}</span>
                       {booking.bookingSource && (
-                        <span style={{ background: "#E2E8F0", color: "#475569", border: "1px solid #CBD5E1", fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 5, display: "inline-block", width: "fit-content" }}>
+                        <span className="bg-slate-200 text-slate-600 border border-slate-300 text-[11px] font-semibold py-[1px] px-2 rounded-[5px] inline-block w-fit">
                           {booking.bookingSource}
                         </span>
                       )}
                     </div>
 
                     {/* VEHICLE */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
+                    <div className="flex flex-col gap-[2px]">
+                      <span className="text-[13px] text-[#334155] font-medium">{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
                       {driver.vehicleReg && driver.vehicle && (
-                        <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{driver.vehicle}</span>
+                        <span className="text-[11px] text-slate-500 font-medium">{driver.vehicle}</span>
                       )}
                     </div>
 
@@ -603,9 +640,9 @@ export default function DriverProfilePage() {
                     <TripStatusBadge status={booking.status} />
 
                     {/* CREATED AT */}
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{day}</span>
-                      <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 2 }}>{time}</span>
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#334155]">{day}</span>
+                      <span className="text-[11px] text-slate-400 font-medium mt-[2px]">{time}</span>
                     </div>
                   </div>
                 );
@@ -616,32 +653,39 @@ export default function DriverProfilePage() {
               {driver.recentTrips.map((trip, idx) => (
                 <div
                   key={trip.bookingId}
-                  style={{ display: "grid", gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px", gap: 16, padding: "14px 20px", borderBottom: idx < driver.recentTrips.length - 1 ? "1px solid #F8FAFC" : "none", alignItems: "center" }}
+                  className="grid gap-4 px-5 py-[14px] items-center"
+                  style={{
+                    gridTemplateColumns: "110px 2fr 150px 1.3fr 110px 90px",
+                    borderBottom: idx < driver.recentTrips.length - 1 ? "1px solid #F8FAFC" : "none",
+                  }}
                 >
                   {/* TRIP ID & TYPE */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontWeight: 800, color: "#0F172A", fontSize: 13 }}>{trip.bookingId}</span>
-                    <span style={{ background: "#EEF2FF", color: "#2563EB", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4, display: "inline-block", width: "fit-content" }}>Instant</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-extrabold text-slate-900 text-[13px]">{trip.bookingId}</span>
+                    <span className="bg-[#EEF2FF] text-blue-600 text-[10px] font-bold py-[2px] px-[7px] rounded-[4px] inline-block w-fit">Instant</span>
                   </div>
 
                   {/* ROUTE */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.from}</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                      <div style={{ width: 42, height: 2, borderRadius: 2, background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }} />
+                  <div className="flex flex-col gap-[1px] min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">{trip.from}</p>
+                    <div className="flex items-center gap-[3px]">
+                      <div
+                        className="w-[42px] h-[2px] rounded-[2px]"
+                        style={{ background: `linear-gradient(to right,#A5B4FC,${ACCENT})` }}
+                      />
                       <ArrowRight className="h-3 w-3" style={{ color: ACCENT }} />
                     </div>
-                    <p style={{ fontSize: 12, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.to}</p>
+                    <p className="text-[12px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">{trip.to}</p>
                   </div>
 
                   {/* SUPERVISOR */}
-                  <span style={{ fontSize: 13, color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{trip.supervisorName}</span>
+                  <span className="text-[13px] text-[#334155] font-medium overflow-hidden text-ellipsis whitespace-nowrap">{trip.supervisorName}</span>
 
                   {/* VEHICLE */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
+                  <div className="flex flex-col gap-[2px]">
+                    <span className="text-[13px] text-[#334155] font-medium">{driver.vehicleReg ?? driver.vehicle ?? "—"}</span>
                     {driver.vehicleReg && driver.vehicle && (
-                      <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{driver.vehicle}</span>
+                      <span className="text-[11px] text-slate-500 font-medium">{driver.vehicle}</span>
                     )}
                   </div>
 
@@ -649,14 +693,14 @@ export default function DriverProfilePage() {
                   <TripStatusBadge status="Completed" />
 
                   {/* CREATED AT */}
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "#334155" }}>{trip.date}</span>
+                  <div className="flex flex-col">
+                    <span className="text-[13px] font-medium text-[#334155]">{trip.date}</span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ textAlign: "center" as const, padding: "40px 0", color: "#94A3B8", fontSize: 13 }}>No trips yet.</p>
+            <p className="text-center py-10 text-slate-400 text-[13px]">No trips yet.</p>
           )}
         </div>
       )}
@@ -664,7 +708,7 @@ export default function DriverProfilePage() {
       {/* ══ TAB: EARNINGS ══ */}
       {activeTab === "earnings" && (isLoading || !driver ? (
         <div className="space-y-4">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+          <div className="grid grid-cols-3 gap-[14px]">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-24 rounded-2xl" />
             ))}
@@ -673,61 +717,64 @@ export default function DriverProfilePage() {
           <Skeleton className="h-48 w-full rounded-2xl" />
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-[14px]">
             <StatCard label="Total Earned"    value={`₹${displayEarned.toLocaleString()}`}         icon={IndianRupee} iconBg="#DBEAFE" iconColor="#2563EB" />
             <StatCard label="Completed Trips" value={completedTrips || driver.totalTrips}            icon={CheckCircle2} iconBg="#DCFCE7" iconColor="#15803D" />
             <StatCard label="Avg per Trip"    value={`₹${displayAvg.toLocaleString()}`}             icon={TrendingUp}   iconBg="#EDE9FE" iconColor="#6D28D9" />
           </div>
 
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 22px 8px" }}>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="flex items-start justify-between px-[22px] pt-[18px] pb-2">
               <div>
-                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Daily Earnings — Last 7 Days</p>
-                <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>
-                  Week total: <span style={{ fontWeight: 700, color: "#334155" }}>₹{weekDays.reduce((s, d) => s + d.total, 0).toLocaleString()}</span>
+                <p className="text-[15px] font-extrabold text-slate-900">Daily Earnings — Last 7 Days</p>
+                <p className="text-[12px] text-slate-400 mt-[3px]">
+                  Week total: <span className="font-bold text-[#334155]">₹{weekDays.reduce((s, d) => s + d.total, 0).toLocaleString()}</span>
                 </p>
               </div>
-              <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#64748B" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: ACCENT, display: "inline-block" }} /> Today
+              <div className="flex gap-[14px] text-[11px] text-slate-500">
+                <span className="flex items-center gap-[5px]">
+                  <span className="w-[10px] h-[10px] rounded-[3px] bg-blue-600 inline-block" /> Today
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 3, background: "#BFDBFE", display: "inline-block" }} /> Past days
+                <span className="flex items-center gap-[5px]">
+                  <span className="w-[10px] h-[10px] rounded-[3px] bg-[#BFDBFE] inline-block" /> Past days
                 </span>
               </div>
             </div>
-            <div style={{ padding: "4px 22px 18px" }}>
+            <div className="px-[22px] pt-1 pb-[18px]">
               <BarChart days={weekDays} />
             </div>
           </div>
 
-          <div style={CARD_STYLE}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 12px" }}>
-              <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Earnings by Source</p>
-              <span style={{ fontSize: 12, color: "#94A3B8" }}>{sourceEntries.length} sources</span>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between px-5 pt-4 pb-3">
+              <p className="text-[15px] font-extrabold text-slate-900">Earnings by Source</p>
+              <span className="text-[12px] text-slate-400">{sourceEntries.length} sources</span>
             </div>
-            <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="px-5 pb-5 flex flex-col gap-[14px]">
               {sourceEntries.map(([source, amount]) => {
                 const pct      = totalSource > 0 ? (amount / totalSource) * 100 : 0;
                 const cfg      = srcCfg(source);
                 const tripCount = drvBookings.filter(b => (b.bookingSource ?? "Individual") === source && b.fare).length || (source === "Individual" ? 5 : 3);
                 return (
                   <div key={source}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: cfg.bg, color: cfg.color, fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div className="flex items-center justify-between mb-[7px]">
+                      <div className="flex items-center gap-[10px]">
+                        <div
+                          style={{ background: cfg.bg, color: cfg.color }}
+                          className="w-[30px] h-[30px] rounded-lg text-[12px] font-extrabold flex items-center justify-center"
+                        >
                           {cfg.initial}
                         </div>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{source}</span>
-                        <span style={{ fontSize: 11.5, color: "#94A3B8" }}>{tripCount} trip{tripCount !== 1 ? "s" : ""}</span>
+                        <span className="text-[13.5px] font-bold text-slate-900">{source}</span>
+                        <span className="text-[11.5px] text-slate-400">{tripCount} trip{tripCount !== 1 ? "s" : ""}</span>
                       </div>
-                      <div style={{ textAlign: "right" as const }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>₹{amount.toLocaleString()}</span>
-                        <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 8 }}>{pct.toFixed(1)}%</span>
+                      <div className="text-right">
+                        <span className="text-[14px] font-extrabold text-slate-900">₹{amount.toLocaleString()}</span>
+                        <span className="text-[11px] text-slate-400 ml-2">{pct.toFixed(1)}%</span>
                       </div>
                     </div>
-                    <div style={{ height: 8, borderRadius: 20, background: "#F1F5F9", overflow: "hidden" }}>
+                    <div className="h-2 rounded-[20px] bg-slate-100 overflow-hidden">
                       <EarningsBar pct={pct} color={cfg.color} />
                     </div>
                   </div>
@@ -740,15 +787,15 @@ export default function DriverProfilePage() {
 
       {/* ══ TAB: LOCATION HISTORY ══ */}
       {activeTab === "history" && (isLoading || !driver ? (
-        <div style={{ ...CARD_STYLE, padding: "20px 24px" }}>
+        <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] px-6 py-5">
           <Skeleton className="h-5 w-48 mb-4" />
           <Skeleton className="h-[380px] w-full rounded-xl" />
         </div>
       ) : (
-        <div style={{ ...CARD_STYLE, padding: "20px 24px" }}>
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Location History</p>
-            <p style={{ fontSize: 12, color: "#94A3B8", marginTop: 3 }}>GPS route replay for {driver.name}</p>
+        <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] px-6 py-5">
+          <div className="mb-4">
+            <p className="text-[15px] font-extrabold text-slate-900">Location History</p>
+            <p className="text-[12px] text-slate-400 mt-[3px]">GPS route replay for {driver.name}</p>
           </div>
           <DriverHistoryMap
             driverId={String(id)}
@@ -764,11 +811,11 @@ export default function DriverProfilePage() {
 
       {/* ══ TAB: SETTINGS ══ */}
       {activeTab === "settings" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ ...CARD_STYLE, padding: 24 }}>
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Driver Information</p>
-              <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Full profile details for this driver</p>
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6">
+            <div className="mb-5">
+              <p className="text-[16px] font-extrabold text-slate-900">Driver Information</p>
+              <p className="text-[12.5px] text-slate-400 mt-[3px]">Full profile details for this driver</p>
             </div>
             {(() => {
               type SettingsEntry =
@@ -789,7 +836,7 @@ export default function DriverProfilePage() {
                 ];
 
               return (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div className="grid grid-cols-2 gap-5">
               {settingsEntries.map((entry) => (
                 <div key={entry._key ?? entry.label}>
                   {entry._skeleton ? (
@@ -799,8 +846,8 @@ export default function DriverProfilePage() {
                     </>
                   ) : (
                     <>
-                      <p style={{ fontSize: 11.5, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 5 }}>{entry.label}</p>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#0F172A" }}>{entry.value}</p>
+                      <p className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-[0.06em] mb-[5px]">{entry.label}</p>
+                      <p className="text-[14px] font-bold text-slate-900">{entry.value}</p>
                     </>
                   )}
                 </div>
@@ -808,41 +855,44 @@ export default function DriverProfilePage() {
             </div>
               );
             })()}
-            <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid #F1F5F9" }}>
-              <p style={{ fontSize: 12.5, color: "#94A3B8" }}>To edit driver details, use the driver management section.</p>
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-[12.5px] text-slate-400">To edit driver details, use the driver management section.</p>
             </div>
           </div>
 
-          <div style={{ ...CARD_STYLE, padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
               <div>
-                <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Documents</p>
-                <p style={{ fontSize: 12.5, color: "#94A3B8", marginTop: 3 }}>Driver licence and vehicle document records</p>
+                <p className="text-[16px] font-extrabold text-slate-900">Documents</p>
+                <p className="text-[12.5px] text-slate-400 mt-[3px]">Driver licence and vehicle document records</p>
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 20, padding: "4px 12px" }}>
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-[12px] font-bold text-blue-600 bg-[#EFF6FF] border border-[#BFDBFE] rounded-[20px] py-1 px-3">
                   {driverDocuments?.length ?? 0} total
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#15803D", background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 20, padding: "4px 12px" }}>
+                <span className="text-[12px] font-bold text-[#15803D] bg-[#DCFCE7] border border-[#BBF7D0] rounded-[20px] py-1 px-3">
                   {driverDocuments?.filter(doc => doc.is_verified).length ?? 0} verified
                 </span>
               </div>
             </div>
 
             {docsLoadedForId !== id ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16 }}>
+              <div className="grid gap-4" style={{ gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr" }}>
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} style={{ padding: "14px 0", borderTop: i === 0 ? "1px solid #F1F5F9" : "1px solid #F8FAFC" }}>
+                  <div key={i} className={`py-[14px] ${i === 0 ? "border-t border-slate-100" : "border-t border-slate-50"}`}>
                     <Skeleton className="h-3.5 w-40 mb-2" />
                     <Skeleton className="h-3 w-24" />
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden", background: "#fff" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16, padding: "11px 20px", background: "#F8FAFC", borderBottom: "1px solid #E2E8F0" }}>
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <div
+                  className="grid gap-4 px-5 py-[11px] bg-slate-50 border-b border-slate-200"
+                  style={{ gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr" }}
+                >
                   {["DOCUMENT", "STATUS", "FILE", "ACTION"].map(h => (
-                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{h}</span>
+                    <span key={h} className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.07em]">{h}</span>
                   ))}
                 </div>
 
@@ -853,19 +903,26 @@ export default function DriverProfilePage() {
                   return (
                     <div
                       key={def.doc_type}
-                      style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr", gap: 16, padding: "14px 20px", alignItems: "center", borderBottom: isLast ? "none" : "1px solid #F8FAFC" }}
+                      className="grid gap-4 px-5 py-[14px] items-center"
+                      style={{
+                        gridTemplateColumns: "1.4fr 0.9fr 0.9fr 0.8fr",
+                        borderBottom: isLast ? "none" : "1px solid #F8FAFC",
+                      }}
                     >
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: 13.5, fontWeight: 700, color: "#0F172A" }}>{def.name}</p>
-                        <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>{doc?.doc_number ?? "No document number"}</p>
+                      <div className="min-w-0">
+                        <p className="text-[13.5px] font-bold text-slate-900">{def.name}</p>
+                        <p className="text-[11.5px] text-slate-400 mt-[2px]">{doc?.doc_number ?? "No document number"}</p>
                       </div>
 
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: badge.bg, color: badge.text, border: `1px solid ${badge.border}`, width: "fit-content" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.dot, flexShrink: 0 }} />
+                      <span
+                        style={{ background: badge.bg, color: badge.text, border: `1px solid ${badge.border}` }}
+                        className="inline-flex items-center gap-[5px] text-[11.5px] font-bold py-[3px] px-[10px] rounded-[20px] w-fit"
+                      >
+                        <span style={{ background: badge.dot }} className="w-[6px] h-[6px] rounded-full shrink-0" />
                         {badge.label}
                       </span>
 
-                      <span style={{ fontSize: 12.5, color: "#334155", fontWeight: 600 }}>
+                      <span className="text-[12.5px] text-[#334155] font-semibold">
                         {doc?.expiry_date ? new Date(doc.expiry_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                       </span>
 
@@ -877,12 +934,13 @@ export default function DriverProfilePage() {
                               fileName: def.name,
                               fileTypeHint: detectFileType(doc.file_url!),
                             })}
-                            style={{ padding: "5px 11px", borderRadius: 7, border: "1.5px solid #E2E8F0", background: "#fff", color: "#475569", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font }}
+                            style={{ fontFamily: font }}
+                            className="py-[5px] px-[11px] rounded-[7px] border-[1.5px] border-slate-200 bg-white text-slate-600 text-[12px] font-semibold cursor-pointer"
                           >
                             View
                           </button>
                         ) : (
-                          <span style={{ fontSize: 12.5, color: "#94A3B8", fontStyle: "italic" }}>Not available</span>
+                          <span className="text-[12.5px] text-slate-400 italic">Not available</span>
                         )}
                       </div>
                     </div>

@@ -24,10 +24,6 @@ import { ExportButton } from "@/components/ExportButton";
 
 const A    = "#2563EB";
 const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
-const CARD: React.CSSProperties = {
-  background: "#fff", border: "1.5px solid #E8EEF4",
-  borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-};
 
 type InvStatus = InvoiceListItem["status"];
 
@@ -62,14 +58,15 @@ function effectiveStatus(inv: { status: InvStatus; dueDate: string }): InvStatus
 function DrawerPanel({ open, onClose, children }: { open:boolean; onClose:()=>void; children:React.ReactNode }) {
   return (
     <>
-      {open && <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.35)", zIndex:40 }}/>}
-      <div style={{
-        position:"fixed", top:0, right:0, bottom:0, width:520, maxWidth:"100vw",
-        background:"#fff", boxShadow:"-8px 0 32px rgba(0,0,0,0.12)", zIndex:50,
-        display:"flex", flexDirection:"column", fontFamily:FONT,
-        transform: open ? "translateX(0)" : "translateX(100%)",
-        transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1)",
-      }}>
+      {open && <div onClick={onClose} className="fixed inset-0 bg-[rgba(15,23,42,0.35)] z-40"/>}
+      <div
+        className="fixed top-0 right-0 bottom-0 w-[520px] max-w-full bg-white shadow-[-8px_0_32px_rgba(0,0,0,0.12)] z-50 flex flex-col"
+        style={{
+          fontFamily: FONT,
+          transform: open ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+        }}
+      >
         {children}
       </div>
     </>
@@ -79,10 +76,11 @@ function DrawerPanel({ open, onClose, children }: { open:boolean; onClose:()=>vo
 function StatusBadge({ status }: { status: InvStatus }) {
   const s = SC[status];
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:s.bg, color:s.text,
-      border:`1px solid ${s.border}`, borderRadius:20, fontSize:11, fontWeight:700,
-      padding:"3px 8px 3px 7px", whiteSpace:"nowrap" }}>
-      <span style={{ width:5, height:5, borderRadius:"50%", background:s.dot, flexShrink:0 }}/>
+    <span
+      style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}` }}
+      className="inline-flex items-center gap-[5px] rounded-[20px] text-[11px] font-bold px-2 py-[3px] whitespace-nowrap"
+    >
+      <span style={{ background: s.dot }} className="w-[5px] h-[5px] rounded-full shrink-0"/>
       {status}
     </span>
   );
@@ -90,29 +88,34 @@ function StatusBadge({ status }: { status: InvStatus }) {
 
 function TripsMiniTable({ rows, total }: { rows: InvoiceTripItem[]; total: number }) {
   return (
-    <div style={{ border:"1.5px solid #E8EEF4", borderRadius:12, overflow:"hidden" }}>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"9px 14px", background:"#F8FAFC", borderBottom:"1px solid #E8EEF4" }}>
+    <div className="border-[1.5px] border-[#E8EEF4] rounded-xl overflow-hidden">
+      <div className="grid gap-2 px-[14px] py-[9px] bg-slate-50 border-b border-[#E8EEF4]"
+           style={{ gridTemplateColumns: "1fr 90px 80px" }}>
         {["Trip / Route","Date","Fare"].map(h => (
-          <div key={h} style={{ fontSize:10.5, fontWeight:700, color:"#CBD5E1", textTransform:"uppercase", letterSpacing:"0.05em" }}>{h}</div>
+          <div key={h} className="text-[10.5px] font-bold text-slate-300 uppercase tracking-[0.05em]">{h}</div>
         ))}
       </div>
       {rows.map((t, i) => (
-        <div key={t.tripId} style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"11px 14px",
-          borderBottom: i < rows.length - 1 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
+        <div key={t.tripId}
+             className="grid gap-2 px-[14px] py-[11px] items-center"
+             style={{
+               gridTemplateColumns: "1fr 90px 80px",
+               borderBottom: i < rows.length - 1 ? "1px solid #F1F5F9" : "none",
+             }}>
           <div>
-            <div style={{ fontSize:12.5, fontWeight:600, color:"#0F172A", fontFamily:"monospace" }}>{t.tripRef || "—"}</div>
-            <div style={{ fontSize:11, color:"#94A3B8", marginTop:2 }}>{(t.pickupAddress || "").split(",")[0]} → {(t.dropAddress || "").split(",")[0]}</div>
+            <div className="text-[12.5px] font-semibold text-slate-900 font-mono">{t.tripRef || "—"}</div>
+            <div className="text-[11px] text-slate-400 mt-[2px]">{(t.pickupAddress || "").split(",")[0]} → {(t.dropAddress || "").split(",")[0]}</div>
           </div>
-          <div style={{ fontSize:12, color:"#475569" }}>
+          <div className="text-[12px] text-slate-600">
             {t.pickupTime ? new Date(t.pickupTime).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
           </div>
-          <div style={{ fontSize:13, fontWeight:700, color:"#0F172A" }}>{fmt(t.fare)}</div>
+          <div className="text-[13px] font-bold text-slate-900">{fmt(t.fare)}</div>
         </div>
       ))}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"11px 14px",
-        background:"#F8FAFC", borderTop:"2px solid #E8EEF4", alignItems:"center" }}>
-        <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", gridColumn:"1/3" }}>Subtotal</div>
-        <div style={{ fontSize:15, fontWeight:800, color:A }}>{fmt(total)}</div>
+      <div className="grid gap-2 px-[14px] py-[11px] bg-slate-50 border-t-2 border-[#E8EEF4] items-center"
+           style={{ gridTemplateColumns: "1fr 90px 80px" }}>
+        <div className="text-[13px] font-bold text-slate-900 col-[1/3]">Subtotal</div>
+        <div className="text-[15px] font-extrabold text-blue-600">{fmt(total)}</div>
       </div>
     </div>
   );
@@ -120,26 +123,29 @@ function TripsMiniTable({ rows, total }: { rows: InvoiceTripItem[]; total: numbe
 
 function TripsMiniTableSkeleton() {
   const bar = (w: string, h = 10) => (
-    <div className="animate-pulse" style={{ height:h, borderRadius:5, background:"#E2E8F0", width:w }}/>
+    <div className="animate-pulse rounded-[5px] bg-[#E2E8F0]" style={{ height: h, width: w }}/>
   );
   return (
-    <div style={{ border:"1.5px solid #E8EEF4", borderRadius:12, overflow:"hidden" }}>
+    <div className="border-[1.5px] border-[#E8EEF4] rounded-xl overflow-hidden">
       {/* header */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"9px 14px", background:"#F8FAFC", borderBottom:"1px solid #E8EEF4" }}>
+      <div className="grid gap-2 px-[14px] py-[9px] bg-slate-50 border-b border-[#E8EEF4]"
+           style={{ gridTemplateColumns: "1fr 90px 80px" }}>
         {bar("55%")} {bar("60%")} {bar("50%")}
       </div>
       {/* rows */}
       {[...Array(4)].map((_, i) => (
-        <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"13px 14px", borderBottom:"1px solid #F1F5F9", alignItems:"center" }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+        <div key={i} className="grid gap-2 px-[14px] py-[13px] border-b border-[#F1F5F9] items-center"
+             style={{ gridTemplateColumns: "1fr 90px 80px" }}>
+          <div className="flex flex-col gap-[5px]">
             {bar("40%", 9)} {bar("70%", 8)}
           </div>
           {bar("65%", 9)} {bar("55%", 11)}
         </div>
       ))}
       {/* footer */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 80px", gap:8, padding:"11px 14px", background:"#F8FAFC", borderTop:"2px solid #E8EEF4", alignItems:"center" }}>
-        <div style={{ gridColumn:"1/3" }}>{bar("30%", 10)}</div>
+      <div className="grid gap-2 px-[14px] py-[11px] bg-slate-50 border-t-2 border-[#E8EEF4] items-center"
+           style={{ gridTemplateColumns: "1fr 90px 80px" }}>
+        <div className="col-[1/3]">{bar("30%", 10)}</div>
         {bar("60%", 12)}
       </div>
     </div>
@@ -371,31 +377,37 @@ export default function InvoicingPage() {
 
   /* ── RENDER ── */
   return (
-    <div style={{ fontFamily:FONT, color:"#0F172A", display:"flex", flexDirection:"column", gap:20 }}
-         onClick={() => { setExportMenu(null); setStatusMenu(null); }}>
+    <div
+      className="flex flex-col gap-5 text-slate-900"
+      style={{ fontFamily: FONT }}
+      onClick={() => { setExportMenu(null); setStatusMenu(null); }}
+    >
 
       {/* Header */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+      <div className="flex items-center justify-between">
         <div>
-          <p style={{ fontSize:20, fontWeight:800 }}>Invoicing</p>
-          <p style={{ fontSize:12.5, color:"#94A3B8", marginTop:2 }}>Generate and manage company invoices</p>
+          <p className="text-[20px] font-extrabold">Invoicing</p>
+          <p className="text-[12.5px] text-slate-400 mt-[2px]">Generate and manage company invoices</p>
         </div>
-        <button onClick={openNew}
-          style={{ display:"flex", alignItems:"center", gap:7, padding:"8px 18px", border:"none", borderRadius:10, background:A, color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:FONT }}>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-[7px] px-[18px] py-2 border-none rounded-[10px] bg-blue-600 text-white font-bold text-[13px] cursor-pointer"
+          style={{ fontFamily: FONT }}
+        >
           <Plus className="h-4 w-4"/> New Invoice
         </button>
       </div>
 
       {/* Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label:"Total Billed", value:fmt(summary.totalBilled),  sub:`${summary.totalCount} invoice${summary.totalCount===1?"":"s"}`, Icon:IndianRupee },
           { label:"Collected",    value:fmt(summary.collected),    sub:`${summary.paidCount} paid`,    Icon:CheckCircle2 },
           { label:"Outstanding",  value:fmt(summary.outstanding),  sub:`${summary.unpaidCount} unpaid`, Icon:Clock },
         ].map(({ label, value, sub, Icon }) => (
-          <div key={label} style={{ ...CARD, padding:20, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-            <div style={{ flex:1, minWidth:0 }}>
-              <p style={{ fontSize:11, color:"#64748B", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.06em" }}>{label}</p>
+          <div key={label} className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-5 flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] text-slate-500 font-semibold uppercase tracking-[0.06em]">{label}</p>
               {loading ? (
                 <>
                   <Skeleton className="h-7 w-24 mt-2" />
@@ -403,36 +415,38 @@ export default function InvoicingPage() {
                 </>
               ) : (
                 <>
-                  <p style={{ fontSize:28, fontWeight:800, color:"#0F172A", lineHeight:1.1, marginTop:4 }}>{value}</p>
-                  <p style={{ fontSize:12, color:"#94A3B8", marginTop:4 }}>{sub}</p>
+                  <p className="text-[28px] font-extrabold text-slate-900 leading-[1.1] mt-1">{value}</p>
+                  <p className="text-[12px] text-slate-400 mt-1">{sub}</p>
                 </>
               )}
             </div>
-            <div style={{ background:"#F1F5F9", borderRadius:11, width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <Icon style={{ color:"#94A3B8" }} className="h-5 w-5"/>
+            <div className="bg-[#F1F5F9] rounded-[11px] w-10 h-10 flex items-center justify-center shrink-0">
+              <Icon className="h-5 w-5 text-slate-400"/>
             </div>
           </div>
         ))}
       </div>
 
       {/* Invoice table */}
-      <div style={CARD}>
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid #F1F5F9", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 }}>
-          <p style={{ fontSize:15, fontWeight:800 }}>All Invoices</p>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <div className="px-5 py-4 border-b border-[#F1F5F9] flex justify-between items-center flex-wrap gap-[10px]">
+          <p className="text-[15px] font-extrabold">All Invoices</p>
+          <div className="flex items-center gap-[10px]">
             {loading
               ? <Skeleton className="h-3 w-20" />
-              : <span style={{ fontSize:12, color:"#94A3B8" }}>{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
+              : <span className="text-[12px] text-slate-400">{invoices.length} invoice{invoices.length===1?"":"s"}</span>}
             <ColumnsPopover tableKey="invoices" visible={visibleCols} totalCount={totalCount} onToggle={toggle} onReset={reset} />
             {!loading && invoices.length > 0 && (
               <ExportButton onClick={handleExportCsv} />
             )}
           </div>
         </div>
-        <div style={{ overflowX:"auto" }}>
+        <div className="overflow-x-auto">
           <div className="w-fit min-w-full" style={{ minWidth: minTableWidth }}>
-            <div style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
-              padding:"10px 20px", borderBottom:"1px solid #F1F5F9", background:"#FAFBFC" }}>
+            <div
+              className="grid gap-3 px-5 py-[10px] border-b border-[#F1F5F9] bg-[#FAFBFC]"
+              style={{ gridTemplateColumns: gridTemplate }}
+            >
               {prefsLoading
                 ? Array.from({ length: visibleCols.length + 1 }).map((_, i) => (
                     <Skeleton key={i} className="h-3 w-16" />
@@ -441,14 +455,20 @@ export default function InvoicingPage() {
                     const col = spec.columns.find(c => c.key === k);
                     return col?.label.toUpperCase() ?? k.toUpperCase();
                   }), "DOWNLOAD"].map(h => (
-                    <div key={h} style={{ fontSize:10.5, fontWeight:700, color:"#CBD5E1", textTransform:"uppercase", letterSpacing:"0.06em" }}>{h}</div>
+                    <div key={h} className="text-[10.5px] font-bold text-slate-300 uppercase tracking-[0.06em]">{h}</div>
                   ))}
             </div>
             {loading ? (
               <div>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
-                    padding:"13px 20px", borderBottom: i < 4 ? "1px solid #F1F5F9" : "none", alignItems:"center" }}>
+                  <div
+                    key={i}
+                    className="grid gap-3 px-5 py-[13px] items-center"
+                    style={{
+                      gridTemplateColumns: gridTemplate,
+                      borderBottom: i < 4 ? "1px solid #F1F5F9" : "none",
+                    }}
+                  >
                     {visibleCols.map(k => (
                       <Skeleton key={k} className="h-3.5 w-20" />
                     ))}
@@ -457,53 +477,59 @@ export default function InvoicingPage() {
                 ))}
               </div>
             ) : error ? (
-              <div style={{ padding:"40px 24px", textAlign:"center" }}>
-                <div style={{ fontSize:13, color:"#B91C1C", marginBottom:12 }}>{error}</div>
-                <button onClick={reload}
-                  style={{ padding:"7px 16px", border:"1.5px solid #E2E8F0", borderRadius:9, background:"#fff", color:"#475569", fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:FONT }}>
+              <div className="px-6 py-10 text-center">
+                <div className="text-[13px] text-[#B91C1C] mb-3">{error}</div>
+                <button
+                  onClick={reload}
+                  className="px-4 py-[7px] border-[1.5px] border-[#E2E8F0] rounded-[9px] bg-white text-slate-600 text-[12.5px] font-semibold cursor-pointer"
+                  style={{ fontFamily: FONT }}
+                >
                   Retry
                 </button>
               </div>
             ) : invoices.length === 0 ? (
-              <div style={{ padding:"48px 0", textAlign:"center", color:"#94A3B8", fontSize:13 }}>
-                No invoices yet. Click <strong style={{ color:"#475569" }}>New Invoice</strong> to generate one.
+              <div className="py-12 text-center text-slate-400 text-[13px]">
+                No invoices yet. Click <strong className="text-slate-600">New Invoice</strong> to generate one.
               </div>
             ) : invoices.map((inv, i) => {
               const status = effectiveStatus(inv);
               const cellFor = (k: string): React.ReactNode => {
                 switch (k) {
-                  case "invoiceNo":  return <span style={{ fontWeight:800, fontSize:13, color:"#1E293B", fontFamily:"monospace" }}>{formatInvoiceNumber(inv.invoiceNumber)}</span>;
+                  case "invoiceNo":  return <span className="font-extrabold text-[13px] text-[#1E293B] font-mono">{formatInvoiceNumber(inv.invoiceNumber)}</span>;
                   case "company":    return (
                     <div>
-                      <p style={{ fontSize:13, fontWeight:600, color:"#0F172A" }}>{inv.companyName}</p>
-                      <p style={{ fontSize:11.5, color:"#94A3B8", marginTop:1 }}>Issued {fmtDate(inv.issuedAt)} · {inv.tripCount} trip{inv.tripCount===1?"":"s"}</p>
+                      <p className="text-[13px] font-semibold text-slate-900">{inv.companyName}</p>
+                      <p className="text-[11.5px] text-slate-400 mt-[1px]">Issued {fmtDate(inv.issuedAt)} · {inv.tripCount} trip{inv.tripCount===1?"":"s"}</p>
                     </div>
                   );
-                  case "period":     return <span style={{ fontSize:13, color:"#475569" }}>{fmtPeriod(inv.periodFrom, inv.periodTo)}</span>;
-                  case "amount":     return <span style={{ fontSize:14, fontWeight:700, color:"#0F172A" }}>{fmt(inv.amount)}</span>;
-                  case "issuedAt":   return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.issuedAt)}</span>;
-                  case "dueDate":    return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.dueDate)}</span>;
-                  case "paidAt":     return inv.paidAt ? <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.paidAt)}</span> : <span style={{ fontSize:13, color:"#CBD5E1" }}>—</span>;
-                  case "paymentRef": return <span style={{ fontSize:13, color:"#475569" }}>—</span>;
-                  case "notes":      return <span style={{ fontSize:13, color:"#475569" }}>—</span>;
-                  case "createdAt":  return <span style={{ fontSize:13, color:"#475569" }}>{fmtDate(inv.issuedAt)}</span>;
+                  case "period":     return <span className="text-[13px] text-slate-600">{fmtPeriod(inv.periodFrom, inv.periodTo)}</span>;
+                  case "amount":     return <span className="text-[14px] font-bold text-slate-900">{fmt(inv.amount)}</span>;
+                  case "issuedAt":   return <span className="text-[13px] text-slate-600">{fmtDate(inv.issuedAt)}</span>;
+                  case "dueDate":    return <span className="text-[13px] text-slate-600">{fmtDate(inv.dueDate)}</span>;
+                  case "paidAt":     return inv.paidAt ? <span className="text-[13px] text-slate-600">{fmtDate(inv.paidAt)}</span> : <span className="text-[13px] text-slate-300">—</span>;
+                  case "paymentRef": return <span className="text-[13px] text-slate-600">—</span>;
+                  case "notes":      return <span className="text-[13px] text-slate-600">—</span>;
+                  case "createdAt":  return <span className="text-[13px] text-slate-600">{fmtDate(inv.issuedAt)}</span>;
                   case "status":     return null; // rendered separately below
                   default:           return null;
                 }
               };
               return (
-                <div key={inv.id}
+                <div
+                  key={inv.id}
                   onClick={() => openView(inv.id)}
                   onMouseEnter={() => setHovRow(i)} onMouseLeave={() => setHovRow(null)}
-                  style={{ display:"grid", gridTemplateColumns: gridTemplate, gap:12,
-                    padding:"13px 20px", borderBottom:"1px solid #F1F5F9",
-                    background:hovRow===i?"#F8FAFC":"#fff", cursor:"pointer",
-                    transition:"background 0.12s", alignItems:"center" }}>
+                  className="grid gap-3 px-5 py-[13px] border-b border-[#F1F5F9] cursor-pointer transition-[background] duration-[120ms] items-center"
+                  style={{
+                    gridTemplateColumns: gridTemplate,
+                    background: hovRow === i ? "#F8FAFC" : "#fff",
+                  }}
+                >
                   {visibleCols.map(k => {
                     if (k === "status") return (
-                      <div key={k} style={{ position:"relative" }} onClick={e => e.stopPropagation()}>
+                      <div key={k} className="relative" onClick={e => e.stopPropagation()}>
                         {changingStatus === inv.id ? (
-                          <span style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:11, color:"#94A3B8" }}>
+                          <span className="inline-flex items-center gap-[5px] text-[11px] text-slate-400">
                             <Loader2 className="h-3 w-3 animate-spin"/> Saving…
                           </span>
                         ) : (
@@ -515,34 +541,31 @@ export default function InvoicingPage() {
                               setExportMenu(null);
                             }}
                             title={status === "Paid" || status === "Voided" ? undefined : "Click to change status"}
-                            style={{ background:"none", border:"none", padding:0, cursor: status==="Paid"||status==="Voided" ? "default" : "pointer",
-                              display:"inline-flex", alignItems:"center", gap:3 }}>
+                            className="bg-transparent border-none p-0 inline-flex items-center gap-[3px]"
+                            style={{ cursor: status === "Paid" || status === "Voided" ? "default" : "pointer" }}
+                          >
                             <StatusBadge status={status}/>
                             {status !== "Paid" && status !== "Voided" && (
-                              <ChevronDown style={{ width:10, height:10, color:"#94A3B8", flexShrink:0 }}/>
+                              <ChevronDown className="text-slate-400 shrink-0" style={{ width: 10, height: 10 }}/>
                             )}
                           </button>
                         )}
                         {statusMenu === inv.id && (
                           <>
-                            <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setStatusMenu(null)}/>
-                            <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:99,
-                              background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
-                              boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden", minWidth:155 }}>
+                            <div className="fixed inset-0 z-[98]" onClick={() => setStatusMenu(null)}/>
+                            <div className="absolute top-[calc(100%+4px)] left-0 z-[99] bg-white border-[1.5px] border-[#E2E8F0] rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden min-w-[155px]">
                               <button
                                 onClick={() => quickChangeStatus(inv.id, "paid")}
-                                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px",
-                                  textAlign:"left", border:"none", borderBottom:"1px solid #F1F5F9",
-                                  cursor:"pointer", fontFamily:FONT, fontSize:13, background:"#fff", color:"#15803D", fontWeight:600 }}
+                                className="flex items-center gap-2 w-full px-[14px] py-[10px] text-left border-none border-b border-[#F1F5F9] cursor-pointer text-[13px] bg-white text-[#15803D] font-semibold"
+                                style={{ fontFamily: FONT }}
                                 onMouseEnter={e=>(e.currentTarget.style.background="#F0FDF4")}
                                 onMouseLeave={e=>(e.currentTarget.style.background="#fff")}>
                                 <CheckCircle2 className="h-3.5 w-3.5"/> Mark as Paid
                               </button>
                               <button
                                 onClick={() => quickChangeStatus(inv.id, "void")}
-                                style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"10px 14px",
-                                  textAlign:"left", border:"none", cursor:"pointer", fontFamily:FONT, fontSize:13,
-                                  background:"#fff", color:"#B91C1C", fontWeight:600 }}
+                                className="flex items-center gap-2 w-full px-[14px] py-[10px] text-left border-none cursor-pointer text-[13px] bg-white text-[#B91C1C] font-semibold"
+                                style={{ fontFamily: FONT }}
                                 onMouseEnter={e=>(e.currentTarget.style.background="#FEF2F2")}
                                 onMouseLeave={e=>(e.currentTarget.style.background="#fff")}>
                                 <Ban className="h-3.5 w-3.5"/> Void Invoice
@@ -556,26 +579,26 @@ export default function InvoicingPage() {
                   })}
 
                   {/* Download dropdown — always last, fixed 110px */}
-                  <div style={{ position:"relative" }} onClick={e => e.stopPropagation()}>
+                  <div className="relative" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={e => { e.stopPropagation(); setExportMenu(exportMenu === inv.id ? null : inv.id); }}
-                      style={{ display:"flex", alignItems:"center", gap:4, fontSize:12, fontWeight:600, color:"#64748B",
-                        background:"none", border:"1px solid #E8EEF4", borderRadius:7, padding:"5px 10px",
-                        cursor:"pointer", fontFamily:FONT }}>
+                      className="flex items-center gap-1 text-[12px] font-semibold text-slate-500 bg-transparent border border-[#E8EEF4] rounded-[7px] px-[10px] py-[5px] cursor-pointer"
+                      style={{ fontFamily: FONT }}
+                    >
                       <Download className="h-3 w-3"/> Export <ChevronDown className="h-3 w-3"/>
                     </button>
                     {exportMenu === inv.id && (
                       <>
-                        <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setExportMenu(null)}/>
-                        <div style={{ position:"absolute", top:"calc(100% + 4px)", right:0, zIndex:99,
-                          background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
-                          boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden", minWidth:140 }}>
+                        <div className="fixed inset-0 z-[98]" onClick={() => setExportMenu(null)}/>
+                        <div className="absolute top-[calc(100%+4px)] right-0 z-[99] bg-white border-[1.5px] border-[#E2E8F0] rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden min-w-[140px]">
                           {(["summary","detailed"] as const).map((mode, i) => (
                             <button key={mode}
                               onClick={() => { void viewInvoicePdf(inv.id, mode); setExportMenu(null); }}
-                              style={{ display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
-                                border:"none", borderBottom: i === 0 ? "1px solid #F1F5F9" : "none",
-                                cursor:"pointer", fontFamily:FONT, fontSize:13, background:"#fff", color:"#0F172A" }}
+                              className="block w-full px-[14px] py-[10px] text-left border-none cursor-pointer text-[13px] bg-white text-slate-900"
+                              style={{
+                                fontFamily: FONT,
+                                borderBottom: i === 0 ? "1px solid #F1F5F9" : "none",
+                              }}
                               onMouseEnter={e => (e.currentTarget.style.background = "#F8FAFC")}
                               onMouseLeave={e => (e.currentTarget.style.background = "#fff")}>
                               {mode === "summary" ? "Summary" : "Detailed"}
@@ -599,62 +622,70 @@ export default function InvoicingPage() {
 
         {/* ── NEW INVOICE ── */}
         {drawerMode === "new" && (<>
-          <div style={{ padding:"20px 24px 16px", borderBottom:"1.5px solid #F1F5F9", flexShrink:0 }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div className="px-6 pt-5 pb-4 border-b-[1.5px] border-[#F1F5F9] shrink-0">
+            <div className="flex items-center justify-between">
               <div>
-                <div style={{ fontSize:17, fontWeight:800, color:"#0F172A" }}>New Invoice</div>
-                <div style={{ fontSize:12, color:"#94A3B8", marginTop:2 }}>
+                <div className="text-[17px] font-extrabold text-slate-900">New Invoice</div>
+                <div className="text-[12px] text-slate-400 mt-[2px]">
                   Step {step} of 2 — {step===1 ? "Select company & period" : "Review & confirm"}
                 </div>
               </div>
-              <button onClick={closeDrawer} style={{ width:32, height:32, borderRadius:8, border:"1.5px solid #E2E8F0", background:"#F8FAFC", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <X className="h-4 w-4" style={{ color:"#64748B" }}/>
+              <button
+                onClick={closeDrawer}
+                className="w-8 h-8 rounded-lg border-[1.5px] border-[#E2E8F0] bg-slate-50 cursor-pointer flex items-center justify-center"
+              >
+                <X className="h-4 w-4 text-slate-500"/>
               </button>
             </div>
-            <div style={{ display:"flex", gap:6, marginTop:14 }}>
+            <div className="flex gap-[6px] mt-[14px]">
               {[1,2].map(s => (
-                <div key={s} style={{ height:3, flex:1, borderRadius:4, background:s<=step?A:"#E2E8F0", transition:"background .2s" }}/>
+                <div
+                  key={s}
+                  className="h-[3px] flex-1 rounded-[4px] transition-[background] duration-[200ms]"
+                  style={{ background: s <= step ? A : "#E2E8F0" }}
+                />
               ))}
             </div>
           </div>
 
           {/* Step 1 — Company & Period */}
           {step === 1 && (
-            <div style={{ flex:1, overflowY:"auto", padding:"24px" }}>
+            <div className="flex-1 overflow-y-auto p-6">
 
               {/* ── Company custom dropdown ── */}
-              <div style={{ marginBottom:22 }}>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em" }}>Company</label>
-                <div style={{ position:"relative" }}>
+              <div className="mb-[22px]">
+                <label className="text-[11.5px] font-bold text-slate-500 block mb-2 uppercase tracking-[0.06em]">Company</label>
+                <div className="relative">
                   <button
                     onClick={() => { setCompanyOpen(o => !o); setPickerOpen(false); }}
+                    className="w-full flex items-center justify-between h-[42px] px-[14px] border-[1.5px] border-[#E2E8F0] rounded-[10px] bg-white cursor-pointer text-[14px] text-left"
                     style={{
-                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                      height:42, padding:"0 14px", border:"1.5px solid #E2E8F0", borderRadius:10,
-                      background:"#fff", cursor:"pointer", fontFamily:FONT, fontSize:14,
-                      color: selCompany ? "#0F172A" : "#94A3B8", textAlign:"left",
+                      fontFamily: FONT,
+                      color: selCompany ? "#0F172A" : "#94A3B8",
                     }}
                   >
                     <span>{selCompanyName || "Select company…"}</span>
-                    <ChevronDown style={{ width:16, height:16, color:"#94A3B8", flexShrink:0, transform: companyOpen ? "rotate(180deg)" : "none", transition:"transform .15s" }}/>
+                    <ChevronDown
+                      className="text-slate-400 shrink-0"
+                      style={{
+                        width: 16, height: 16,
+                        transform: companyOpen ? "rotate(180deg)" : "none",
+                        transition: "transform .15s",
+                      }}
+                    />
                   </button>
                   {companyOpen && (
                     <>
-                      <div style={{ position:"fixed", inset:0, zIndex:98 }} onClick={() => setCompanyOpen(false)}/>
-                      <div style={{
-                        position:"absolute", top:"calc(100% + 4px)", left:0, right:0, zIndex:99,
-                        background:"#fff", border:"1.5px solid #E2E8F0", borderRadius:10,
-                        boxShadow:"0 8px 24px rgba(0,0,0,0.12)", overflow:"hidden",
-                        maxHeight:220, overflowY:"auto",
-                      }}>
+                      <div className="fixed inset-0 z-[98]" onClick={() => setCompanyOpen(false)}/>
+                      <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-[99] bg-white border-[1.5px] border-[#E2E8F0] rounded-[10px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden max-h-[220px] overflow-y-auto">
                         {companies.length === 0 ? (
-                          <div style={{ padding:"12px 14px", fontSize:13, color:"#94A3B8" }}>No companies found</div>
+                          <div className="px-[14px] py-3 text-[13px] text-slate-400">No companies found</div>
                         ) : companies.map((c) => (
                           <button key={c.id}
                             onClick={() => { setSelCompany(c.id); setCompanyOpen(false); }}
+                            className="block w-full px-[14px] py-[10px] text-left border-none cursor-pointer text-[14px]"
                             style={{
-                              display:"block", width:"100%", padding:"10px 14px", textAlign:"left",
-                              border:"none", cursor:"pointer", fontFamily:FONT, fontSize:14,
+                              fontFamily: FONT,
                               background: selCompany === c.id ? "#EFF6FF" : "#fff",
                               color: selCompany === c.id ? A : "#0F172A",
                               fontWeight: selCompany === c.id ? 700 : 400,
@@ -672,23 +703,26 @@ export default function InvoicingPage() {
               </div>
 
               {/* ── Billing Period — DateRangePicker ── */}
-              <div style={{ marginBottom:22 }}>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em" }}>Billing Period</label>
-                <div style={{ position:"relative" }}>
+              <div className="mb-[22px]">
+                <label className="text-[11.5px] font-bold text-slate-500 block mb-2 uppercase tracking-[0.06em]">Billing Period</label>
+                <div className="relative">
                   <button
                     onClick={() => { setPickerOpen(o => !o); setCompanyOpen(false); }}
-                    style={{
-                      width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
-                      height:42, padding:"0 14px", border:"1.5px solid #E2E8F0", borderRadius:10,
-                      background:"#fff", cursor:"pointer", fontFamily:FONT, fontSize:14,
-                      color: "#0F172A", textAlign:"left",
-                    }}
+                    className="w-full flex items-center justify-between h-[42px] px-[14px] border-[1.5px] border-[#E2E8F0] rounded-[10px] bg-white cursor-pointer text-[14px] text-slate-900 text-left"
+                    style={{ fontFamily: FONT }}
                   >
-                    <span style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <CalendarDays style={{ width:15, height:15, color:"#94A3B8", flexShrink:0 }}/>
+                    <span className="flex items-center gap-2">
+                      <CalendarDays className="text-slate-400 shrink-0" style={{ width: 15, height: 15 }}/>
                       {periodLabel}
                     </span>
-                    <ChevronDown style={{ width:16, height:16, color:"#94A3B8", flexShrink:0, transform: pickerOpen ? "rotate(180deg)" : "none", transition:"transform .15s" }}/>
+                    <ChevronDown
+                      className="text-slate-400 shrink-0"
+                      style={{
+                        width: 16, height: 16,
+                        transform: pickerOpen ? "rotate(180deg)" : "none",
+                        transition: "transform .15s",
+                      }}
+                    />
                   </button>
                   {pickerOpen && (
                     <DateRangePicker
@@ -703,10 +737,12 @@ export default function InvoicingPage() {
               </div>
 
               <div>
-                <label style={{ fontSize:11.5, fontWeight:700, color:"#64748B", display:"block", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.06em" }}>Notes (optional)</label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+                <label className="text-[11.5px] font-bold text-slate-500 block mb-2 uppercase tracking-[0.06em]">Notes (optional)</label>
+                <textarea
+                  value={notes} onChange={(e) => setNotes(e.target.value)}
                   placeholder="Internal note shown only on the PDF…"
-                  style={{ width:"100%", minHeight:72, padding:"10px 12px", border:"1.5px solid #E2E8F0", borderRadius:9, fontSize:13, fontFamily:FONT, color:"#374151", outline:"none", resize:"vertical", boxSizing:"border-box" }}
+                  className="w-full min-h-[72px] px-3 py-[10px] border-[1.5px] border-[#E2E8F0] rounded-[9px] text-[13px] text-[#374151] outline-none resize-y box-border"
+                  style={{ fontFamily: FONT }}
                 />
               </div>
             </div>
@@ -714,12 +750,12 @@ export default function InvoicingPage() {
 
           {/* Step 2 — Confirm + result */}
           {step === 2 && (
-            <div style={{ flex:1, overflowY:"auto", padding:"20px 24px" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               {generatedInv ? (
                 <>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background:"#DCFCE7", border:"1px solid #BBF7D0", borderRadius:10, marginBottom:16 }}>
-                    <CheckCircle2 className="h-5 w-5" style={{ color:"#15803D", flexShrink:0 }}/>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#15803D" }}>
+                  <div className="flex items-center gap-[10px] px-[14px] py-3 bg-[#DCFCE7] border border-[#BBF7D0] rounded-[10px] mb-4">
+                    <CheckCircle2 className="h-5 w-5 text-[#15803D] shrink-0"/>
+                    <div className="text-[13px] font-bold text-[#15803D]">
                       Invoice {formatInvoiceNumber(generatedInv.invoiceNumber)} created · {generatedInv.tripCount} trip{generatedInv.tripCount===1?"":"s"} · {fmt(generatedInv.amount)}
                     </div>
                   </div>
@@ -727,15 +763,15 @@ export default function InvoicingPage() {
                 </>
               ) : (
                 <>
-                  <div style={{ background:"#F8FAFC", borderRadius:12, padding:"14px 18px", marginBottom:16, border:"1px solid #E8EEF4" }}>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                  <div className="bg-slate-50 rounded-xl px-[18px] py-[14px] mb-4 border border-[#E8EEF4]">
+                    <div className="grid grid-cols-2 gap-[14px]">
                       {[
                         { lbl:"Company", val:selCompanyName || "—" },
                         { lbl:"Period",  val:periodLabel },
                       ].map(({ lbl, val }) => (
                         <div key={lbl}>
-                          <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{lbl}</div>
-                          <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:3 }}>{val}</div>
+                          <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.06em]">{lbl}</div>
+                          <div className="text-[14px] font-bold text-slate-900 mt-[3px]">{val}</div>
                         </div>
                       ))}
                     </div>
@@ -744,22 +780,22 @@ export default function InvoicingPage() {
                   {previewLoading ? (
                     <TripsMiniTableSkeleton />
                   ) : previewErr ? (
-                    <div style={{ padding:"10px 14px", background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:9, color:"#B91C1C", fontSize:12.5 }}>
+                    <div className="px-[14px] py-[10px] bg-[#FEE2E2] border border-[#FECACA] rounded-[9px] text-[#B91C1C] text-[12.5px]">
                       {previewErr}
                     </div>
                   ) : previewTrips.length === 0 ? (
-                    <div style={{ textAlign:"center", padding:"30px 0" }}>
-                      <div style={{ width:48, height:48, borderRadius:14, background:"#F1F5F9", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px" }}>
-                        <FileText style={{ color:"#94A3B8" }} className="h-5 w-5"/>
+                    <div className="text-center py-[30px]">
+                      <div className="w-12 h-12 rounded-[14px] bg-[#F1F5F9] flex items-center justify-center mx-auto mb-[14px]">
+                        <FileText className="h-5 w-5 text-slate-400"/>
                       </div>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#0F172A", marginBottom:6 }}>No eligible trips</div>
-                      <div style={{ fontSize:12.5, color:"#94A3B8", lineHeight:1.6, maxWidth:300, margin:"0 auto" }}>
+                      <div className="text-[13px] font-bold text-slate-900 mb-[6px]">No eligible trips</div>
+                      <div className="text-[12.5px] text-slate-400 leading-[1.6] max-w-[300px] mx-auto">
                         No completed, uninvoiced trips found for this company in the selected period.
                       </div>
                     </div>
                   ) : (
                     <>
-                      <div style={{ fontSize:12, fontWeight:700, color:"#64748B", marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                      <div className="text-[12px] font-bold text-slate-500 mb-[10px] uppercase tracking-[0.05em]">
                         {previewTrips.length} trip{previewTrips.length !== 1 ? "s" : ""} to invoice
                       </div>
                       <TripsMiniTable rows={previewTrips} total={previewTotal}/>
@@ -767,7 +803,7 @@ export default function InvoicingPage() {
                   )}
 
                   {generateErr && (
-                    <div style={{ marginTop:16, padding:"10px 14px", background:"#FEE2E2", border:"1px solid #FECACA", borderRadius:9, color:"#B91C1C", fontSize:12.5 }}>
+                    <div className="mt-4 px-[14px] py-[10px] bg-[#FEE2E2] border border-[#FECACA] rounded-[9px] text-[#B91C1C] text-[12.5px]">
                       {generateErr}
                     </div>
                   )}
@@ -776,32 +812,50 @@ export default function InvoicingPage() {
             </div>
           )}
 
-          <div style={{ padding:"16px 24px", borderTop:"1.5px solid #F1F5F9", display:"flex", gap:10, flexShrink:0 }}>
+          <div className="px-6 py-4 border-t-[1.5px] border-[#F1F5F9] flex gap-[10px] shrink-0">
             {step === 2 && !generatedInv && (
-              <button onClick={() => { setStep(1); setGenerateErr(null); setPreviewTrips([]); setPreviewTotal(0); setPreviewErr(null); }} disabled={generating}
-                style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 18px", border:"1.5px solid #E2E8F0", borderRadius:10, background:"#fff", color:"#475569", fontSize:14, fontWeight:600, cursor: generating ? "default" : "pointer", fontFamily:FONT, opacity: generating ? 0.6 : 1 }}>
+              <button
+                onClick={() => { setStep(1); setGenerateErr(null); setPreviewTrips([]); setPreviewTotal(0); setPreviewErr(null); }}
+                disabled={generating}
+                className="flex items-center gap-[6px] px-[18px] py-[10px] border-[1.5px] border-[#E2E8F0] rounded-[10px] bg-white text-slate-600 text-[14px] font-semibold"
+                style={{ fontFamily: FONT, cursor: generating ? "default" : "pointer", opacity: generating ? 0.6 : 1 }}
+              >
                 <ChevronLeft className="h-4 w-4"/> Back
               </button>
             )}
             {step === 1 ? (
-              <button disabled={!step1Valid} onClick={() => { void goToStep2(); }}
-                style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10,
-                  background:step1Valid?A:"#E2E8F0", color:step1Valid?"#fff":"#94A3B8",
-                  fontSize:14, fontWeight:700, cursor:step1Valid?"pointer":"default", fontFamily:FONT }}>
+              <button
+                disabled={!step1Valid}
+                onClick={() => { void goToStep2(); }}
+                className="flex-1 px-[18px] py-[10px] border-none rounded-[10px] text-[14px] font-bold"
+                style={{
+                  fontFamily: FONT,
+                  background: step1Valid ? A : "#E2E8F0",
+                  color: step1Valid ? "#fff" : "#94A3B8",
+                  cursor: step1Valid ? "pointer" : "default",
+                }}
+              >
                 Next →
               </button>
             ) : generatedInv ? (
-              <button onClick={closeDrawer}
-                style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10, background:A, color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:FONT }}>
+              <button
+                onClick={closeDrawer}
+                className="flex-1 px-[18px] py-[10px] border-none rounded-[10px] bg-blue-600 text-white text-[14px] font-bold cursor-pointer"
+                style={{ fontFamily: FONT }}
+              >
                 Done
               </button>
             ) : (
-              <button disabled={generating || previewLoading || previewTrips.length === 0} onClick={confirmGenerate}
-                style={{ flex:1, padding:"10px 18px", border:"none", borderRadius:10,
+              <button
+                disabled={generating || previewLoading || previewTrips.length === 0}
+                onClick={confirmGenerate}
+                className="flex-1 px-[18px] py-[10px] border-none rounded-[10px] text-white text-[14px] font-bold flex items-center justify-center gap-2"
+                style={{
+                  fontFamily: FONT,
                   background: (generating || previewLoading || previewTrips.length === 0) ? "#93C5FD" : A,
-                  color:"#fff", fontSize:14, fontWeight:700,
-                  cursor: (generating || previewLoading || previewTrips.length === 0) ? "default" : "pointer", fontFamily:FONT,
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                  cursor: (generating || previewLoading || previewTrips.length === 0) ? "default" : "pointer",
+                }}
+              >
                 {generating && <Loader2 className="h-4 w-4 animate-spin"/>}
                 {generating ? "Generating…" : "Generate Invoice"}
               </button>
@@ -812,51 +866,63 @@ export default function InvoicingPage() {
         {/* ── VIEW INVOICE ── */}
         {drawerMode === "view" && (
           <>
-            <div style={{ padding:"20px 24px 16px", borderBottom:"1.5px solid #F1F5F9", flexShrink:0 }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div className="px-6 pt-5 pb-4 border-b-[1.5px] border-[#F1F5F9] shrink-0">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div style={{ fontSize:17, fontWeight:800, color:"#0F172A", fontFamily:"monospace" }}>
+                  <div className="text-[17px] font-extrabold text-slate-900 font-mono">
                     {viewInv ? formatInvoiceNumber(viewInv.invoiceNumber) : "Loading…"}
                   </div>
-                  <div style={{ fontSize:12, color:"#94A3B8", marginTop:2 }}>
+                  <div className="text-[12px] text-slate-400 mt-[2px]">
                     {viewInv ? `Issued ${fmtDate(viewInv.issuedAt)}` : ""}
                   </div>
                 </div>
-                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <div className="flex gap-2 items-center">
                   {viewInv && (<>
-                    <button onClick={() => { setPreviewMode("summary"); setPreviewInv(viewInv); }}
-                      style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", border:"1.5px solid #C5CBF0", borderRadius:9, background:"#EEF0FB", color:"#1B2B7E", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:FONT, whiteSpace:"nowrap" }}>
+                    <button
+                      onClick={() => { setPreviewMode("summary"); setPreviewInv(viewInv); }}
+                      className="flex items-center gap-[5px] px-3 py-[7px] border-[1.5px] border-[#C5CBF0] rounded-[9px] bg-[#EEF0FB] text-[#1B2B7E] text-[12px] font-bold cursor-pointer whitespace-nowrap"
+                      style={{ fontFamily: FONT }}
+                    >
                       <FileText className="h-3 w-3"/> Summary
                     </button>
-                    <button onClick={() => { setPreviewMode("detailed"); setPreviewInv(viewInv); }}
-                      style={{ display:"flex", alignItems:"center", gap:5, padding:"7px 12px", border:"1.5px solid #E2E8F0", borderRadius:9, background:"#fff", color:"#475569", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:FONT, whiteSpace:"nowrap" }}>
+                    <button
+                      onClick={() => { setPreviewMode("detailed"); setPreviewInv(viewInv); }}
+                      className="flex items-center gap-[5px] px-3 py-[7px] border-[1.5px] border-[#E2E8F0] rounded-[9px] bg-white text-slate-600 text-[12px] font-semibold cursor-pointer whitespace-nowrap"
+                      style={{ fontFamily: FONT }}
+                    >
                       <FileText className="h-3 w-3"/> Detailed
                     </button>
                   </>)}
-                  <button onClick={closeDrawer} style={{ width:32, height:32, borderRadius:8, border:"1.5px solid #E2E8F0", background:"#F8FAFC", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <X className="h-4 w-4" style={{ color:"#64748B" }}/>
+                  <button
+                    onClick={closeDrawer}
+                    className="w-8 h-8 rounded-lg border-[1.5px] border-[#E2E8F0] bg-slate-50 cursor-pointer flex items-center justify-center"
+                  >
+                    <X className="h-4 w-4 text-slate-500"/>
                   </button>
                 </div>
               </div>
             </div>
 
-            <div style={{ flex:1, overflowY:"auto", padding:"20px 24px" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               {viewLoading ? (
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"60px 0", color:"#94A3B8" }}>
+                <div className="flex items-center justify-center gap-2 py-[60px] text-slate-400">
                   <Loader2 className="h-4 w-4 animate-spin"/>
-                  <span style={{ fontSize:13 }}>Loading invoice…</span>
+                  <span className="text-[13px]">Loading invoice…</span>
                 </div>
               ) : viewError ? (
-                <div style={{ padding:"40px 0", textAlign:"center" }}>
-                  <div style={{ fontSize:13, color:"#B91C1C", marginBottom:12 }}>{viewError}</div>
-                  <button onClick={() => viewInv && openView(viewInv.id)}
-                    style={{ padding:"7px 16px", border:"1.5px solid #E2E8F0", borderRadius:9, background:"#fff", color:"#475569", fontSize:12.5, fontWeight:600, cursor:"pointer", fontFamily:FONT }}>
+                <div className="py-10 text-center">
+                  <div className="text-[13px] text-[#B91C1C] mb-3">{viewError}</div>
+                  <button
+                    onClick={() => viewInv && openView(viewInv.id)}
+                    className="px-4 py-[7px] border-[1.5px] border-[#E2E8F0] rounded-[9px] bg-white text-slate-600 text-[12.5px] font-semibold cursor-pointer"
+                    style={{ fontFamily: FONT }}
+                  >
                     Retry
                   </button>
                 </div>
               ) : viewInv ? (
-                <div style={{ background:"#F8FAFC", borderRadius:12, padding:"16px 18px", border:"1px solid #E8EEF4" }}>
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+                <div className="bg-slate-50 rounded-xl px-[18px] py-4 border border-[#E8EEF4]">
+                  <div className="grid grid-cols-2 gap-[14px]">
                     {[
                       { lbl:"Company", val:viewInv.companyName },
                       { lbl:"Period",  val:fmtPeriod(viewInv.periodFrom, viewInv.periodTo) },
@@ -866,25 +932,25 @@ export default function InvoicingPage() {
                       { lbl:"Issued",  val:fmtDate(viewInv.issuedAt) },
                     ].map(({ lbl, val }) => (
                       <div key={lbl}>
-                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>{lbl}</div>
-                        <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{val}</div>
+                        <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.06em]">{lbl}</div>
+                        <div className="text-[14px] font-bold text-slate-900 mt-1">{val}</div>
                       </div>
                     ))}
                     <div>
-                      <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Status</div>
+                      <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.06em] mb-1">Status</div>
                       <StatusBadge status={viewInv.status}/>
                     </div>
                     {viewInv.paidAt && (
                       <div>
-                        <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em" }}>Paid</div>
-                        <div style={{ fontSize:14, fontWeight:700, color:"#0F172A", marginTop:4 }}>{fmtDate(viewInv.paidAt)}</div>
+                        <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.06em]">Paid</div>
+                        <div className="text-[14px] font-bold text-slate-900 mt-1">{fmtDate(viewInv.paidAt)}</div>
                       </div>
                     )}
                   </div>
                   {viewInv.notes && (
-                    <div style={{ marginTop:14, paddingTop:12, borderTop:"1px dashed #E2E8F0" }}>
-                      <div style={{ fontSize:10.5, fontWeight:700, color:"#94A3B8", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>Notes</div>
-                      <div style={{ fontSize:12.5, color:"#475569", lineHeight:1.5 }}>{viewInv.notes}</div>
+                    <div className="mt-[14px] pt-3 border-t border-dashed border-[#E2E8F0]">
+                      <div className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.06em] mb-1">Notes</div>
+                      <div className="text-[12.5px] text-slate-600 leading-[1.5]">{viewInv.notes}</div>
                     </div>
                   )}
                 </div>
@@ -892,16 +958,24 @@ export default function InvoicingPage() {
             </div>
 
             {viewInv && (viewInv.status === "Pending" || viewInv.status === "Overdue") && (
-              <div style={{ padding:"16px 24px", borderTop:"1.5px solid #F1F5F9", display:"flex", gap:10, flexShrink:0 }}>
-                <button onClick={handleVoid} disabled={voiding || marking}
-                  style={{ display:"flex", alignItems:"center", gap:6, padding:"10px 14px", border:"1.5px solid #FECACA", borderRadius:10, background:"#fff", color:"#B91C1C", fontSize:13, fontWeight:600, cursor:(voiding||marking)?"default":"pointer", fontFamily:FONT, opacity:(voiding||marking)?0.6:1 }}>
+              <div className="px-6 py-4 border-t-[1.5px] border-[#F1F5F9] flex gap-[10px] shrink-0">
+                <button
+                  onClick={handleVoid} disabled={voiding || marking}
+                  className="flex items-center gap-[6px] px-[14px] py-[10px] border-[1.5px] border-[#FECACA] rounded-[10px] bg-white text-[#B91C1C] text-[13px] font-semibold"
+                  style={{ fontFamily: FONT, cursor: (voiding || marking) ? "default" : "pointer", opacity: (voiding || marking) ? 0.6 : 1 }}
+                >
                   {voiding ? <Loader2 className="h-4 w-4 animate-spin"/> : <Ban className="h-4 w-4"/>}
                   Void
                 </button>
-                <button onClick={handleMarkPaid} disabled={marking || voiding}
-                  style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"10px 18px", border:"none", borderRadius:10,
-                    background:(marking||voiding)?"#93C5FD":A, color:"#fff", fontSize:14, fontWeight:700,
-                    cursor:(marking||voiding)?"default":"pointer", fontFamily:FONT }}>
+                <button
+                  onClick={handleMarkPaid} disabled={marking || voiding}
+                  className="flex-1 flex items-center justify-center gap-2 px-[18px] py-[10px] border-none rounded-[10px] text-white text-[14px] font-bold"
+                  style={{
+                    fontFamily: FONT,
+                    background: (marking || voiding) ? "#93C5FD" : A,
+                    cursor: (marking || voiding) ? "default" : "pointer",
+                  }}
+                >
                   {marking ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4"/>}
                   {marking ? "Marking…" : "Mark as Paid"}
                 </button>

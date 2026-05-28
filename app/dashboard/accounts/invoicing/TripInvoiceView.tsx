@@ -125,7 +125,7 @@ function LocalRouteMap({
   };
 
   return (
-    <div style={{ position: "relative", height: 220, borderRadius: 10, overflow: "hidden", background: "#eaf0ea" }}>
+    <div className="relative h-[220px] rounded-[10px] overflow-hidden bg-[#eaf0ea]">
       <svg viewBox={`0 0 ${width} ${height}`} xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
         <defs>
           <pattern id="route-grid" width="28" height="28" patternUnits="userSpaceOnUse">
@@ -244,16 +244,16 @@ function GeocodedRouteMap({ pickup, drop }: { pickup: string; drop: string }) {
 
   if (status === "no-token") {
     return (
-      <div style={{ height: 220, borderRadius: 10, background: "#eaf0ea", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontSize: 12, color: "#6B7280" }}>Route map unavailable</span>
+      <div className="h-[220px] rounded-[10px] bg-[#eaf0ea] flex items-center justify-center">
+        <span className="text-[12px] text-gray-500">Route map unavailable</span>
       </div>
     );
   }
 
   if (status === "loading") {
     return (
-      <div style={{ height: 220, borderRadius: 10, background: "#eaf0ea", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontSize: 12, color: "#6B7280" }}>Loading map…</span>
+      <div className="h-[220px] rounded-[10px] bg-[#eaf0ea] flex items-center justify-center">
+        <span className="text-[12px] text-gray-500">Loading map…</span>
       </div>
     );
   }
@@ -264,7 +264,7 @@ function GeocodedRouteMap({ pickup, drop }: { pickup: string; drop: string }) {
         src={mapUrl}
         alt="Route map"
         crossOrigin="anonymous"
-        style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 10, display: "block" }}
+        className="w-full h-[220px] object-cover rounded-[10px] block"
       />
     );
   }
@@ -273,7 +273,7 @@ function GeocodedRouteMap({ pickup, drop }: { pickup: string; drop: string }) {
   const p = pickup.split(",")[0].trim().slice(0, 18);
   const d = drop.split(",")[0].trim().slice(0, 18);
   return (
-    <div style={{ position: "relative", background: "#eaf0ea", borderRadius: 10, overflow: "hidden", height: 220 }}>
+    <div className="relative bg-[#eaf0ea] rounded-[10px] overflow-hidden h-[220px]">
       <svg viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
         <rect width="300" height="220" fill="#e8f0e8" />
         <line x1="0" y1="110" x2="300" y2="110" stroke="#d0dbd0" strokeWidth="10" />
@@ -354,70 +354,60 @@ function TripInvoiceCard({
   ];
 
   return (
-    <div style={{
-      background: "#fff", borderRadius: 16, border: "1px solid #E2E6F0",
-      width: "100%", maxWidth: 780, overflow: "hidden",
-      boxShadow: "0 4px 32px rgba(27,43,126,0.08)",
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-    }}>
+    <div className="bg-white rounded-2xl border border-[#E2E6F0] w-full max-w-[780px] overflow-hidden shadow-[0_4px_32px_rgba(27,43,126,0.08)]" style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       {/* Header */}
-      <div style={{
-        padding: "1.75rem 2rem", borderBottom: "1px solid #E8ECF4",
-        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-        gap: "1rem", flexWrap: "wrap",
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <div style={{
-            width: 40, height: 40, background: NAVY, borderRadius: 10,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontSize: 13, fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
-          }}>{VI.short}</div>
+      <div className="px-8 py-7 border-b border-[#E8ECF4] flex justify-between items-start gap-4 flex-wrap">
+        <div className="flex items-start gap-3">
+          <div
+            className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-[13px] font-semibold tracking-[0.5px] shrink-0"
+            style={{ background: NAVY }}
+          >{VI.short}</div>
           <div>
-            <p style={{ fontSize: 18, fontWeight: 600, color: "#111827", margin: 0 }}>{VI.name}</p>
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0", lineHeight: 1.6 }}>{VI.line1}</p>
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0", lineHeight: 1.6 }}>
+            <p className="text-lg font-semibold text-[#111827] m-0">{VI.name}</p>
+            <p className="text-[12px] text-gray-500 mt-[2px] leading-relaxed m-0">{VI.line1}</p>
+            <p className="text-[12px] text-gray-500 mt-[2px] leading-relaxed m-0">
               {VI.email} · {VI.phone}
             </p>
-            <p style={{ fontSize: 11, color: "#9CA3AF", margin: "2px 0 0", lineHeight: 1.6 }}>
+            <p className="text-[11px] text-gray-400 mt-[2px] leading-relaxed m-0">
               GST: {VI.gst} · PAN: {VI.pan}
             </p>
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: 22, fontWeight: 700, color: NAVY, margin: 0, letterSpacing: "-0.5px" }}>
+        <div className="text-right">
+          <p className="text-[22px] font-bold tracking-[-0.5px] m-0" style={{ color: NAVY }}>
             {formatInvoiceNumber(inv.invoiceNumber)}
           </p>
-          <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0", lineHeight: 1.6 }}>
+          <p className="text-[12px] text-gray-500 mt-[2px] leading-relaxed m-0">
             Invoice date: {fmtDate(inv.issuedAt)}
           </p>
-          <p style={{ fontSize: 12, color: "#6B7280", margin: "2px 0 0", lineHeight: 1.6 }}>
+          <p className="text-[12px] text-gray-500 mt-[2px] leading-relaxed m-0">
             Due date: {fmtDate(inv.dueDate)}
           </p>
-          <p style={{ fontSize: 11, color: "#9CA3AF", margin: "2px 0 0", lineHeight: 1.6 }}>
+          <p className="text-[11px] text-gray-400 mt-[2px] leading-relaxed m-0">
             SAC: {VI.sac}
           </p>
         </div>
       </div>
 
       {/* From / Billed To */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #E8ECF4" }}>
-        <div style={{ padding: "1.25rem 2rem", borderRight: "1px solid #E8ECF4" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", margin: "0 0 8px" }}>From</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#111827", margin: 0 }}>{VI.name}</p>
-          <p style={{ fontSize: 12, color: "#6B7280", margin: "3px 0 0", lineHeight: 1.6 }}>{VI.line1}</p>
-          <p style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>{VI.gst}</p>
+      <div className="grid grid-cols-2 border-b border-[#E8ECF4]">
+        <div className="px-8 py-5 border-r border-[#E8ECF4]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 m-0 mb-2">From</p>
+          <p className="text-[13px] font-semibold text-[#111827] m-0">{VI.name}</p>
+          <p className="text-[12px] text-gray-500 mt-[3px] leading-relaxed m-0">{VI.line1}</p>
+          <p className="text-[11px] text-gray-400 mt-1 m-0">{VI.gst}</p>
         </div>
-        <div style={{ padding: "1.25rem 2rem" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", margin: "0 0 8px" }}>Billed to</p>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "#111827", margin: 0 }}>{inv.companyName}</p>
+        <div className="px-8 py-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 m-0 mb-2">Billed to</p>
+          <p className="text-[13px] font-semibold text-[#111827] m-0">{inv.companyName}</p>
           {inv.companyAddress && (
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "3px 0 0", lineHeight: 1.6 }}>{inv.companyAddress}</p>
+            <p className="text-[12px] text-gray-500 mt-[3px] leading-relaxed m-0">{inv.companyAddress}</p>
           )}
-          <p style={{ fontSize: 12, color: "#6B7280", margin: "3px 0 0", lineHeight: 1.6 }}>
+          <p className="text-[12px] text-gray-500 mt-[3px] leading-relaxed m-0">
             Period: {fmtPeriod(inv.periodFrom, inv.periodTo)}
           </p>
           {inv.tripCount > 1 && (
-            <p style={{ fontSize: 12, color: "#6B7280", margin: "3px 0 0", lineHeight: 1.6 }}>
+            <p className="text-[12px] text-gray-500 mt-[3px] leading-relaxed m-0">
               Trip {idx + 1} of {inv.tripCount}
             </p>
           )}
@@ -425,9 +415,9 @@ function TripInvoiceCard({
       </div>
 
       {/* Route Map + Trip Info */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderBottom: "1px solid #E8ECF4" }}>
-        <div style={{ padding: "1.25rem 2rem", borderRight: "1px solid #E8ECF4" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", margin: "0 0 8px" }}>Route map</p>
+      <div className="grid grid-cols-2 border-b border-[#E8ECF4]">
+        <div className="px-8 py-5 border-r border-[#E8ECF4]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 m-0 mb-2">Route map</p>
           <RouteMap
             pickup={trip.pickupAddress || "Pickup"}
             drop={trip.dropAddress || "Drop"}
@@ -437,21 +427,20 @@ function TripInvoiceCard({
             dropLng={trip.dropLng}
           />
         </div>
-        <div style={{ padding: "1.25rem 2rem" }}>
+        <div className="px-8 py-5">
           {/* Badges row */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          <div className="flex items-center gap-2 mb-[14px] flex-wrap">
             {trip.bookingType && (
-              <span style={{
-                display: "inline-flex", alignItems: "center",
-                background: NAVY_LIGHT, border: `1px solid ${NAVY_BORDER}`,
-                borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 600, color: NAVY,
-              }}>{trip.bookingType}</span>
+              <span
+                className="inline-flex items-center rounded-[20px] px-3 py-[3px] text-[11px] font-semibold border"
+                style={{ background: NAVY_LIGHT, borderColor: NAVY_BORDER, color: NAVY }}
+              >{trip.bookingType}</span>
             )}
-            <span style={{ fontSize: 11, color: "#6B7280" }}>{tripDate}</span>
+            <span className="text-[11px] text-gray-500">{tripDate}</span>
             {trip.passengers && (
               <>
-                <span style={{ fontSize: 11, color: "#D1D5DB" }}>·</span>
-                <span style={{ fontSize: 11, color: "#6B7280" }}>
+                <span className="text-[11px] text-gray-300">·</span>
+                <span className="text-[11px] text-gray-500">
                   {trip.passengers} passenger{trip.passengers > 1 ? "s" : ""}
                 </span>
               </>
@@ -459,58 +448,50 @@ function TripInvoiceCard({
           </div>
 
           {/* Timing box */}
-          <div style={{
-            background: "#F8F9FE", borderRadius: 10, padding: "14px 16px",
-            marginBottom: 14, display: "grid", gridTemplateColumns: "1fr auto 1fr",
-            alignItems: "center", gap: 8,
-          }}>
+          <div className="bg-[#F8F9FE] rounded-[10px] px-4 py-[14px] mb-[14px] grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div>
-              <p style={{ fontSize: 9, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Pickup</p>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "4px 0 0", letterSpacing: "-0.5px" }}>{pickupT}</p>
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.06em] m-0">Pickup</p>
+              <p className="text-[20px] font-bold text-[#111827] mt-1 m-0 tracking-[-0.5px]">{pickupT}</p>
             </div>
-            <div style={{ textAlign: "center" }}>
-              <span style={{ fontSize: 9, color: "#9CA3AF" }}>
+            <div className="text-center">
+              <span className="text-[9px] text-gray-400">
                 {trip.distanceKm ? `${trip.distanceKm} km` : ""}
               </span>
-              <div style={{ height: 1, background: "#D1D5DB", marginTop: 4 }} />
+              <div className="h-px bg-gray-300 mt-1" />
             </div>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ fontSize: 9, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Drop</p>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "4px 0 0", letterSpacing: "-0.5px" }}>{dropT}</p>
+            <div className="text-right">
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.06em] m-0">Drop</p>
+              <p className="text-[20px] font-bold text-[#111827] mt-1 m-0 tracking-[-0.5px]">{dropT}</p>
             </div>
           </div>
 
           {/* Route addresses */}
-          <div style={{ marginBottom: 14, background: "#F8F9FE", borderRadius: 10, padding: "12px 14px" }}>
-            <div style={{ marginBottom: 8 }}>
-              <p style={{ fontSize: 9, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Pickup</p>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "#111827", margin: "3px 0 0", lineHeight: 1.4 }}>{trip.pickupAddress || "—"}</p>
+          <div className="mb-[14px] bg-[#F8F9FE] rounded-[10px] px-[14px] py-3">
+            <div className="mb-2">
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.06em] m-0">Pickup</p>
+              <p className="text-[12px] font-semibold text-[#111827] mt-[3px] leading-[1.4] m-0">{trip.pickupAddress || "—"}</p>
             </div>
-            <div style={{ height: 1, background: "#E5E7EB", margin: "8px 0" }} />
+            <div className="h-px bg-[#E5E7EB] my-2" />
             <div>
-              <p style={{ fontSize: 9, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>Drop</p>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "#111827", margin: "3px 0 0", lineHeight: 1.4 }}>{trip.dropAddress || "—"}</p>
+              <p className="text-[9px] text-gray-400 uppercase tracking-[0.06em] m-0">Drop</p>
+              <p className="text-[12px] font-semibold text-[#111827] mt-[3px] leading-[1.4] m-0">{trip.dropAddress || "—"}</p>
             </div>
           </div>
 
           {/* Info rows */}
           {infoRows.map(([label, value], i) => (
-            <div key={label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "6px 0",
-              borderBottom: i === infoRows.length - 1 ? "none" : "1px solid #F3F4F6",
-            }}>
-              <span style={{ fontSize: 11, color: "#6B7280" }}>{label}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "#111827" }}>{value}</span>
+            <div key={label} className={`flex justify-between items-center py-[6px] ${i === infoRows.length - 1 ? "" : "border-b border-[#F3F4F6]"}`}>
+              <span className="text-[11px] text-gray-500">{label}</span>
+              <span className="text-[11px] font-semibold text-[#111827]">{value}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Bank Details + Fare Breakdown */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", borderTop: "1px solid #E8ECF4" }}>
-        <div style={{ padding: "1.25rem 2rem", borderRight: "1px solid #E8ECF4" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", margin: "0 0 8px" }}>Bank details</p>
+      <div className="grid grid-cols-2 border-t border-[#E8ECF4]">
+        <div className="px-8 py-5 border-r border-[#E8ECF4]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 m-0 mb-2">Bank details</p>
           {([
             ["Account name", VI.bank.accountName, false],
             ["Account no",   VI.bank.accountNo,   false],
@@ -518,74 +499,61 @@ function TripInvoiceCard({
             ["IFSC",         VI.bank.ifsc,         false],
             ["UPI",          VI.bank.upi,          true],
           ] as [string, string, boolean][]).map(([label, value, highlight], i, arr) => (
-            <div key={label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "6px 0",
-              borderBottom: i === arr.length - 1 ? "none" : "1px solid #F3F4F6",
-            }}>
-              <span style={{ fontSize: 11, color: "#6B7280" }}>{label}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: highlight ? NAVY : "#111827" }}>{value}</span>
+            <div key={label} className={`flex justify-between items-center py-[6px] ${i === arr.length - 1 ? "" : "border-b border-[#F3F4F6]"}`}>
+              <span className="text-[11px] text-gray-500">{label}</span>
+              <span className="text-[11px] font-semibold" style={{ color: highlight ? NAVY : "#111827" }}>{value}</span>
             </div>
           ))}
-          <div style={{ background: "#F8F9FE", borderRadius: 8, padding: "10px 14px", marginTop: 14 }}>
-            <p style={{ fontSize: 11, color: "#6B7280", margin: 0, lineHeight: 1.6 }}>
+          <div className="bg-[#F8F9FE] rounded-lg px-[14px] py-[10px] mt-[14px]">
+            <p className="text-[11px] text-gray-500 m-0 leading-relaxed">
               Please include <strong>{formatInvoiceNumber(inv.invoiceNumber)}</strong> in payment reference.<br />
               This is a computer generated invoice — no signature required.
             </p>
           </div>
         </div>
 
-        <div style={{ padding: "1.25rem 2rem" }}>
-          <p style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9CA3AF", margin: "0 0 8px" }}>Fare breakdown</p>
-          <div style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: "6px 0", borderBottom: "1px solid #E8ECF4", paddingBottom: 8,
-          }}>
-            <span style={{ fontSize: 12, color: "#374151", fontWeight: 600 }}>Total fare</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>
+        <div className="px-8 py-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-400 m-0 mb-2">Fare breakdown</p>
+          <div className="flex justify-between items-center py-[6px] border-b border-[#E8ECF4] pb-2">
+            <span className="text-[12px] text-[#374151] font-semibold">Total fare</span>
+            <span className="text-[12px] font-bold text-[#111827]">
               ₹{fd.taxable.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <div style={{ height: 8 }} />
+          <div className="h-2" />
           {([
             ["CGST @ 2.5%", fd.cgst],
             ["SGST @ 2.5%", fd.sgst],
             ...(fd.toll > 0 ? [["Toll charges", fd.toll] as [string, number]] : []),
           ] as [string, number][]).map(([label, value]) => (
-            <div key={label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "6px 0", borderBottom: "1px solid #F3F4F6",
-            }}>
-              <span style={{ fontSize: 11, color: "#6B7280" }}>{label}</span>
-              <span style={{ fontSize: 12, color: "#374151" }}>
+            <div key={label} className="flex justify-between items-center py-[6px] border-b border-[#F3F4F6]">
+              <span className="text-[11px] text-gray-500">{label}</span>
+              <span className="text-[12px] text-[#374151]">
                 ₹{value.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
               </span>
             </div>
           ))}
-          <div style={{
-            background: NAVY, borderRadius: 10, padding: "16px 18px", marginTop: 14,
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-          }}>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>Total due</span>
-            <span style={{ fontSize: 24, fontWeight: 700, color: "#fff", letterSpacing: "-0.5px" }}>
+          <div
+            className="rounded-[10px] px-[18px] py-4 mt-[14px] flex justify-between items-center"
+            style={{ background: NAVY }}
+          >
+            <span className="text-[13px] text-white/70">Total due</span>
+            <span className="text-[24px] font-bold text-white tracking-[-0.5px]">
               ₹{fd.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </span>
           </div>
-          <p style={{ fontSize: 10, color: "#9CA3AF", margin: "8px 0 0", lineHeight: 1.5, fontStyle: "italic" }}>
+          <p className="text-[10px] text-gray-400 mt-2 leading-[1.5] italic m-0">
             In words: {numWords(fd.total)}
           </p>
         </div>
       </div>
 
       {/* Footer */}
-      <div style={{
-        padding: "0.875rem 2rem", display: "flex", justifyContent: "space-between",
-        alignItems: "center", flexWrap: "wrap", gap: 8, borderTop: "1px solid #E8ECF4",
-      }}>
-        <span style={{ fontSize: 11, color: "#9CA3AF" }}>
+      <div className="px-8 py-[0.875rem] flex justify-between items-center flex-wrap gap-2 border-t border-[#E8ECF4]">
+        <span className="text-[11px] text-gray-400">
           {formatInvoiceNumber(inv.invoiceNumber)} · {trip.tripRef || "—"} · {VI.name}
         </span>
-        <span style={{ fontSize: 11, color: "#9CA3AF" }}>Due {fmtDate(inv.dueDate)}</span>
+        <span className="text-[11px] text-gray-400">Due {fmtDate(inv.dueDate)}</span>
       </div>
     </div>
   );
@@ -597,12 +565,9 @@ export const TripInvoiceDocument = forwardRef<HTMLDivElement, {
 }>(
   function TripInvoiceDocument({ inv, mode = "auto" }, ref) {
     return (
-      <div ref={ref} style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        gap: 32, padding: "2rem", background: "#F4F6FB",
-      }}>
+      <div ref={ref} className="flex flex-col items-center gap-8 p-8 bg-[#F4F6FB]">
         {inv.trips.length === 0 ? (
-          <div style={{ padding: "60px 0", textAlign: "center", color: "#9CA3AF", fontSize: 14 }}>
+          <div className="py-[60px] text-center text-gray-400 text-[14px]">
             No trip details available for this invoice.
           </div>
         ) : mode === "summary" ? (
@@ -686,37 +651,30 @@ export default function TripInvoiceView({
   }
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 60,
-      background: "#F4F6FB", overflowY: "auto",
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-    }}>
+    <div
+      className="fixed inset-0 z-[60] bg-[#F4F6FB] overflow-y-auto"
+      style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
+    >
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Top bar */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 10,
-        background: "rgba(244,246,251,0.92)", backdropFilter: "blur(8px)",
-        borderBottom: "1px solid #E2E6F0",
-        padding: "12px 2rem",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: NAVY, fontFamily: "monospace" }}>
+      <div className="sticky top-0 z-10 bg-[rgba(244,246,251,0.92)] backdrop-blur-[8px] border-b border-[#E2E6F0] px-8 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-[10px]">
+          <span className="text-[14px] font-bold font-mono" style={{ color: NAVY }}>
             {formatInvoiceNumber(inv.invoiceNumber)}
           </span>
-          <span style={{ fontSize: 13, color: "#6B7280" }}>
+          <span className="text-[13px] text-gray-500">
             · {inv.companyName} · {inv.tripCount} trip{inv.tripCount === 1 ? "" : "s"}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex gap-2">
           <button
             onClick={() => void downloadPdf()}
             disabled={downloading}
+            className="px-[18px] py-[7px] rounded-[10px] text-[13px] font-semibold text-white border-[1.5px]"
             style={{
-              padding: "7px 18px", border: `1.5px solid ${NAVY_BORDER}`,
-              borderRadius: 10, background: NAVY, color: "#fff",
-              fontSize: 13, fontWeight: 600,
+              background: NAVY,
+              borderColor: NAVY_BORDER,
               cursor: downloading ? "default" : "pointer",
               opacity: downloading ? 0.7 : 1,
               fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
@@ -727,12 +685,8 @@ export default function TripInvoiceView({
           {onClose && (
             <button
               onClick={onClose}
-              style={{
-                padding: "7px 18px", border: "1.5px solid #E2E6F0",
-                borderRadius: 10, background: "#fff", color: "#374151",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-                fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-              }}
+              className="px-[18px] py-[7px] border-[1.5px] border-[#E2E6F0] rounded-[10px] bg-white text-[#374151] text-[13px] font-semibold cursor-pointer"
+              style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}
             >
               ← Back
             </button>

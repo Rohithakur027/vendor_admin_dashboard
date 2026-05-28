@@ -81,118 +81,111 @@ export default function AccountsPage() {
         : "0.0",
     }));
 
-  const CARD: React.CSSProperties = {
-    background: "#fff",
-    border: "1.5px solid #E8EEF4",
-    borderRadius: 18,
-    overflow: "hidden",
-  };
-
   return (
     <>
 
-<div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+      <div className="flex gap-5 items-start">
 
         {/* ── Left column ── */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
 
           {/* Hero card */}
-          <div style={CARD}>
-            <div style={{ padding: "26px 28px 24px" }}>
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em" }}>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-[18px] overflow-hidden">
+            <div className="px-7 pt-[26px] pb-6">
+              <div className="mb-4">
+                <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-[0.12em]">
                   Total Outflow · Today
                 </span>
               </div>
-              <div style={{ marginBottom: 20 }}>
+              <div className="mb-5">
                 {isLoading ? (
                   <Skeleton className="h-9 w-56" />
                 ) : (
-                  <span style={{ fontSize: 36, fontWeight: 800, color: "#0F172A", lineHeight: 1, letterSpacing: -0.5 }}>
+                  <span className="text-[36px] font-extrabold text-slate-900 leading-none tracking-[-0.5px]">
                     ₹{totalConsumed.toLocaleString("en-IN")}
                   </span>
                 )}
               </div>
-              <div style={{ borderTop: "1.5px solid #F1F5F9", paddingTop: 20, display: "flex", gap: 36 }}>
+              <div className="border-t-[1.5px] border-[#F1F5F9] pt-5 flex gap-9">
                 <div>
-                  <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>VS Yesterday</p>
+                  <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1.5">VS Yesterday</p>
                   {isLoading ? (
                     <Skeleton className="h-5 w-20 mb-1" />
                   ) : (
-                    <p style={{ fontSize: 16, fontWeight: 700, color: isUp ? "#16A34A" : "#DC2626" }}>
+                    <p className={`text-base font-bold ${isUp ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
                       {isUp ? "↑" : "↓"} {Math.abs(pctChange).toFixed(1)}%
                     </p>
                   )}
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>was {fmt(prevAmt)}</p>
+                  <p className="text-[11.5px] text-slate-400 mt-[3px]">was {fmt(prevAmt)}</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Avg / Day</p>
+                  <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1.5">Avg / Day</p>
                   {isLoading ? (
                     <Skeleton className="h-5 w-24 mb-1" />
                   ) : (
-                    <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(avgPerDay)}</p>
+                    <p className="text-base font-bold text-slate-900">{fmt(avgPerDay)}</p>
                   )}
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>trailing 30 days</p>
+                  <p className="text-[11.5px] text-slate-400 mt-[3px]">trailing 30 days</p>
                 </div>
                 <div>
-                  <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>Peak Day</p>
+                  <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1.5">Peak Day</p>
                   {isLoading ? (
                     <Skeleton className="h-5 w-24 mb-1" />
                   ) : (
-                    <p style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>{fmt(peakDay)}</p>
+                    <p className="text-base font-bold text-slate-900">{fmt(peakDay)}</p>
                   )}
-                  <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 3 }}>highest in period</p>
+                  <p className="text-[11.5px] text-slate-400 mt-[3px]">highest in period</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* 4 stat tiles */}
-          <div style={{ ...CARD, display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-            <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
-              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Total Spent (Lifetime)</p>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-[18px] overflow-hidden grid grid-cols-4">
+            <div className="px-[22px] py-[18px] border-r-[1.5px] border-[#F1F5F9]">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-2.5">Total Spent (Lifetime)</p>
               {isLoading ? (
                 <Skeleton className="h-7 w-32 mb-2" />
               ) : (
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(totalConsumed)}</p>
+                <p className="text-[26px] font-extrabold text-slate-900 leading-none mb-2 tracking-[-0.5px]">{fmt(totalConsumed)}</p>
               )}
-              <p style={{ fontSize: 12, color: "#94A3B8" }}>
-                Across all supervisors · <span style={{ color: "#16A34A", fontWeight: 700 }}>vendor wallet</span>
+              <p className="text-xs text-slate-400">
+                Across all supervisors · <span className="text-[#16A34A] font-bold">vendor wallet</span>
               </p>
             </div>
-            <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
-              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Today&apos;s Spend</p>
+            <div className="px-[22px] py-[18px] border-r-[1.5px] border-[#F1F5F9]">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-2.5">Today&apos;s Spend</p>
               {isLoading ? (
                 <Skeleton className="h-7 w-32 mb-2" />
               ) : (
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>{fmt(totalConsumed)}</p>
+                <p className="text-[26px] font-extrabold text-slate-900 leading-none mb-2 tracking-[-0.5px]">{fmt(totalConsumed)}</p>
               )}
-              <p style={{ fontSize: 12, color: "#94A3B8" }}>
+              <p className="text-xs text-slate-400">
                 Across {isLoading ? <SkeletonInline className="h-3 w-6" /> : activeSups.length} active supervisors
               </p>
             </div>
-            <div style={{ padding: "18px 22px", borderRight: "1.5px solid #F1F5F9" }}>
-              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Avg / Active Supervisor</p>
+            <div className="px-[22px] py-[18px] border-r-[1.5px] border-[#F1F5F9]">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-2.5">Avg / Active Supervisor</p>
               {isLoading ? (
                 <Skeleton className="h-7 w-32 mb-2" />
               ) : (
-                <p style={{ fontSize: 26, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8, letterSpacing: -0.5 }}>
+                <p className="text-[26px] font-extrabold text-slate-900 leading-none mb-2 tracking-[-0.5px]">
                   {activeSups.length > 0 ? fmt(Math.round(totalConsumed / activeSups.length)) : "₹0"}
                 </p>
               )}
-              <p style={{ fontSize: 12, color: "#94A3B8" }}>Today&apos;s spend ÷ active</p>
+              <p className="text-xs text-slate-400">Today&apos;s spend ÷ active</p>
             </div>
-            <div style={{ padding: "18px 22px" }}>
-              <p style={{ fontSize: 9.5, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 10 }}>Top Spender Today</p>
+            <div className="px-[22px] py-[18px]">
+              <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-[0.12em] mb-2.5">Top Spender Today</p>
               {isLoading ? (
                 <Skeleton className="h-6 w-32 mb-2" />
               ) : (
-                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1, marginBottom: 8 }}>{topSpender?.name ?? "—"}</p>
+                <p className="text-[22px] font-extrabold text-slate-900 leading-none mb-2">{topSpender?.name ?? "—"}</p>
               )}
               {isLoading ? (
                 <Skeleton className="h-3 w-28" />
               ) : (
-                <p style={{ fontSize: 12, color: "#94A3B8" }}>
+                <p className="text-xs text-slate-400">
                   {topSpender ? `${fmt(topSpender.walletUsed)} · ${topSpender.zone}` : "No data"}
                 </p>
               )}
@@ -200,17 +193,17 @@ export default function AccountsPage() {
           </div>
 
           {/* Two tables side by side */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="grid grid-cols-2 gap-4">
 
             {/* Spending table */}
-            <div style={CARD}>
-              <div style={{ padding: "16px 20px 12px", borderBottom: "1.5px solid #F1F5F9" }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Spending</p>
-                <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>By supervisor · today</p>
+            <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-[18px] overflow-hidden">
+              <div className="px-5 pt-4 pb-3 border-b-[1.5px] border-[#F1F5F9]">
+                <p className="text-[15px] font-extrabold text-slate-900">Spending</p>
+                <p className="text-[11.5px] text-slate-400 mt-0.5">By supervisor · today</p>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 90px 76px", gap: "0 10px", padding: "9px 20px", borderBottom: "1px solid #F8FAFC" }}>
+              <div className="grid grid-cols-[28px_1fr_90px_76px] gap-x-[10px] px-5 py-[9px] border-b border-[#F8FAFC]">
                 {["#", "SUPERVISOR", "SPEND", "SHARE"].map((h) => (
-                  <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.6 }}>{h}</span>
+                  <span key={h} className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.6px]">{h}</span>
                 ))}
               </div>
               <div>
@@ -218,14 +211,7 @@ export default function AccountsPage() {
                   ? Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "28px 1fr 90px 76px",
-                        gap: "0 10px",
-                        padding: "12px 20px",
-                        borderBottom: i < 4 ? "1px solid #F8FAFC" : "none",
-                        alignItems: "center",
-                      }}
+                      className={`grid grid-cols-[28px_1fr_90px_76px] gap-x-[10px] px-5 py-3 items-center ${i < 4 ? "border-b border-[#F8FAFC]" : ""}`}
                     >
                       <Skeleton className="h-3 w-3" />
                       <div className="space-y-1.5">
@@ -242,25 +228,18 @@ export default function AccountsPage() {
                   : sortedBySpend.map(({ sup, share }, idx) => (
                   <div
                     key={sup.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "28px 1fr 90px 76px",
-                      gap: "0 10px",
-                      padding: "12px 20px",
-                      borderBottom: idx < sortedBySpend.length - 1 ? "1px solid #F8FAFC" : "none",
-                      alignItems: "center",
-                    }}
+                    className={`grid grid-cols-[28px_1fr_90px_76px] gap-x-[10px] px-5 py-3 items-center ${idx < sortedBySpend.length - 1 ? "border-b border-[#F8FAFC]" : ""}`}
                   >
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#CBD5E1" }}>{idx + 1}</span>
+                    <span className="text-xs font-bold text-slate-300">{idx + 1}</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{sup.name}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{sup.zone}</div>
+                      <div className="text-[13px] font-bold text-slate-900">{sup.name}</div>
+                      <div className="text-[11px] text-slate-400">{sup.zone}</div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{fmt(sup.walletUsed)}</div>
+                    <div className="text-[13px] font-extrabold text-slate-900">{fmt(sup.walletUsed)}</div>
                     <div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>{share}%</span>
-                      <div style={{ height: 3, borderRadius: 2, background: "#F1F5F9", marginTop: 4, overflow: "hidden" }}>
-                        <div style={{ height: "100%", background: "#0F172A", width: `${share}%`, borderRadius: 2 }} />
+                      <span className="text-xs font-bold text-slate-500">{share}%</span>
+                      <div className="h-[3px] rounded-sm bg-[#F1F5F9] mt-1 overflow-hidden">
+                        <div className="h-full bg-slate-900 rounded-sm" style={{ width: `${share}%` }} />
                       </div>
                     </div>
                   </div>
@@ -269,14 +248,14 @@ export default function AccountsPage() {
             </div>
 
             {/* Bookings table */}
-            <div style={CARD}>
-              <div style={{ padding: "16px 20px 12px", borderBottom: "1.5px solid #F1F5F9" }}>
-                <p style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>Trips</p>
-                <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>Per supervisor · today</p>
+            <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-[18px] overflow-hidden">
+              <div className="px-5 pt-4 pb-3 border-b-[1.5px] border-[#F1F5F9]">
+                <p className="text-[15px] font-extrabold text-slate-900">Trips</p>
+                <p className="text-[11.5px] text-slate-400 mt-0.5">Per supervisor · today</p>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 72px 76px", gap: "0 10px", padding: "9px 20px", borderBottom: "1px solid #F8FAFC" }}>
+              <div className="grid grid-cols-[28px_1fr_72px_76px] gap-x-[10px] px-5 py-[9px] border-b border-[#F8FAFC]">
                 {["#", "SUPERVISOR", "TRIPS", "SHARE"].map((h) => (
-                  <span key={h} style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" as const, letterSpacing: 0.6 }}>{h}</span>
+                  <span key={h} className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.6px]">{h}</span>
                 ))}
               </div>
               <div>
@@ -284,14 +263,7 @@ export default function AccountsPage() {
                   ? Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "28px 1fr 72px 76px",
-                        gap: "0 10px",
-                        padding: "12px 20px",
-                        borderBottom: i < 4 ? "1px solid #F8FAFC" : "none",
-                        alignItems: "center",
-                      }}
+                      className={`grid grid-cols-[28px_1fr_72px_76px] gap-x-[10px] px-5 py-3 items-center ${i < 4 ? "border-b border-[#F8FAFC]" : ""}`}
                     >
                       <Skeleton className="h-3 w-3" />
                       <div className="space-y-1.5">
@@ -308,25 +280,18 @@ export default function AccountsPage() {
                   : sortedByBookings.map(({ sup, bookingCount, bookingShare }, idx) => (
                   <div
                     key={sup.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "28px 1fr 72px 76px",
-                      gap: "0 10px",
-                      padding: "12px 20px",
-                      borderBottom: idx < sortedByBookings.length - 1 ? "1px solid #F8FAFC" : "none",
-                      alignItems: "center",
-                    }}
+                    className={`grid grid-cols-[28px_1fr_72px_76px] gap-x-[10px] px-5 py-3 items-center ${idx < sortedByBookings.length - 1 ? "border-b border-[#F8FAFC]" : ""}`}
                   >
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#CBD5E1" }}>{idx + 1}</span>
+                    <span className="text-xs font-bold text-slate-300">{idx + 1}</span>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{sup.name}</div>
-                      <div style={{ fontSize: 11, color: "#94A3B8" }}>{sup.zone}</div>
+                      <div className="text-[13px] font-bold text-slate-900">{sup.name}</div>
+                      <div className="text-[11px] text-slate-400">{sup.zone}</div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{bookingCount}</div>
+                    <div className="text-[13px] font-extrabold text-slate-900">{bookingCount}</div>
                     <div>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>{bookingShare}%</span>
-                      <div style={{ height: 3, borderRadius: 2, background: "#F1F5F9", marginTop: 4, overflow: "hidden" }}>
-                        <div style={{ height: "100%", background: "#0F172A", width: `${bookingShare}%`, borderRadius: 2 }} />
+                      <span className="text-xs font-bold text-slate-500">{bookingShare}%</span>
+                      <div className="h-[3px] rounded-sm bg-[#F1F5F9] mt-1 overflow-hidden">
+                        <div className="h-full bg-slate-900 rounded-sm" style={{ width: `${bookingShare}%` }} />
                       </div>
                     </div>
                   </div>
@@ -339,14 +304,14 @@ export default function AccountsPage() {
         </div>
 
         {/* ── Right sidebar ── */}
-        <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="w-[300px] shrink-0 flex flex-col gap-4">
 
           {/* Spend by Booking Type */}
-          <div style={{ ...CARD, padding: "20px" }}>
-            <p style={{ fontSize: 14, fontWeight: 800, color: "#0F172A", marginBottom: 2 }}>Spend by Trip Type</p>
-            <p style={{ fontSize: 11.5, color: "#94A3B8", marginBottom: 20 }}>Today across all supervisors</p>
+          <div className="bg-white border-[1.5px] border-[#E8EEF4] rounded-[18px] overflow-hidden p-5">
+            <p className="text-sm font-extrabold text-slate-900 mb-0.5">Spend by Trip Type</p>
+            <p className="text-[11.5px] text-slate-400 mb-5">Today across all supervisors</p>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div className="flex items-center gap-4">
               {isLoading ? (
                 <Skeleton className="h-[130px] w-[130px] rounded-full" />
               ) : (
@@ -356,34 +321,37 @@ export default function AccountsPage() {
                 {isLoading ? (
                   <Skeleton className="h-6 w-24 mb-1" />
                 ) : (
-                  <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{fmt(instantFare + scheduledFare)}</p>
+                  <p className="text-[22px] font-extrabold text-slate-900 leading-none">{fmt(instantFare + scheduledFare)}</p>
                 )}
-                <p style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 4 }}>Total today</p>
+                <p className="text-[11.5px] text-slate-400 mt-1">Total today</p>
               </div>
             </div>
 
-            <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="mt-5 flex flex-col gap-[14px]">
               {[
                 { label: "Instant",   amount: instantFare,   pct: instPct,  color: "#2563EB" },
                 { label: "Scheduled", amount: scheduledFare, pct: schedPct, color: "#818CF8" },
               ].map(({ label, amount, pct, color }) => (
                 <div key={label}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ width: 10, height: 10, borderRadius: 2, background: color, display: "inline-block", flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{label}</span>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <div className="flex items-center gap-[7px]">
+                      <span className="w-2.5 h-2.5 rounded-[2px] inline-block shrink-0" style={{ background: color }} />
+                      <span className="text-[13px] font-semibold text-slate-900">{label}</span>
                     </div>
                     {isLoading ? (
                       <Skeleton className="h-3 w-20" />
                     ) : (
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{fmt(amount)}</span>
-                        <span style={{ fontSize: 11.5, color: "#94A3B8", fontWeight: 600 }}>{pct}%</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[13px] font-bold text-slate-900">{fmt(amount)}</span>
+                        <span className="text-[11.5px] text-slate-400 font-semibold">{pct}%</span>
                       </div>
                     )}
                   </div>
-                  <div style={{ height: 5, borderRadius: 10, background: "#F1F5F9", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${isLoading ? 0 : pct}%`, background: color, borderRadius: 10, transition: "width 0.5s ease" }} />
+                  <div className="h-[5px] rounded-[10px] bg-[#F1F5F9] overflow-hidden">
+                    <div
+                      className="h-full rounded-[10px] transition-[width] duration-500 ease-in-out"
+                      style={{ width: `${isLoading ? 0 : pct}%`, background: color }}
+                    />
                   </div>
                 </div>
               ))}

@@ -71,7 +71,7 @@ function buildRenderers(
         <div className="flex flex-col min-w-0 pr-4 gap-px">
           <span className="font-semibold text-[13px] text-slate-800 leading-tight truncate">{b.pickupLocation.split(",")[0]}</span>
           <div className="flex items-center gap-1">
-            <div className="w-14 h-[2px] rounded-full" style={{ background: "linear-gradient(to right, #A5B4FC, #2563EB)" }} />
+            <div className="w-14 h-[2px] rounded-full bg-gradient-to-r from-[#A5B4FC] to-[#2563EB]" />
             <ArrowRight className="h-3 w-3 text-blue-600 shrink-0" />
           </div>
           <span className="text-[12px] text-gray-500 truncate">{b.dropLocation.split(",")[0]}</span>

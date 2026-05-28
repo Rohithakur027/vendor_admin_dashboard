@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutGrid, Building2, Users, Shield, ClipboardCheck, BarChart2, MapPin,
   ChevronLeft, ChevronRight, UserCog, MessageSquare, LogOut, FileText,
+  Home, Sparkles, Inbox, Star, IndianRupee, Car,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
-  subItems?: { label: string; href: string; reportType?: "vendor" | "driver" }[];
+  subItems?: { label: string; href: string; icon?: React.ElementType; reportType?: "vendor" | "driver" }[];
   // null = always shown; otherwise hidden for superadmin_member without this permission.
   permission?: keyof typeof SUPERADMIN_PERMISSION_KEYS | null;
   // true = hidden from superadmin_member entirely (e.g. team management).
@@ -29,15 +30,25 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: LayoutGrid,
     permission: null,
     subItems: [
-      { label: "Overview", href: "/superadmin" },
-      { label: "New Dashboard", href: "/superadmin/dashboard/new" },
+      { label: "Overview", href: "/superadmin", icon: Home },
+      { label: "New Dashboard", href: "/superadmin/dashboard/new", icon: Sparkles },
     ],
   },
   { label: "Vendors",           href: "/superadmin/vendors",           icon: Building2,     permission: "VENDOR_MANAGEMENT" },
   { label: "Live Map",          href: "/superadmin/live-map",          icon: MapPin,        permission: "TRIP_MONITORING" },
   { label: "Drivers",           href: "/superadmin/drivers",           icon: Users,         permission: "DRIVER_MANAGEMENT" },
   { label: "Driver Onboarding", href: "/superadmin/driver-onboarding", icon: ClipboardCheck, permission: "DRIVER_MANAGEMENT" },
-  { label: "Booking Enquiries", href: "/superadmin/booking-enquiries", icon: MessageSquare, permission: "TRIP_MONITORING" },
+  {
+    label: "Website Enquiry",
+    href: "/superadmin/booking-enquiries",
+    icon: MessageSquare,
+    permission: "TRIP_MONITORING",
+    subItems: [
+      { label: "Booking Enquiry",  href: "/superadmin/booking-enquiries", icon: Inbox },
+      { label: "Special Enquiry",  href: "/superadmin/special-enquiry",   icon: Star },
+      { label: "Finance",          href: "/superadmin/finance",           icon: IndianRupee },
+    ],
+  },
   { label: "Invoices",          href: "/superadmin/invoices",          icon: FileText,      permission: "REPORTS_MANAGEMENT" },
   {
     label: "Reports",
@@ -45,8 +56,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: BarChart2,
     permission: "REPORTS_MANAGEMENT",
     subItems: [
-      { label: "Vendor Report", href: "/superadmin/reports?type=vendor", reportType: "vendor" },
-      { label: "Driver Report", href: "/superadmin/reports?type=driver", reportType: "driver" },
+      { label: "Vendor Report", href: "/superadmin/reports?type=vendor", icon: Building2, reportType: "vendor" },
+      { label: "Driver Report", href: "/superadmin/reports?type=driver", icon: Car,       reportType: "driver" },
     ],
   },
   { label: "User Management",   href: "/superadmin/settings",          icon: UserCog,       permission: null, adminOnly: true },
@@ -71,6 +82,18 @@ function NavTooltip({ label, children }: { label: string; children: React.ReactN
       </div>
     </div>
   );
+}
+
+function matchesHrefWithQuery(currentPath: string, currentSearch: URLSearchParams, href: string): boolean {
+  const [targetPath, queryString] = href.split("?");
+  if (currentPath !== targetPath) return false;
+  if (!queryString) return true;
+
+  const targetParams = new URLSearchParams(queryString);
+  for (const [key, value] of targetParams.entries()) {
+    if (currentSearch.get(key) !== value) return false;
+  }
+  return true;
 }
 
 type SidebarContentProps = {
@@ -118,10 +141,12 @@ function SidebarContent({
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto")}>
+      <nav className={cn("flex-1 py-4 space-y-1", isCollapsed ? "px-2 overflow-visible" : "px-3 overflow-y-auto scrollbar-hide")}>
         {navItems.map(({ label, href, icon: Icon, subItems }) => {
           const baseHref = href.split("?")[0];
-          const active = baseHref === "/superadmin" ? pathname === baseHref : pathname.startsWith(baseHref);
+          const activeByPath = baseHref === "/superadmin" ? pathname === baseHref : pathname.startsWith(baseHref);
+          const activeByChild = subItems?.some(sub => pathname.startsWith(sub.href.split("?")[0]));
+          const active = activeByPath || !!activeByChild;
           const reportType = searchParams.get("type") === "driver" ? "driver" : "vendor";
           const link = (
             <Link
@@ -143,12 +168,50 @@ function SidebarContent({
           return (
             <div key={href}>
               {isCollapsed ? <NavTooltip label={label}>{link}</NavTooltip> : link}
+
+              {/* Collapsed sub-items: always visible as lettered dots with tooltips */}
+              {isCollapsed && subItems && (
+                <div className="mt-0.5 space-y-0.5">
+                  {subItems.map((sub) => {
+                    const subActive = sub.reportType
+                      ? pathname === "/superadmin/reports" && sub.reportType === reportType
+                      : matchesHrefWithQuery(pathname, searchParams, sub.href);
+                    return (
+                      <NavTooltip key={sub.href} label={sub.label}>
+                        <Link
+                          href={sub.href}
+                          onClick={onLinkClick}
+                          className={cn(
+                            "flex items-center justify-center py-1.5 rounded-md transition-colors",
+                            subActive ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
+                          )}
+                        >
+                          {sub.icon ? (
+                            <sub.icon className="h-3.5 w-3.5" />
+                          ) : (
+                            <div className={cn(
+                              "h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold border",
+                              subActive
+                                ? "bg-blue-50 border-blue-200 text-blue-600"
+                                : "bg-slate-50 border-slate-200 text-slate-500"
+                            )}>
+                              {sub.label[0].toUpperCase()}
+                            </div>
+                          )}
+                        </Link>
+                      </NavTooltip>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Expanded sub-items */}
               {!isCollapsed && subItems && (label === "Dashboard" || active) && (
                 <div className="mt-1 ml-7 space-y-1">
                   {subItems.map((sub) => {
                     const subActive = sub.reportType
                       ? pathname === "/superadmin/reports" && sub.reportType === reportType
-                      : pathname === sub.href;
+                      : matchesHrefWithQuery(pathname, searchParams, sub.href);
                     return (
                       <Link
                         key={sub.href}

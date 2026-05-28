@@ -776,8 +776,7 @@ export default function VendorSettingsPage() {
             <div
               key={m.id}
               onClick={() => setSelectedMember(m)}
-              className="grid items-center gap-4 px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: "minmax(0,1.8fr) minmax(0,1.3fr) minmax(0,1.6fr) 100px 110px 60px 108px" }}
+              className={`grid ${COLS} items-center gap-4 px-5 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer`}
             >
               <div className="min-w-0">
                 <p className="text-[13px] font-bold text-slate-800 truncate">{m.full_name}</p>

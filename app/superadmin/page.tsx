@@ -7,16 +7,6 @@ import { Building2, Users, CheckCircle2, Route } from "lucide-react";
 import Link from "next/link";
 import { getStatusStyle } from "@/components/StatusBadge";
 
-const font = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
-
-const CARD: React.CSSProperties = {
-  background: "#fff",
-  border: "1.5px solid #E8EEF4",
-  borderRadius: 16,
-  boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-  fontFamily: font,
-};
-
 function StatCard({
   label,
   value,
@@ -31,24 +21,22 @@ function StatCard({
   loading?: boolean;
 }) {
   return (
-    <div style={{ ...CARD, padding: "20px 22px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 10 }}>
-          {label}
-        </div>
-        <div style={{ width: 32, height: 32, borderRadius: 9, background: "#F1F5F9", border: "1.5px solid #E8EEF4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={16} color="#64748B" />
+    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+      <div className="flex items-start justify-between">
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2.5">{label}</p>
+        <div className="w-8 h-8 rounded-[9px] bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0">
+          <Icon size={16} className="text-slate-500" />
         </div>
       </div>
       {loading ? (
-        <div style={{ height: 34, width: 60, borderRadius: 8, background: "#F1F5F9", animation: "pulse 1.5s ease-in-out infinite" }} />
+        <div className="h-[34px] w-[60px] rounded-lg bg-slate-100 animate-pulse" />
       ) : (
-        <div style={{ fontSize: 34, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{value}</div>
+        <div className="text-[34px] font-extrabold text-slate-900 leading-none">{value}</div>
       )}
       {sub && (
         loading
-          ? <div style={{ height: 10, width: 110, borderRadius: 6, background: "#F1F5F9", marginTop: 12, animation: "pulse 1.5s ease-in-out infinite" }} />
-          : <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8, fontWeight: 500 }}>{sub}</div>
+          ? <div className="h-2.5 w-28 rounded bg-slate-100 mt-3 animate-pulse" />
+          : <div className="text-[12px] text-slate-400 mt-2 font-medium">{sub}</div>
       )}
     </div>
   );
@@ -56,11 +44,11 @@ function StatCard({
 
 function SkeletonRow({ cols, extra }: { cols: string; extra?: boolean }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "13px 20px", alignItems: "center" }}>
-      <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", width: "60%" }} />
-      {extra && <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", width: "70%" }} />}
-      <div style={{ height: 12, borderRadius: 6, background: "#F1F5F9", marginLeft: "auto", width: 32 }} />
-      <div style={{ height: 22, borderRadius: 99, background: "#F1F5F9", marginLeft: "auto", width: 60 }} />
+    <div className="grid gap-3 px-5 py-3.5 items-center animate-pulse" style={{ gridTemplateColumns: cols }}>
+      <div className="h-3 rounded bg-slate-100 w-3/5" />
+      {extra && <div className="h-3 rounded bg-slate-100 w-[70%]" />}
+      <div className="h-3 rounded bg-slate-100 ml-auto w-8" />
+      <div className="h-[22px] rounded-full bg-slate-100 ml-auto w-[60px]" />
     </div>
   );
 }
@@ -77,8 +65,6 @@ export default function SuperAdminOverviewPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Patch the matching driver row + recompute the On Trip / Available
-  // aggregates so the stat cards stay in sync without a page reload.
   const onDriverStatus = useCallback((ev: DriverStatusEvent) => {
     setData((prev) => {
       if (!prev) return prev;
@@ -108,148 +94,130 @@ export default function SuperAdminOverviewPage() {
   const totalBookingsToday = data?.totalBookingsToday ?? 0;
 
   return (
-    <div style={{ fontFamily: font, display: "flex", flexDirection: "column", gap: 24 }}>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-      `}</style>
-
+    <div className="flex flex-col gap-6">
       {/* Page title */}
       <div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Dashboard</div>
-        <div style={{ fontSize: 13, color: "#94A3B8", marginTop: 3, fontWeight: 500 }}>Live summary across all vendors and drivers</div>
+        <p className="text-xl font-extrabold text-slate-900">Dashboard</p>
+        <p className="text-[13px] text-slate-400 mt-0.5 font-medium">Live summary across all vendors and drivers</p>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
-        <StatCard loading={loading} label="Total Vendors"   value={totalVendors}       icon={Building2}    sub={`${activeVendors} active · ${inactiveVendors} inactive`} />
-        <StatCard loading={loading} label="Active Vendors"  value={activeVendors}      icon={CheckCircle2} sub={`${inactiveVendors} inactive`} />
-        <StatCard loading={loading} label="Total Drivers"   value={totalDrivers}       icon={Users}        sub={`${driversAvailable} available · ${driversOnTrip} on trip`} />
-        <StatCard loading={loading} label="Trips Today"  value={totalBookingsToday} icon={Route}        sub="across all vendors" />
+        <StatCard loading={loading} label="Total Vendors"  value={totalVendors}       icon={Building2}    sub={`${activeVendors} active · ${inactiveVendors} inactive`} />
+        <StatCard loading={loading} label="Active Vendors" value={activeVendors}      icon={CheckCircle2} sub={`${inactiveVendors} inactive`} />
+        <StatCard loading={loading} label="Total Drivers"  value={totalDrivers}       icon={Users}        sub={`${driversAvailable} available · ${driversOnTrip} on trip`} />
+        <StatCard loading={loading} label="Trips Today"    value={totalBookingsToday} icon={Route}        sub="across all vendors" />
       </div>
 
       {/* Two panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-        {/* ── Vendors panel ── */}
-        <div style={CARD}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1.5px solid #F1F5F9" }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Vendors</div>
-            <Link href="/superadmin/vendors" style={{ fontSize: 12, fontWeight: 600, color: "#2563EB", textDecoration: "none" }}>
+        {/* Vendors panel */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <p className="text-[14px] font-extrabold text-slate-900">Vendors</p>
+            <Link href="/superadmin/vendors" className="text-[12px] font-semibold text-blue-600 no-underline hover:text-blue-700">
               View all →
             </Link>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="overflow-x-auto">
             <div style={{ minWidth: 320 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 90px", gap: 12, padding: "10px 20px 8px", borderBottom: "1.5px solid #F8FAFC" }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>VENDOR</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" }}>TODAY TRIPS</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "right" }}>STATUS</div>
+              <div className="grid gap-3 px-5 py-2.5 border-b border-slate-50" style={{ gridTemplateColumns: "1fr 110px 90px" }}>
+                {["VENDOR", "TODAY TRIPS", "STATUS"].map(h => (
+                  <div key={h} className="text-[10.5px] font-bold text-slate-300 uppercase tracking-wide last:text-right [&:nth-child(2)]:text-center">
+                    {h}
+                  </div>
+                ))}
               </div>
-
               <div>
                 {loading
-                  ? Array.from({ length: 5 }).map((_, i) => (
-                      <SkeletonRow key={i} cols="1fr 110px 90px" />
-                    ))
-                  : vendors.slice(0, 5).map((vendor, i) => (
-                      <div
-                        key={vendor.id}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 110px 90px",
-                          gap: 12,
-                          padding: "13px 20px",
-                          borderBottom: i < Math.min(vendors.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{vendor.name}</div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: vendor.bookingsToday === 0 ? "#CBD5E1" : "#0F172A" }}>
+                  ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols="1fr 110px 90px" />)
+                  : vendors.slice(0, 5).map((vendor, i) => {
+                      const vs = getStatusStyle(vendor.status);
+                      return (
+                        <div
+                          key={vendor.id}
+                          className="grid gap-3 px-5 py-3.5 items-center"
+                          style={{
+                            gridTemplateColumns: "1fr 110px 90px",
+                            borderBottom: i < Math.min(vendors.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
+                          }}
+                        >
+                          <p className="text-[13px] font-bold text-slate-900">{vendor.name}</p>
+                          <p className="text-center text-[14px] font-extrabold" style={{ color: vendor.bookingsToday === 0 ? "#CBD5E1" : "#0F172A" }}>
                             {vendor.bookingsToday}
-                          </span>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          {(() => { const vs = getStatusStyle(vendor.status); return (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: vs.bg, color: vs.text }}>
-                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: vs.dot, flexShrink: 0 }} />
+                          </p>
+                          <div className="text-right">
+                            <span
+                              className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                              style={{ background: vs.bg, color: vs.text }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: vs.dot }} />
                               {vendor.status}
                             </span>
-                          ); })()}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* ── Drivers panel ── */}
-        <div style={CARD}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1.5px solid #F1F5F9" }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>Drivers</div>
-            <Link href="/superadmin/drivers" style={{ fontSize: 12, fontWeight: 600, color: "#2563EB", textDecoration: "none" }}>
+        {/* Drivers panel */}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <p className="text-[14px] font-extrabold text-slate-900">Drivers</p>
+            <Link href="/superadmin/drivers" className="text-[12px] font-semibold text-blue-600 no-underline hover:text-blue-700">
               View all →
             </Link>
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="overflow-x-auto">
             <div style={{ minWidth: 480 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 110px 100px", gap: 12, padding: "10px 20px 8px", borderBottom: "1.5px solid #F8FAFC" }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>DRIVER</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6 }}>VEHICLE DETAILS</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "center" }}>TODAY TRIPS</div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: "#CBD5E1", textTransform: "uppercase", letterSpacing: 0.6, textAlign: "right" }}>STATUS</div>
+              <div className="grid gap-3 px-5 py-2.5 border-b border-slate-50" style={{ gridTemplateColumns: "1fr 140px 110px 100px" }}>
+                {["DRIVER", "VEHICLE DETAILS", "TODAY TRIPS", "STATUS"].map((h, idx) => (
+                  <div key={h} className={`text-[10.5px] font-bold text-slate-300 uppercase tracking-wide ${idx === 2 ? "text-center" : idx === 3 ? "text-right" : ""}`}>
+                    {h}
+                  </div>
+                ))}
               </div>
-
               <div>
                 {loading
-                  ? Array.from({ length: 5 }).map((_, i) => (
-                      <SkeletonRow key={i} cols="1fr 140px 110px 100px" extra />
-                    ))
+                  ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols="1fr 140px 110px 100px" extra />)
                   : drivers.slice(0, 5).map((driver, i) => {
                       const badge = getStatusStyle(driver.status);
                       return (
                         <div
                           key={driver.id}
+                          className="grid gap-3 px-5 py-3.5 items-center"
                           style={{
-                            display: "grid",
                             gridTemplateColumns: "1fr 140px 110px 100px",
-                            gap: 12,
-                            padding: "13px 20px",
                             borderBottom: i < Math.min(drivers.length, 5) - 1 ? "1.5px solid #F8FAFC" : "none",
-                            alignItems: "center",
                           }}
                         >
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{driver.name}</div>
+                          <p className="text-[13px] font-bold text-slate-900">{driver.name}</p>
                           <div>
                             {driver.vehicle ? (
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{driver.vehicle}</div>
-                                {driver.vehicleModel && (
-                                  <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 500, marginTop: 1 }}>{driver.vehicleModel}</div>
-                                )}
-                                {driver.vehicleType && (
-                                  <div style={{ fontSize: 10, color: "#64748B", fontWeight: 600, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.4 }}>{driver.vehicleType}</div>
-                                )}
-                              </div>
+                              <>
+                                <p className="text-[12px] font-bold text-slate-900 tabular-nums">{driver.vehicle}</p>
+                                {driver.vehicleModel && <p className="text-[11px] text-slate-400 font-medium mt-px">{driver.vehicleModel}</p>}
+                                {driver.vehicleType && <p className="text-[10px] text-slate-500 font-semibold mt-0.5 uppercase tracking-wide">{driver.vehicleType}</p>}
+                              </>
                             ) : (
-                              <span style={{ fontSize: 11, color: "#64748B", fontWeight: 400, fontStyle: "italic" }}>No vehicle assigned</span>
+                              <span className="text-[11px] text-slate-500 italic">No vehicle assigned</span>
                             )}
                           </div>
-                          <div style={{ textAlign: "center" }}>
-                            <span style={{ fontSize: 14, fontWeight: 800, color: driver.bookingsToday === 0 ? "#CBD5E1" : "#0F172A" }}>
-                              {driver.bookingsToday}
-                            </span>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99, background: badge.bg, color: badge.text }}>
-                              <span style={{ width: 5, height: 5, borderRadius: "50%", background: badge.dot, flexShrink: 0 }} />
+                          <p className="text-center text-[14px] font-extrabold" style={{ color: driver.bookingsToday === 0 ? "#CBD5E1" : "#0F172A" }}>
+                            {driver.bookingsToday}
+                          </p>
+                          <div className="text-right">
+                            <span
+                              className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                              style={{ background: badge.bg, color: badge.text }}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: badge.dot }} />
                               {driver.status}
                             </span>
                           </div>
@@ -259,7 +227,6 @@ export default function SuperAdminOverviewPage() {
               </div>
             </div>
           </div>
-
         </div>
 
       </div>

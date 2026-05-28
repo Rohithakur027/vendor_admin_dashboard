@@ -163,7 +163,7 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "address",       label: "Address",        dbFields: "address",                 minWidth: 200 },
       { key: "createdAt",     label: "Joined On",      dbFields: "created_at (IST)",        minWidth: 130 },
     ],
-    defaults: ["name", "email", "phone", "contactPerson", "status", "createdAt"],
+    defaults: ["name", "email", "phone", "contactPerson", "status", "billingType", "createdAt"],
   },
 
   unverifiedVendors: {
@@ -236,6 +236,7 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
     title: "Booking Enquiries", blurb: "Customer booking requests",
     columns: [
       { key: "enqRef",          label: "Booking ID",       dbFields: "enq_ref",                        minWidth: 130 },
+      { key: "status",          label: "Status",           dbFields: "website_booking_status",         minWidth: 120 },
       { key: "customer",        label: "Customer",         dbFields: "customer_name + email + phone",  minWidth: 180 },
       { key: "route",           label: "Route",            dbFields: "pickup_location → destination",  minWidth: 220 },
       { key: "type",            label: "Vehicle Type",     dbFields: "vehicle_type + is_scheduled",    minWidth: 150 },
@@ -247,7 +248,7 @@ export const TABLE_SPECS: Record<TableKey, TableSpec> = {
       { key: "isReturnTrip",    label: "Return Trip",      dbFields: "is_return_trip",                 minWidth: 120 },
       { key: "returnAt",        label: "Return Date",      dbFields: "return_at (IST)",                minWidth: 150 },
     ],
-    defaults: ["enqRef", "customer", "route", "type", "passengers", "createdAt"],
+    defaults: ["enqRef", "status", "customer", "route", "type", "createdAt", "passengers"],
   },
 
   superadminInvoices: {

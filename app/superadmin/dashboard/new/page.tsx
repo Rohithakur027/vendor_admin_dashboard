@@ -121,20 +121,10 @@ function StatusPill({ label, tone = "slate" }: { label: string; tone?: KpiTone }
   const c = toneClass(tone);
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: c.bg,
-        color: c.fg,
-        padding: "4px 10px",
-        borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 700,
-        whiteSpace: "nowrap",
-      }}
+      className="inline-flex items-center gap-1.5 rounded-full text-[11px] font-bold whitespace-nowrap px-[10px] py-1"
+      style={{ background: c.bg, color: c.fg }}
     >
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.dot, flexShrink: 0 }} />
+      <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: c.dot }} />
       {label}
     </span>
   );
@@ -149,13 +139,8 @@ function PanelCard({
 }) {
   return (
     <div
-      style={{
-        background: "#fff",
-        border: "1.5px solid #E8EEF4",
-        borderRadius: 22,
-        boxShadow: "0 8px 28px rgba(15,23,42,0.05)",
-        ...style,
-      }}
+      className="bg-white border-[1.5px] border-slate-200 rounded-[22px] shadow-[0_8px_28px_rgba(15,23,42,0.05)]"
+      style={style}
     >
       {children}
     </div>
@@ -172,10 +157,10 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+    <div className="flex items-start justify-between gap-4 mb-[18px]">
       <div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", lineHeight: 1.1 }}>{title}</div>
-        {subtitle && <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>{subtitle}</div>}
+        <div className="text-[18px] font-extrabold text-slate-900 leading-[1.1]">{title}</div>
+        {subtitle && <div className="text-[12.5px] text-slate-500 mt-1 leading-[1.5]">{subtitle}</div>}
       </div>
       {action}
     </div>
@@ -197,42 +182,20 @@ function KpiCard({
 }) {
   const c = toneClass(tone);
   return (
-    <div
-      style={{
-        background: "rgba(255,255,255,0.94)",
-        border: "1.5px solid #E8EEF4",
-        borderRadius: 18,
-        boxShadow: "0 4px 18px rgba(15,23,42,0.04)",
-        padding: "18px 18px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        minHeight: 128,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>
+    <div className="bg-white/[0.94] border-[1.5px] border-slate-200 rounded-[18px] shadow-[0_4px_18px_rgba(15,23,42,0.04)] p-[18px_18px_16px] flex flex-col gap-3 min-h-[128px]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">
           {label}
         </div>
         <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 12,
-            background: c.iconBg,
-            border: "1px solid #E2E8F0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: c.fg,
-            flexShrink: 0,
-          }}
+          className="w-9 h-9 rounded-[12px] border border-slate-200 flex items-center justify-center shrink-0"
+          style={{ background: c.iconBg, color: c.fg }}
         >
           <Icon size={17} />
         </div>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 900, color: "#0F172A", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.45 }}>{sub}</div>
+      <div className="text-[32px] font-black text-slate-900 leading-none">{value}</div>
+      <div className="text-[12px] text-slate-500 leading-[1.45]">{sub}</div>
     </div>
   );
 }
@@ -251,15 +214,15 @@ function FlowRow({
   ratio: number;
 }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 110px", gap: 12, alignItems: "center" }}>
+    <div className="grid gap-3 items-center" style={{ gridTemplateColumns: "150px 1fr 110px" }}>
       <div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>{label}</div>
-        <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>{sub}</div>
+        <div className="text-[12px] font-extrabold text-slate-900">{label}</div>
+        <div className="text-[11.5px] text-slate-400 mt-0.5">{sub}</div>
       </div>
-      <div style={{ height: 10, borderRadius: 999, background: "#EEF2F7", overflow: "hidden" }}>
+      <div className="h-[10px] rounded-full overflow-hidden" style={{ background: "#EEF2F7" }}>
         <div style={{ width: `${Math.max(4, Math.min(100, ratio))}%`, height: "100%", borderRadius: 999, background: color }} />
       </div>
-      <div style={{ textAlign: "right", fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>{value}</div>
+      <div className="text-right text-[13.5px] font-extrabold text-slate-900">{value}</div>
     </div>
   );
 }
@@ -444,55 +407,34 @@ export default function SuperAdminNewDashboardPage() {
   ];
 
   return (
-    <div style={{ fontFamily: FONT, display: "flex", flexDirection: "column", gap: 20 }}>
-      <div
-        style={{
-          background: "linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(245,249,255,0.92) 100%)",
-          border: "1.5px solid #E8EEF4",
-          borderRadius: 28,
-          padding: "22px 24px",
-          boxShadow: "0 8px 28px rgba(15,23,42,0.05)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+    <div className="flex flex-col gap-5" style={{ fontFamily: FONT }}>
+      <div className="bg-gradient-to-b from-white/[0.92] to-[rgba(245,249,255,0.92)] border-[1.5px] border-slate-200 rounded-[28px] p-[22px_24px] shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 10px", borderRadius: 999, background: "#EEF4FF", color: "#2563EB", fontSize: 11, fontWeight: 800, letterSpacing: 0.3 }}>
+            <div className="inline-flex items-center gap-2 px-[10px] py-[5px] rounded-full bg-[#EEF4FF] text-blue-600 text-[11px] font-extrabold tracking-[0.3px]">
               <Sparkles size={13} />
               New Dashboard
             </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: "#0F172A", lineHeight: 1.1, marginTop: 12 }}>
+            <div className="text-[28px] font-black text-slate-900 leading-[1.1] mt-3">
               Dashboard Command Center
             </div>
-            <div style={{ fontSize: 13.5, color: "#64748B", marginTop: 6, lineHeight: 1.6 }}>
+            <div className="text-[13.5px] text-slate-500 mt-1.5 leading-[1.6]">
               A denser operations view for vendor spend, driver earnings, wallet movement, and urgent exceptions.
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 999, padding: "8px 14px", color: "#475569", fontSize: 12, fontWeight: 700 }}>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="bg-white border-[1.5px] border-slate-200 rounded-full px-[14px] py-2 text-slate-600 text-[12px] font-bold">
               {todayLabel()}
             </div>
             {lastUpdated && (
-              <div style={{ background: "#fff", border: "1.5px solid #E8EEF4", borderRadius: 999, padding: "8px 14px", color: "#64748B", fontSize: 12, fontWeight: 600 }}>
+              <div className="bg-white border-[1.5px] border-slate-200 rounded-full px-[14px] py-2 text-slate-500 text-[12px] font-semibold">
                 Updated {formatRelative(lastUpdated)}
               </div>
             )}
             <button
               onClick={() => void refresh()}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "#2563EB",
-                color: "#fff",
-                border: "none",
-                borderRadius: 14,
-                padding: "10px 16px",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: "pointer",
-                boxShadow: "0 4px 16px rgba(37,99,235,0.28)",
-              }}
+              className="inline-flex items-center gap-2 bg-blue-600 text-white border-none rounded-[14px] px-4 py-[10px] text-[13px] font-extrabold cursor-pointer shadow-[0_4px_16px_rgba(37,99,235,0.28)]"
             >
               <RefreshCw size={14} />
               Refresh
@@ -500,28 +442,28 @@ export default function SuperAdminNewDashboardPage() {
           </div>
         </div>
 
-        <div style={{ marginTop: 20, display: "grid", gap: 12, gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}>
+        <div className="mt-5 grid gap-3" style={{ gridTemplateColumns: "repeat(12, minmax(0, 1fr))" }}>
           {kpis.map((kpi) => (
-            <div key={kpi.label} style={{ gridColumn: "span 3 / span 3" }}>
+            <div key={kpi.label} className="col-span-3">
               <KpiCard {...kpi} />
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 20, gridTemplateColumns: "minmax(0, 1.35fr) minmax(320px, 0.85fr)" }}>
+      <div className="grid gap-5" style={{ gridTemplateColumns: "minmax(0, 1.35fr) minmax(320px, 0.85fr)" }}>
         <PanelCard style={{ padding: 22 }}>
           <SectionHeader
             title="Financial Overview"
-            subtitle="Today’s wallet movement across vendors and drivers"
+            subtitle="Today's wallet movement across vendors and drivers"
             action={
-              <Link href="/superadmin/reports" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#2563EB", fontSize: 12.5, fontWeight: 800, textDecoration: "none" }}>
+              <Link href="/superadmin/reports" className="inline-flex items-center gap-1.5 text-blue-600 text-[12.5px] font-extrabold no-underline">
                 Open reports <ArrowRight size={14} />
               </Link>
             }
           />
 
-          <div style={{ display: "grid", gap: 16 }}>
+          <div className="grid gap-4">
             {flowItems.map((item) => (
               <FlowRow
                 key={item.label}
@@ -534,63 +476,63 @@ export default function SuperAdminNewDashboardPage() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(3, minmax(0, 1fr))", marginTop: 22 }}>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Top spend vendor</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0F172A", marginTop: 6 }}>{topSpendVendor?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtCurrency(topSpendVendor?.spendToday ?? null)} spend today</div>
+          <div className="grid gap-3 mt-[22px]" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Top spend vendor</div>
+              <div className="text-[18px] font-black text-slate-900 mt-1.5">{topSpendVendor?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtCurrency(topSpendVendor?.spendToday ?? null)} spend today</div>
             </div>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Top earning driver</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0F172A", marginTop: 6 }}>{topDriver?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtCurrency(topDriver?.earningsToday ?? null)} earned today</div>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Top earning driver</div>
+              <div className="text-[18px] font-black text-slate-900 mt-1.5">{topDriver?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtCurrency(topDriver?.earningsToday ?? null)} earned today</div>
             </div>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Wallet pressure</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0F172A", marginTop: 6 }}>{lowWalletVendors.length} alerts</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>vendors below {fmtCurrency(LOW_WALLET_THRESHOLD)}</div>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Wallet pressure</div>
+              <div className="text-[18px] font-black text-slate-900 mt-1.5">{lowWalletVendors.length} alerts</div>
+              <div className="text-[12px] text-slate-500 mt-1">vendors below {fmtCurrency(LOW_WALLET_THRESHOLD)}</div>
             </div>
           </div>
 
-          <div style={{ marginTop: 18, display: "grid", gap: 14, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-            <div style={{ background: "#fff", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+          <div className="mt-[18px] grid gap-3.5" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <div className="bg-white border border-slate-200 rounded-[18px] p-4">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Vendor spend trend</div>
-                  <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>Top six vendors by spend today</div>
+                  <div className="text-[13.5px] font-extrabold text-slate-900">Vendor spend trend</div>
+                  <div className="text-[11.5px] text-slate-400 mt-0.5">Top six vendors by spend today</div>
                 </div>
                 <MiniSparkline values={vendorTrendValues} color="#2563EB" />
               </div>
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="grid gap-3">
                 {vendorTrendValues.length === 0 ? (
-                  <div style={{ color: "#94A3B8", fontSize: 13 }}>No spend data yet.</div>
+                  <div className="text-slate-400 text-[13px]">No spend data yet.</div>
                 ) : (
                   vendorRows.slice(0, 6).map((row) => (
-                    <div key={row.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
-                      <span style={{ color: "#0F172A", fontWeight: 700 }}>{row.name}</span>
-                      <span style={{ color: "#2563EB", fontWeight: 800 }}>{fmtCurrency(row.spendToday)}</span>
+                    <div key={row.id} className="flex justify-between gap-3 text-[12.5px]">
+                      <span className="text-slate-900 font-bold">{row.name}</span>
+                      <span className="text-blue-600 font-extrabold">{fmtCurrency(row.spendToday)}</span>
                     </div>
                   ))
                 )}
               </div>
             </div>
 
-            <div style={{ background: "#fff", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+            <div className="bg-white border border-slate-200 rounded-[18px] p-4">
+              <div className="flex items-center justify-between gap-3 mb-2.5">
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Driver earnings trend</div>
-                  <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>Top six drivers by earnings today</div>
+                  <div className="text-[13.5px] font-extrabold text-slate-900">Driver earnings trend</div>
+                  <div className="text-[11.5px] text-slate-400 mt-0.5">Top six drivers by earnings today</div>
                 </div>
                 <MiniSparkline values={driverTrendValues} color="#F59E0B" />
               </div>
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="grid gap-3">
                 {driverTrendValues.length === 0 ? (
-                  <div style={{ color: "#94A3B8", fontSize: 13 }}>No earnings data yet.</div>
+                  <div className="text-slate-400 text-[13px]">No earnings data yet.</div>
                 ) : (
                   driverRows.slice(0, 6).map((row) => (
-                    <div key={row.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
-                      <span style={{ color: "#0F172A", fontWeight: 700 }}>{row.name}</span>
-                      <span style={{ color: "#F59E0B", fontWeight: 800 }}>{fmtCurrency(row.earningsToday)}</span>
+                    <div key={row.id} className="flex justify-between gap-3 text-[12.5px]">
+                      <span className="text-slate-900 font-bold">{row.name}</span>
+                      <span className="text-amber-500 font-extrabold">{fmtCurrency(row.earningsToday)}</span>
                     </div>
                   ))
                 )}
@@ -601,38 +543,38 @@ export default function SuperAdminNewDashboardPage() {
 
         <PanelCard style={{ padding: 22 }}>
           <SectionHeader title="Alerts" subtitle="Exceptions and wallet risks that need attention now" />
-          <div style={{ display: "grid", gap: 12 }}>
+          <div className="grid gap-3">
             {lowWalletVendors.length > 0 ? (
               lowWalletVendors.slice(0, 4).map((vendor) => (
-                <div key={vendor.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, border: "1px solid #FEE2E2", background: "#FEF2F2" }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#EF4444", flexShrink: 0 }}>
+                <div key={vendor.id} className="flex items-start gap-3 p-[14px] rounded-[16px] border border-red-200 bg-red-50">
+                  <div className="w-9 h-9 rounded-[12px] bg-white flex items-center justify-center text-red-500 shrink-0">
                     <AlertTriangle size={16} />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>{vendor.name}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[13.5px] font-extrabold text-slate-900">{vendor.name}</div>
                       <StatusPill label="Low wallet" tone="red" />
                     </div>
-                    <div style={{ fontSize: 12, color: "#7F1D1D", marginTop: 4, lineHeight: 1.5 }}>
+                    <div className="text-[12px] text-red-900 mt-1 leading-[1.5]">
                       Balance {fmtCurrency(vendor.walletBalance)}. Recharge before trips start blocking.
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <div style={{ padding: 16, borderRadius: 16, background: "#F8FAFC", border: "1px solid #E8EEF4", color: "#64748B", fontSize: 13 }}>
+              <div className="p-4 rounded-[16px] bg-slate-50 border border-slate-200 text-slate-500 text-[13px]">
                 No low-wallet vendors right now.
               </div>
             )}
 
             {overspentVendors.length > 0 && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, border: "1px solid #FEF3C7", background: "#FFFBEB" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#F59E0B", flexShrink: 0 }}>
+              <div className="flex items-start gap-3 p-[14px] rounded-[16px] border border-amber-200 bg-amber-50">
+                <div className="w-9 h-9 rounded-[12px] bg-white flex items-center justify-center text-amber-500 shrink-0">
                   <ShieldAlert size={16} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Spend above recharge</div>
-                  <div style={{ fontSize: 12, color: "#92400E", marginTop: 4, lineHeight: 1.5 }}>
+                <div className="flex-1">
+                  <div className="text-[13.5px] font-extrabold text-slate-900">Spend above recharge</div>
+                  <div className="text-[12px] text-amber-800 mt-1 leading-[1.5]">
                     {overspentVendors.slice(0, 3).map((v) => v.name).join(", ")} are spending faster than they are recharging today.
                   </div>
                 </div>
@@ -640,26 +582,26 @@ export default function SuperAdminNewDashboardPage() {
             )}
 
             {idleDrivers.length > 0 && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, border: "1px solid #E2E8F0", background: "#F8FAFC" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", flexShrink: 0 }}>
+              <div className="flex items-start gap-3 p-[14px] rounded-[16px] border border-slate-200 bg-slate-50">
+                <div className="w-9 h-9 rounded-[12px] bg-white flex items-center justify-center text-slate-500 shrink-0">
                   <Clock3 size={16} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Idle drivers</div>
-                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
+                <div className="flex-1">
+                  <div className="text-[13.5px] font-extrabold text-slate-900">Idle drivers</div>
+                  <div className="text-[12px] text-slate-500 mt-1 leading-[1.5]">
                     {idleDrivers.slice(0, 3).map((d) => d.name).join(", ")} have zero trips today.
                   </div>
                 </div>
               </div>
             )}
 
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 16, border: "1px solid #E8EEF4", background: "#F8FAFC" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#2563EB", flexShrink: 0 }}>
+            <div className="flex items-start gap-3 p-[14px] rounded-[16px] border border-slate-200 bg-slate-50">
+              <div className="w-9 h-9 rounded-[12px] bg-white flex items-center justify-center text-blue-600 shrink-0">
                 <TrendingUp size={16} />
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>Payout feed note</div>
-                <div style={{ fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 1.5 }}>
+              <div className="flex-1">
+                <div className="text-[13.5px] font-extrabold text-slate-900">Payout feed note</div>
+                <div className="text-[12px] text-slate-500 mt-1 leading-[1.5]">
                   Driver withdrawal values are not exposed by the current API, so this dashboard shows earnings today and marks withdrawals as pending feed.
                 </div>
               </div>
@@ -671,33 +613,23 @@ export default function SuperAdminNewDashboardPage() {
       <PanelCard style={{ padding: 22 }}>
         <SectionHeader
           title="Vendor Performance"
-          subtitle="Today’s spend, recharge, wallet balance, and trip activity for each vendor"
+          subtitle="Today's spend, recharge, wallet balance, and trip activity for each vendor"
           action={
-            <Link href="/superadmin/vendors" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#2563EB", fontSize: 12.5, fontWeight: 800, textDecoration: "none" }}>
+            <Link href="/superadmin/vendors" className="inline-flex items-center gap-1.5 text-blue-600 text-[12.5px] font-extrabold no-underline">
               View all vendors <ExternalLink size={14} />
             </Link>
           }
         />
 
-        <div style={{ border: "1px solid #E8EEF4", borderRadius: 18, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto", maxHeight: 460 }}>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 980 }}>
-              <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
-                <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E8EEF4" }}>
+        <div className="border border-slate-200 rounded-[18px] overflow-hidden">
+          <div className="overflow-x-auto max-h-[460px]">
+            <table className="w-full min-w-[980px]" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead className="sticky top-0 z-[2]">
+                <tr className="bg-slate-50 border-b border-slate-200">
                   {["Vendor", "Trips today", "Recharge today", "Spend today", "Wallet balance", "Status", "Action"].map((h) => (
                     <th
                       key={h}
-                      style={{
-                        padding: "14px 16px",
-                        textAlign: "left",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: "#94A3B8",
-                        letterSpacing: 0.7,
-                        textTransform: "uppercase",
-                        borderBottom: "1px solid #E8EEF4",
-                        whiteSpace: "nowrap",
-                      }}
+                      className="px-4 py-[14px] text-left text-[11px] font-extrabold text-slate-400 tracking-[0.7px] uppercase border-b border-slate-200 whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -707,15 +639,15 @@ export default function SuperAdminNewDashboardPage() {
               <tbody>
                 {loading ? (
                   Array.from({ length: 6 }).map((_, idx) => (
-                    <tr key={idx} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                      <td colSpan={7} style={{ padding: "16px" }}>
-                        <div style={{ height: 14, borderRadius: 8, background: "#F1F5F9", width: "100%", animation: "pulse 1.5s ease-in-out infinite" }} />
+                    <tr key={idx} className="border-b border-slate-100">
+                      <td colSpan={7} className="p-4">
+                        <div className="h-[14px] rounded-lg bg-slate-100 w-full animate-pulse" />
                       </td>
                     </tr>
                   ))
                 ) : vendorRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 24, textAlign: "center", color: "#94A3B8" }}>
+                    <td colSpan={7} className="p-6 text-center text-slate-400">
                       No vendor rows available.
                     </td>
                   </tr>
@@ -725,30 +657,30 @@ export default function SuperAdminNewDashboardPage() {
                     const lowWallet = row.walletBalance < LOW_WALLET_THRESHOLD;
                     const overspent = row.spendToday > row.rechargeToday && row.spendToday > 0;
                     return (
-                      <tr key={row.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{row.name}</div>
-                          <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+                      <tr key={row.id} className="border-b border-slate-100">
+                        <td className="p-4">
+                          <div className="text-[14px] font-extrabold text-slate-900">{row.name}</div>
+                          <div className="text-[12px] text-slate-500 mt-1">
                             {row.city} · {row.driverCount ?? "—"} drivers
                           </div>
                         </td>
-                        <td style={{ padding: "16px", fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{fmtNumber(row.bookingsToday)}</td>
-                        <td style={{ padding: "16px", fontSize: 13, fontWeight: 800, color: "#166534" }}>{fmtCurrency(row.rechargeToday)}</td>
-                        <td style={{ padding: "16px", fontSize: 13, fontWeight: 800, color: overspent ? "#B91C1C" : "#1D4ED8" }}>{fmtCurrency(row.spendToday)}</td>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: 13, fontWeight: 900, color: lowWallet ? "#B91C1C" : "#0F172A" }}>{fmtCurrency(row.walletBalance)}</div>
-                          <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 4 }}>Last recharge {formatRelative(row.lastRechargeAt)}</div>
+                        <td className="p-4 text-[13px] font-extrabold text-slate-900">{fmtNumber(row.bookingsToday)}</td>
+                        <td className="p-4 text-[13px] font-extrabold text-green-800">{fmtCurrency(row.rechargeToday)}</td>
+                        <td className="p-4 text-[13px] font-extrabold" style={{ color: overspent ? "#B91C1C" : "#1D4ED8" }}>{fmtCurrency(row.spendToday)}</td>
+                        <td className="p-4">
+                          <div className="text-[13px] font-black" style={{ color: lowWallet ? "#B91C1C" : "#0F172A" }}>{fmtCurrency(row.walletBalance)}</div>
+                          <div className="text-[11.5px] text-slate-400 mt-1">Last recharge {formatRelative(row.lastRechargeAt)}</div>
                         </td>
-                        <td style={{ padding: "16px" }}>
+                        <td className="p-4">
                           <StatusPill label={row.status} tone={statusTone} />
-                          {lowWallet && <div style={{ marginTop: 6 }}><StatusPill label="Low wallet" tone="red" /></div>}
+                          {lowWallet && <div className="mt-1.5"><StatusPill label="Low wallet" tone="red" /></div>}
                         </td>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <Link href={`/superadmin/vendors/${row.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 12, background: "#EFF6FF", color: "#2563EB", fontSize: 12, fontWeight: 800, textDecoration: "none" }}>
+                        <td className="p-4">
+                          <div className="flex gap-2 flex-wrap">
+                            <Link href={`/superadmin/vendors/${row.id}`} className="inline-flex items-center gap-1.5 px-[11px] py-[7px] rounded-[12px] bg-[#EFF6FF] text-blue-600 text-[12px] font-extrabold no-underline">
                               View <ArrowRight size={13} />
                             </Link>
-                            <Link href={`/superadmin/vendors/${row.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 12, background: "#F8FAFC", color: "#475569", fontSize: 12, fontWeight: 800, textDecoration: "none" }}>
+                            <Link href={`/superadmin/vendors/${row.id}`} className="inline-flex items-center gap-1.5 px-[11px] py-[7px] rounded-[12px] bg-slate-50 text-slate-600 text-[12px] font-extrabold no-underline">
                               Wallet
                             </Link>
                           </div>
@@ -766,33 +698,23 @@ export default function SuperAdminNewDashboardPage() {
       <PanelCard style={{ padding: 22 }}>
         <SectionHeader
           title="Driver Performance"
-          subtitle="Today’s earnings, trip counts, and payout readiness for each driver"
+          subtitle="Today's earnings, trip counts, and payout readiness for each driver"
           action={
-            <Link href="/superadmin/drivers" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#2563EB", fontSize: 12.5, fontWeight: 800, textDecoration: "none" }}>
+            <Link href="/superadmin/drivers" className="inline-flex items-center gap-1.5 text-blue-600 text-[12.5px] font-extrabold no-underline">
               View all drivers <ExternalLink size={14} />
             </Link>
           }
         />
 
-        <div style={{ border: "1px solid #E8EEF4", borderRadius: 18, overflow: "hidden" }}>
-          <div style={{ overflowX: "auto", maxHeight: 430 }}>
-            <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, minWidth: 1040 }}>
-              <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
-                <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E8EEF4" }}>
+        <div className="border border-slate-200 rounded-[18px] overflow-hidden">
+          <div className="overflow-x-auto max-h-[430px]">
+            <table className="w-full min-w-[1040px]" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+              <thead className="sticky top-0 z-[2]">
+                <tr className="bg-slate-50 border-b border-slate-200">
                   {["Driver", "Trips today", "Earnings today", "Withdrawn today", "Last active", "Status", "Action"].map((h) => (
                     <th
                       key={h}
-                      style={{
-                        padding: "14px 16px",
-                        textAlign: "left",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: "#94A3B8",
-                        letterSpacing: 0.7,
-                        textTransform: "uppercase",
-                        borderBottom: "1px solid #E8EEF4",
-                        whiteSpace: "nowrap",
-                      }}
+                      className="px-4 py-[14px] text-left text-[11px] font-extrabold text-slate-400 tracking-[0.7px] uppercase border-b border-slate-200 whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -803,14 +725,14 @@ export default function SuperAdminNewDashboardPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, idx) => (
                     <tr key={idx}>
-                      <td colSpan={7} style={{ padding: "16px" }}>
-                        <div style={{ height: 14, borderRadius: 8, background: "#F1F5F9", width: "100%", animation: "pulse 1.5s ease-in-out infinite" }} />
+                      <td colSpan={7} className="p-4">
+                        <div className="h-[14px] rounded-lg bg-slate-100 w-full animate-pulse" />
                       </td>
                     </tr>
                   ))
                 ) : driverRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 24, textAlign: "center", color: "#94A3B8" }}>
+                    <td colSpan={7} className="p-6 text-center text-slate-400">
                       No driver rows available.
                     </td>
                   </tr>
@@ -819,27 +741,27 @@ export default function SuperAdminNewDashboardPage() {
                     const statusTone = row.status === "On Trip" ? "blue" : row.status === "Available" ? "green" : "slate";
                     const idle = row.tripsToday === 0;
                     return (
-                      <tr key={row.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{row.name}</div>
-                          <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{row.vehicleLabel}</div>
+                      <tr key={row.id} className="border-b border-slate-100">
+                        <td className="p-4">
+                          <div className="text-[14px] font-extrabold text-slate-900">{row.name}</div>
+                          <div className="text-[12px] text-slate-500 mt-1">{row.vehicleLabel}</div>
                         </td>
-                        <td style={{ padding: "16px", fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{fmtNumber(row.tripsToday)}</td>
-                        <td style={{ padding: "16px", fontSize: 13, fontWeight: 800, color: "#1D4ED8" }}>{fmtCurrency(row.earningsToday)}</td>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: 13, fontWeight: 900, color: "#64748B" }}>{row.withdrawnToday == null ? "—" : fmtCurrency(row.withdrawnToday)}</div>
-                          <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 4 }}>{row.withdrawnToday == null ? "withdrawal feed pending" : "withdrawn today"}</div>
+                        <td className="p-4 text-[13px] font-extrabold text-slate-900">{fmtNumber(row.tripsToday)}</td>
+                        <td className="p-4 text-[13px] font-extrabold text-blue-700">{fmtCurrency(row.earningsToday)}</td>
+                        <td className="p-4">
+                          <div className="text-[13px] font-black text-slate-500">{row.withdrawnToday == null ? "—" : fmtCurrency(row.withdrawnToday)}</div>
+                          <div className="text-[11.5px] text-slate-400 mt-1">{row.withdrawnToday == null ? "withdrawal feed pending" : "withdrawn today"}</div>
                         </td>
-                        <td style={{ padding: "16px" }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>{formatRelative(row.lastActiveAt)}</div>
-                          <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 4 }}>{row.totalTrips} lifetime trips</div>
+                        <td className="p-4">
+                          <div className="text-[13px] font-extrabold text-slate-900">{formatRelative(row.lastActiveAt)}</div>
+                          <div className="text-[11.5px] text-slate-400 mt-1">{row.totalTrips} lifetime trips</div>
                         </td>
-                        <td style={{ padding: "16px" }}>
+                        <td className="p-4">
                           <StatusPill label={row.status} tone={statusTone} />
-                          {idle && <div style={{ marginTop: 6 }}><StatusPill label="Idle" tone="amber" /></div>}
+                          {idle && <div className="mt-1.5"><StatusPill label="Idle" tone="amber" /></div>}
                         </td>
-                        <td style={{ padding: "16px" }}>
-                          <Link href={`/superadmin/drivers/${row.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 11px", borderRadius: 12, background: "#EFF6FF", color: "#2563EB", fontSize: 12, fontWeight: 800, textDecoration: "none" }}>
+                        <td className="p-4">
+                          <Link href={`/superadmin/drivers/${row.id}`} className="inline-flex items-center gap-1.5 px-[11px] py-[7px] rounded-[12px] bg-[#EFF6FF] text-blue-600 text-[12px] font-extrabold no-underline">
                             View <ArrowRight size={13} />
                           </Link>
                         </td>
@@ -853,36 +775,36 @@ export default function SuperAdminNewDashboardPage() {
         </div>
       </PanelCard>
 
-      <div style={{ display: "grid", gap: 20, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+      <div className="grid gap-5" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
         <PanelCard style={{ padding: 22 }}>
           <SectionHeader title="Insights" subtitle="Fast answers for the super admin" />
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Busiest vendor</div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", marginTop: 7 }}>{busyVendor?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtNumber(busyVendor?.bookingsToday)} trips today</div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Busiest vendor</div>
+              <div className="text-[17px] font-black text-slate-900 mt-[7px]">{busyVendor?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtNumber(busyVendor?.bookingsToday)} trips today</div>
             </div>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Highest recharge</div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", marginTop: 7 }}>{topRechargeVendor?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtCurrency(topRechargeVendor?.rechargeToday ?? null)} recharged today</div>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Highest recharge</div>
+              <div className="text-[17px] font-black text-slate-900 mt-[7px]">{topRechargeVendor?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtCurrency(topRechargeVendor?.rechargeToday ?? null)} recharged today</div>
             </div>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Highest earning driver</div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", marginTop: 7 }}>{topDriver?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtCurrency(topDriver?.earningsToday ?? null)} earned today</div>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Highest earning driver</div>
+              <div className="text-[17px] font-black text-slate-900 mt-[7px]">{topDriver?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtCurrency(topDriver?.earningsToday ?? null)} earned today</div>
             </div>
-            <div style={{ background: "#F8FAFC", border: "1px solid #E8EEF4", borderRadius: 18, padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Lowest wallet</div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: "#0F172A", marginTop: 7 }}>{lowestWalletVendor?.name ?? "—"}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{fmtCurrency(lowestWalletVendor?.walletBalance ?? null)} remaining</div>
+            <div className="bg-slate-50 border border-slate-200 rounded-[18px] p-4">
+              <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Lowest wallet</div>
+              <div className="text-[17px] font-black text-slate-900 mt-[7px]">{lowestWalletVendor?.name ?? "—"}</div>
+              <div className="text-[12px] text-slate-500 mt-1">{fmtCurrency(lowestWalletVendor?.walletBalance ?? null)} remaining</div>
             </div>
           </div>
         </PanelCard>
 
         <PanelCard style={{ padding: 22 }}>
           <SectionHeader title="Quick Actions" subtitle="Shortcuts for the most common super admin actions" />
-          <div style={{ display: "grid", gap: 12 }}>
+          <div className="grid gap-3">
             {[
               { label: "View all vendors", href: "/superadmin/vendors", icon: Building2 },
               { label: "View all drivers", href: "/superadmin/drivers", icon: Users },
@@ -892,56 +814,33 @@ export default function SuperAdminNewDashboardPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 14,
-                  textDecoration: "none",
-                  border: "1px solid #E8EEF4",
-                  borderRadius: 16,
-                  padding: "14px 16px",
-                  background: "#fff",
-                  color: "#0F172A",
-                }}
+                className="flex items-center justify-between gap-[14px] no-underline border border-slate-200 rounded-[16px] px-4 py-[14px] bg-white text-slate-900"
               >
-                <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 14,
-                      background: "#F8FAFC",
-                      border: "1px solid #E2E8F0",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#64748B",
-                    }}
-                  >
+                <span className="flex items-center gap-3">
+                  <span className="w-[38px] h-[38px] rounded-[14px] bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500">
                     <item.icon size={16} />
                   </span>
-                  <span style={{ fontSize: 13.5, fontWeight: 800 }}>{item.label}</span>
+                  <span className="text-[13.5px] font-extrabold">{item.label}</span>
                 </span>
                 <ArrowRight size={14} color="#94A3B8" />
               </Link>
             ))}
           </div>
 
-          <div style={{ marginTop: 16, padding: 16, borderRadius: 18, background: "#F8FAFC", border: "1px solid #E8EEF4" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.7 }}>Live status summary</div>
-            <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                <span style={{ color: "#0F172A", fontWeight: 700 }}>Online drivers</span>
-                <span style={{ color: "#2563EB", fontWeight: 900 }}>{fmtNumber(onlineDrivers)}</span>
+          <div className="mt-4 p-4 rounded-[18px] bg-slate-50 border border-slate-200">
+            <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-[0.7px]">Live status summary</div>
+            <div className="mt-2.5 grid gap-2.5">
+              <div className="flex justify-between gap-3 text-[13px]">
+                <span className="text-slate-900 font-bold">Online drivers</span>
+                <span className="text-blue-600 font-black">{fmtNumber(onlineDrivers)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                <span style={{ color: "#0F172A", fontWeight: 700 }}>Idle drivers</span>
-                <span style={{ color: "#B45309", fontWeight: 900 }}>{fmtNumber(idleDrivers.length)}</span>
+              <div className="flex justify-between gap-3 text-[13px]">
+                <span className="text-slate-900 font-bold">Idle drivers</span>
+                <span className="font-black" style={{ color: "#B45309" }}>{fmtNumber(idleDrivers.length)}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                <span style={{ color: "#0F172A", fontWeight: 700 }}>Low wallet vendors</span>
-                <span style={{ color: "#B91C1C", fontWeight: 900 }}>{fmtNumber(lowWalletVendors.length)}</span>
+              <div className="flex justify-between gap-3 text-[13px]">
+                <span className="text-slate-900 font-bold">Low wallet vendors</span>
+                <span className="text-red-700 font-black">{fmtNumber(lowWalletVendors.length)}</span>
               </div>
             </div>
           </div>
@@ -950,24 +849,17 @@ export default function SuperAdminNewDashboardPage() {
 
       {error && (
         <PanelCard style={{ padding: 18, borderColor: "#FECACA", background: "#FEF2F2" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#EF4444" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-[38px] h-[38px] rounded-[12px] bg-white flex items-center justify-center text-red-500">
               <AlertTriangle size={16} />
             </div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#991B1B" }}>Dashboard load issue</div>
-              <div style={{ fontSize: 12.5, color: "#7F1D1D", marginTop: 3 }}>{error}</div>
+              <div className="text-[14px] font-extrabold" style={{ color: "#991B1B" }}>Dashboard load issue</div>
+              <div className="text-[12.5px] mt-[3px] text-red-900">{error}</div>
             </div>
           </div>
         </PanelCard>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.45; }
-        }
-      `}</style>
     </div>
   );
 }

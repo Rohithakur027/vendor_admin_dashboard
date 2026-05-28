@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   superadminApi,
   type WebsiteBookingEnquiry,
   type WebsiteGeneralEnquiry,
 } from "@/lib/api";
-import { MessageSquare, Inbox, ArrowRight } from "lucide-react";
+import { Inbox, ArrowRight } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButton } from "@/components/ExportButton";
@@ -15,15 +16,9 @@ import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import { getTableSpec } from "@/lib/columnConfig";
 import { FilterPanel, FilterPill, FilterSection, FilterTrigger } from "@/components/FilterPanel";
-import {
-  WebsiteBookingDetailSidebar,
-  WebsiteGeneralEnquiryDetailSidebar,
-} from "./BookingEnquirySidebar";
+import { WebsiteBookingDetailSidebar, NewTripSidebar } from "./BookingEnquirySidebar";
 
-const FONT = "var(--font-plus-jakarta-sans), 'Plus Jakarta Sans', sans-serif";
-const BLUE = "#2563eb";
-
-type Tab = "general" | "special";
+type Section = "booking" | "published" | "driver_assigned" | "active" | "completed";
 type TimingFilter = "" | "instant" | "scheduled";
 type CategoryFilter = "" | "airport_taxis" | "within_city" | "other";
 
@@ -65,7 +60,9 @@ function isToday(iso: string | null): boolean {
 
 const STATUS_PILL: Record<string, { bg: string; color: string; dot: string; border: string }> = {
   pending:         { bg: "#fefce8", color: "#854d0e", dot: "#eab308",  border: "#fef08a" },
+  published:       { bg: "#f0f9ff", color: "#0369a1", dot: "#0ea5e9",  border: "#bae6fd" },
   driver_assigned: { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6",  border: "#bfdbfe" },
+  active:          { bg: "#fefce8", color: "#92400e", dot: "#f59e0b",  border: "#fde68a" },
   completed:       { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e",  border: "#bbf7d0" },
   cancelled:       { bg: "#fef2f2", color: "#b91c1c", dot: "#ef4444",  border: "#fecaca" },
   new:             { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6",  border: "#bfdbfe" },
@@ -78,28 +75,45 @@ function StatusPill({ status }: { status: string | null }) {
   const s = (status ?? "—").toString();
   const t = STATUS_PILL[s.toLowerCase()] ?? { bg: "#f8fafc", color: "#475569", dot: "#94a3b8", border: "#e2e8f0" };
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 5, width: "fit-content",
-      background: t.bg, color: t.color, border: `1px solid ${t.border}`,
-      borderRadius: 20, fontSize: 11, fontWeight: 700, padding: "3px 10px", whiteSpace: "nowrap",
-    }}>
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full text-[11px] font-bold px-2.5 py-0.5 whitespace-nowrap"
+      style={{ background: t.bg, color: t.color, border: `1px solid ${t.border}` }}
+    >
       <span style={{ width: 6, height: 6, borderRadius: "50%", background: t.dot, flexShrink: 0 }} />
       {s.replace(/_/g, " ")}
     </span>
   );
 }
 
+function EmptySection({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-white border-[1.5px] border-slate-200 rounded-[18px] px-6 py-7 min-h-[260px] flex flex-col justify-center items-center text-center gap-2">
+      <div className="w-[54px] h-[54px] rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-lg">
+        W
+      </div>
+      <div className="text-lg font-extrabold text-slate-900">{title}</div>
+      <div className="text-[13px] text-slate-500 max-w-[360px] leading-relaxed">{description}</div>
+    </div>
+  );
+}
+
 function RouteCell({ from, to }: { from: string; to: string }) {
   return (
-    <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div className="min-w-0">
+      <p className="text-[13px] font-semibold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">
         {from.split(",")[0]}
       </p>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, margin: "3px 0" }}>
+      <div className="flex items-center gap-1 my-[3px]">
         <div style={{ width: 40, height: 2, background: "linear-gradient(to right,#a5b4fc,#2563eb)", borderRadius: 2 }} />
-        <ArrowRight style={{ width: 10, height: 10, color: BLUE }} />
+        <ArrowRight className="w-2.5 h-2.5 text-blue-600" />
       </div>
-      <p style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <p className="text-[12px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap">
         {to.split(",")[0]}
       </p>
     </div>
@@ -108,10 +122,10 @@ function RouteCell({ from, to }: { from: string; to: string }) {
 
 function PersonCell({ name, email, phone }: { name: string; email: string; phone: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-      <span style={{ fontSize: 11.5, color: "#64748b", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</span>
-      <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>{fmtPhone(phone)}</span>
+    <div className="flex flex-col min-w-0">
+      <span className="text-[13px] font-bold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">{name}</span>
+      <span className="text-[11.5px] text-slate-500 font-medium overflow-hidden text-ellipsis whitespace-nowrap">{email}</span>
+      <span className="text-[11px] text-slate-400 font-medium">{fmtPhone(phone)}</span>
     </div>
   );
 }
@@ -120,6 +134,7 @@ function PersonCell({ name, email, phone }: { name: string; email: string; phone
 
 const GENERAL_COL_CFG: Record<string, { grid: string; label: string; minPx: number }> = {
   enqRef:          { grid: "130px",           label: "BOOKING ID",       minPx: 130 },
+  status:          { grid: "120px",           label: "STATUS",           minPx: 120 },
   customer:        { grid: "minmax(0,1.6fr)", label: "CUSTOMER",         minPx: 180 },
   route:           { grid: "minmax(0,2.2fr)", label: "ROUTE",            minPx: 220 },
   type:            { grid: "150px",           label: "VEHICLE TYPE",     minPx: 150 },
@@ -148,26 +163,20 @@ function GeneralCell({ b, colKey }: { b: WebsiteBookingEnquiry; colKey: string }
   switch (colKey) {
     case "enqRef":
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div className="flex flex-col gap-[3px]">
+          <div className="flex items-center gap-2 min-w-0">
             {isNewQuery && (
               <span
                 title="New today"
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  boxShadow: "0 0 0 4px rgba(239,68,68,0.14)",
-                  flexShrink: 0,
-                }}
+                className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"
+                style={{ boxShadow: "0 0 0 4px rgba(239,68,68,0.14)" }}
               />
             )}
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", fontFamily: FONT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span className="text-[13px] font-extrabold text-slate-900 overflow-hidden text-ellipsis whitespace-nowrap">
               {b.enqRef ?? "—"}
             </span>
           </div>
-          <span style={{ fontSize: 10, fontWeight: 700, background: "#eef2ff", color: "#2563eb", padding: "2px 7px", borderRadius: 6, display: "inline-block", width: "fit-content", boxShadow: "inset 0 0 0 1px #e0e7ff" }}>
+          <span className="text-[10px] font-bold bg-[#eef2ff] text-blue-600 px-[7px] py-[2px] rounded-[6px] inline-block w-fit" style={{ boxShadow: "inset 0 0 0 1px #e0e7ff" }}>
             {b.isScheduled ? "Scheduled" : "Instant"}
           </span>
         </div>
@@ -177,33 +186,33 @@ function GeneralCell({ b, colKey }: { b: WebsiteBookingEnquiry; colKey: string }
     case "route":
       return <RouteCell from={b.pickupLocation} to={b.destination} />;
     case "type":
-      return <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{b.vehicleType ?? "—"}</span>;
+      return <span className="text-[13px] font-semibold text-slate-900">{b.vehicleType ?? "—"}</span>;
     case "bookingCategory":
       return b.bookingCategory
-        ? <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: 6, background: "#e2e8f0", color: "#334155", border: "1px solid #cbd5e1", fontSize: 11, fontWeight: 700, maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.bookingCategory}>{b.bookingCategory}</span>
-        : <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>;
+        ? <span className="inline-flex items-center px-2 py-[2px] rounded-[6px] bg-slate-200 text-slate-700 border border-[#cbd5e1] text-[11px] font-bold max-w-[130px] overflow-hidden text-ellipsis whitespace-nowrap" title={b.bookingCategory}>{b.bookingCategory}</span>
+        : <span className="text-[12px] text-slate-400">—</span>;
     case "passengers":
-      return <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{b.passengers}</span>;
+      return <span className="text-[13px] text-slate-700 font-semibold">{b.passengers}</span>;
     case "createdAt": {
       const { date, time } = fmtDate(b.createdAt);
-      return <div style={{ display: "flex", flexDirection: "column", gap: 1 }}><span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{date}</span><span style={{ fontSize: 11.5, color: "#64748b" }}>{time}</span></div>;
+      return <div className="flex flex-col gap-[1px]"><span className="text-[13px] text-slate-900 font-semibold">{date}</span><span className="text-[11.5px] text-slate-500">{time}</span></div>;
     }
     case "status":
-      return <StatusPill status={b.status} />;
+      return <StatusPill status={b.websiteBookingStatus ?? "pending"} />;
     case "distance":
-      return <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>{b.distanceKm != null ? `${b.distanceKm} km` : "—"}</span>;
+      return <span className="text-[13px] text-slate-700 font-semibold">{b.distanceKm != null ? `${b.distanceKm} km` : "—"}</span>;
     case "scheduledAt": {
       const { date, time } = fmtDate(b.scheduledAt);
-      return <div style={{ display: "flex", flexDirection: "column", gap: 1 }}><span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{date}</span><span style={{ fontSize: 11.5, color: "#64748b" }}>{time}</span></div>;
+      return <div className="flex flex-col gap-[1px]"><span className="text-[13px] text-slate-900 font-semibold">{date}</span><span className="text-[11.5px] text-slate-500">{time}</span></div>;
     }
     case "returnAt": {
       const { date, time } = fmtDate(b.returnAt);
-      return <div style={{ display: "flex", flexDirection: "column", gap: 1 }}><span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{date}</span><span style={{ fontSize: 11.5, color: "#64748b" }}>{time}</span></div>;
+      return <div className="flex flex-col gap-[1px]"><span className="text-[13px] text-slate-900 font-semibold">{date}</span><span className="text-[11.5px] text-slate-500">{time}</span></div>;
     }
     case "isReturnTrip":
       return b.isReturnTrip
-        ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#EFF6FF", color: "#1D4ED8", border: "1px solid #BFDBFE", borderRadius: 20, fontSize: 11, fontWeight: 700, padding: "3px 10px" }}>Yes</span>
-        : <span style={{ fontSize: 12, color: "#94A3B8" }}>—</span>;
+        ? <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-[#BFDBFE] rounded-full text-[11px] font-bold px-2.5 py-[3px]">Yes</span>
+        : <span className="text-[12px] text-slate-400">—</span>;
     default:
       return <span>—</span>;
   }
@@ -212,23 +221,23 @@ function GeneralCell({ b, colKey }: { b: WebsiteBookingEnquiry; colKey: string }
 function SpecialCell({ s, colKey }: { s: WebsiteGeneralEnquiry; colKey: string }) {
   switch (colKey) {
     case "enqRef":
-      return <span style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", fontFamily: FONT }}>{s.enqRef ?? "—"}</span>;
+      return <span className="text-[13px] font-extrabold text-slate-900">{s.enqRef ?? "—"}</span>;
     case "name":
       return <PersonCell name={s.name} email={s.email ?? "—"} phone={s.mobile} />;
     case "companyName":
-      return <span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }} title={s.companyName ?? ""}>{s.companyName ?? "—"}</span>;
+      return <span className="text-[13px] text-slate-900 font-semibold overflow-hidden text-ellipsis whitespace-nowrap block" title={s.companyName ?? ""}>{s.companyName ?? "—"}</span>;
     case "message":
-      return <span style={{ fontSize: 12.5, color: "#64748b", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }} title={s.message}>{s.message}</span>;
+      return <span className="text-[12.5px] text-slate-500 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }} title={s.message}>{s.message}</span>;
     case "createdAt": {
       const { date, time } = fmtDate(s.createdAt);
-      return <div style={{ display: "flex", flexDirection: "column", gap: 1 }}><span style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{date}</span><span style={{ fontSize: 11.5, color: "#64748b" }}>{time}</span></div>;
+      return <div className="flex flex-col gap-[1px]"><span className="text-[13px] text-slate-900 font-semibold">{date}</span><span className="text-[11.5px] text-slate-500">{time}</span></div>;
     }
     case "status":
       return <StatusPill status={s.status} />;
     case "email":
-      return <span style={{ fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{s.email ?? "—"}</span>;
+      return <span className="text-[12px] text-slate-500 overflow-hidden text-ellipsis whitespace-nowrap block">{s.email ?? "—"}</span>;
     case "mobile":
-      return <span style={{ fontSize: 12, color: "#64748b" }}>{fmtPhone(s.mobile)}</span>;
+      return <span className="text-[12px] text-slate-500">{fmtPhone(s.mobile)}</span>;
     default:
       return <span>—</span>;
   }
@@ -237,13 +246,14 @@ function SpecialCell({ s, colKey }: { s: WebsiteGeneralEnquiry; colKey: string }
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BookingEnquiriesPage() {
-  const [tab, setTab] = useState<Tab>("general");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sectionParam = searchParams.get("section");
+  const VALID_SECTIONS: Section[] = ["booking", "published", "driver_assigned", "active", "completed"];
+  const section: Section = VALID_SECTIONS.includes(sectionParam as Section) ? (sectionParam as Section) : "booking";
 
   const [general, setGeneral] = useState<WebsiteBookingEnquiry[]>([]);
-  const [special, setSpecial] = useState<WebsiteGeneralEnquiry[]>([]);
-
   const [generalTotal, setGeneralTotal] = useState(0);
-  const [specialTotal, setSpecialTotal] = useState(0);
 
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
@@ -257,10 +267,9 @@ export default function BookingEnquiriesPage() {
   const [draftCategoryFilter, setDraftCategoryFilter] = useState<CategoryFilter>("");
 
   const [selectedGeneral, setSelectedGeneral] = useState<WebsiteBookingEnquiry | null>(null);
-  const [selectedSpecial, setSelectedSpecial] = useState<WebsiteGeneralEnquiry | null>(null);
+  const [newTripOpen, setNewTripOpen] = useState(false);
 
-  const genColPrefs  = useColumnPreferences("generalBookingEnquiries");
-  const specColPrefs = useColumnPreferences("specialBookingEnquiries");
+  const genColPrefs = useColumnPreferences("generalBookingEnquiries");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -276,45 +285,40 @@ export default function BookingEnquiriesPage() {
     async function load() {
       setLoading(true);
       setError(null);
-
       const params = { limit: 100, ...(search.trim() && { search: search.trim() }) };
       try {
-        if (tab === "general") {
-          const res = await superadminApi.bookingEnquiries.listWebsiteBookings(params);
-          if (cancelled) return;
-          setGeneral(res.data);
-          setGeneralTotal(res.pagination.total);
-        } else {
-          const res = await superadminApi.bookingEnquiries.listWebsiteEnquiries(params);
-          if (cancelled) return;
-          setSpecial(res.data);
-          setSpecialTotal(res.pagination.total);
-        }
+        const res = section === "booking"
+          ? await superadminApi.bookingEnquiries.listEnquiries(params)
+          : await superadminApi.bookingEnquiries.listWebsiteBookings(params);
+        if (cancelled) return;
+        setGeneral(res.data);
+        setGeneralTotal(res.pagination.total);
       } catch (err: unknown) {
         if (cancelled) return;
-        if (tab === "general") {
-          setGeneral([]);
-          setGeneralTotal(0);
-          setError(err instanceof Error ? err.message : "Failed to load website bookings.");
-        } else {
-          setSpecial([]);
-          setSpecialTotal(0);
-          setError(err instanceof Error ? err.message : "Failed to load website enquiries.");
-        }
+        setGeneral([]);
+        setGeneralTotal(0);
+        setError(err instanceof Error ? err.message : "Failed to load bookings.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [tab, search, refreshTick]);
+    return () => { cancelled = true; };
+  }, [section, search, refreshTick]);
 
   const filteredGeneral = useMemo(() => {
     return general.filter((b) => {
-      if (timingFilter === "instant" && b.isScheduled) return false;
+      // "booking" tab comes from website_booking_enquiries — no status gating needed
+      if (section !== "booking") {
+        const wbStatus = (b.websiteBookingStatus ?? "").toLowerCase();
+        if (section === "published"       && wbStatus !== "published")       return false;
+        if (section === "driver_assigned" && wbStatus !== "driver_assigned") return false;
+        if (section === "active"          && wbStatus !== "active")          return false;
+        if (section === "completed"       && wbStatus !== "completed")       return false;
+      }
+
+      if (timingFilter === "instant"   && b.isScheduled)  return false;
       if (timingFilter === "scheduled" && !b.isScheduled) return false;
 
       if (categoryFilter) {
@@ -328,7 +332,7 @@ export default function BookingEnquiriesPage() {
 
       return true;
     });
-  }, [general, timingFilter, categoryFilter]);
+  }, [general, section, timingFilter, categoryFilter]);
 
   const activeFilterCount = (timingFilter ? 1 : 0) + (categoryFilter ? 1 : 0);
   const draftFilterCount = (draftTimingFilter ? 1 : 0) + (draftCategoryFilter ? 1 : 0);
@@ -382,147 +386,83 @@ export default function BookingEnquiriesPage() {
     }));
   }
 
-  function handleExportSpecial() {
-    exportToXlsx("website-enquiries.xlsx", special.map(s => {
-      const row: Record<string, string | number | null> = {};
-
-      specCols.forEach((key) => {
-        switch (key) {
-          case "enqRef":
-            row["Enquiry ID"] = s.enqRef ?? null;
-            break;
-          case "name":
-            row["Customer Name"] = s.name;
-            row["Email"] = s.email ?? null;
-            row["Mobile"] = phoneExportValue(s.mobile);
-            break;
-          case "companyName":
-            row["Company"] = s.companyName ?? null;
-            break;
-          case "message":
-            row["Message"] = s.message;
-            break;
-          case "createdAt":
-            row["Created At"] = `${fmtDate(s.createdAt).date} ${fmtDate(s.createdAt).time}`.trim();
-            break;
-          case "email":
-            row["Email"] = s.email ?? null;
-            break;
-          case "mobile":
-            row["Mobile"] = phoneExportValue(s.mobile);
-            break;
-        }
-      });
-
-      return row;
-    }));
-  }
-
-  const genCols  = genColPrefs.columns;
-  const specCols = specColPrefs.columns;
+  const genCols = genColPrefs.columns;
 
   const generalGridTemplate = genCols.map(k => GENERAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ");
-  const specialGridTemplate = specCols.map(k => SPECIAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ");
-
   const generalMinWidth = Math.max(800, genCols.reduce((acc, k) => acc + (GENERAL_COL_CFG[k]?.minPx ?? 120), 0) + (genCols.length - 1) * 16);
-  const specialMinWidth = Math.max(700, specCols.reduce((acc, k) => acc + (SPECIAL_COL_CFG[k]?.minPx ?? 120), 0) + (specCols.length - 1) * 16);
 
-  const activeColPrefs = tab === "general" ? genColPrefs : specColPrefs;
-  const activeTableKey = tab === "general" ? "generalBookingEnquiries" as const : "specialBookingEnquiries" as const;
+  const activeColPrefs = genColPrefs;
+  const activeTableKey = "generalBookingEnquiries" as const;
   const activeSpec = getTableSpec(activeTableKey);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Booking Enquiries</h2>
-        <p style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>
-          Customer booking requests and general enquiries from the website
-        </p>
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900">Booking Enquiry</h2>
+          <p className="text-[13px] text-slate-500 mt-[3px]">
+            Manage and track all website booking enquiries by status
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setNewTripOpen(true)}
+          className="inline-flex items-center gap-[7px] bg-blue-600 text-white border-none rounded-[10px] px-[18px] py-[9px] text-[13.5px] font-bold cursor-pointer shadow-[0_1px_4px_rgba(37,99,235,0.18)] flex-shrink-0"
+        >
+          <span className="text-lg leading-none -mt-px">+</span>
+          New Trip
+        </button>
       </div>
 
       {error && (
-        <div
-          style={{
-            background: "#FEF2F2",
-            border: "1.5px solid #FECACA",
-            color: "#991B1B",
-            borderRadius: 12,
-            padding: "12px 14px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ fontSize: 13, fontWeight: 600 }}>
+        <div className="bg-[#FEF2F2] border-[1.5px] border-[#FECACA] text-[#991B1B] rounded-xl px-[14px] py-3 flex items-center justify-between gap-3">
+          <div className="text-[13px] font-semibold">
             {error}
           </div>
           <button
             type="button"
             onClick={() => setRefreshTick(v => v + 1)}
-            style={{
-              border: "1px solid #FCA5A5",
-              background: "#fff",
-              color: "#B91C1C",
-              borderRadius: 10,
-              padding: "7px 12px",
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            className="border border-[#FCA5A5] bg-white text-[#B91C1C] rounded-[10px] px-3 py-[7px] text-[12.5px] font-bold cursor-pointer flex-shrink-0"
           >
             Retry
           </button>
         </div>
       )}
 
-      {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-        {[
-          { label: "Website Bookings",   value: generalTotal, icon: Inbox },
-          { label: "Website Enquiries",  value: specialTotal, icon: MessageSquare },
-        ].map(s => (
-          <div key={s.label} style={{
-            background: "#fff", borderRadius: 14, border: "1.5px solid #E8EEF4",
-            padding: "16px 18px", display: "flex", alignItems: "center", gap: 14,
-          }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, background: "#F1F5F9",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
-              <s.icon className="h-5 w-5" style={{ color: "#64748B" }} />
-            </div>
-            <div>
-              {loading ? (
-                <Skeleton className="h-[22px] w-10 mb-1.5" />
-              ) : (
-                <p style={{ fontSize: 22, fontWeight: 800, color: "#0F172A", lineHeight: 1 }}>{s.value}</p>
-              )}
-              <p style={{ fontSize: 11.5, color: "#64748B", marginTop: 3 }}>{s.label}</p>
-            </div>
+      <div className="inline-flex">
+        <div className="bg-white rounded-[14px] border-[1.5px] border-[#E8EEF4] px-[18px] py-4 flex items-center gap-[14px]">
+          <div className="w-[38px] h-[38px] rounded-[10px] bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <Inbox className="h-5 w-5 text-slate-500" />
           </div>
-        ))}
+          <div>
+            {loading ? <Skeleton className="h-[22px] w-10 mb-1.5" /> : (
+              <p className="text-[22px] font-extrabold text-slate-900 leading-none">{generalTotal}</p>
+            )}
+            <p className="text-[11.5px] text-slate-500 mt-[3px]">Total Bookings</p>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, borderBottom: "1px solid #E2E8F0" }}>
+      <div className="flex gap-2 border-b border-slate-200">
         {([
-          { key: "general", label: "Booking Enquiries" },
-          { key: "special", label: "Special Enquiry" },
-        ] as { key: Tab; label: string }[]).map(t => {
-          const active = tab === t.key;
+          { key: "booking",         label: "Booking Enquiry" },
+          { key: "published",       label: "Published Trip" },
+          { key: "driver_assigned", label: "Driver Assigned" },
+          { key: "active",          label: "Active Trip" },
+          { key: "completed",       label: "Completed Trips" },
+        ] as { key: Section; label: string }[]).map(t => {
+          const active = section === t.key;
           return (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: "9px 16px", fontSize: 13, fontWeight: 700, fontFamily: FONT,
-                background: "transparent", border: "none", cursor: "pointer",
-                color: active ? BLUE : "#64748B",
-                borderBottom: active ? `2px solid ${BLUE}` : "2px solid transparent",
-                marginBottom: -1,
-              }}
+              onClick={() => router.push(`/superadmin/booking-enquiries?section=${t.key}`)}
+              className={[
+                "px-4 py-[9px] text-[13px] font-bold bg-transparent border-none cursor-pointer -mb-px border-b-2",
+                active
+                  ? "text-blue-600 border-blue-600"
+                  : "text-slate-500 border-transparent",
+              ].join(" ")}
             >
               {t.label}
             </button>
@@ -530,16 +470,15 @@ export default function BookingEnquiriesPage() {
         })}
       </div>
 
+      <>
       {/* Search + Columns + Export */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="flex items-center gap-[10px]">
         <SearchBar
           value={searchInput}
           onChange={setSearchInput}
-          placeholder={tab === "general"
-            ? "Search by customer name, email, phone, or location…"
-            : "Search by name, email, or mobile…"}
+          placeholder="Search by customer name, email, phone, or location…"
         />
-        {tab === "general" && (
+        {section === "booking" && (
           <div className="relative">
             <FilterTrigger
               activeCount={activeFilterCount}
@@ -604,11 +543,8 @@ export default function BookingEnquiriesPage() {
           onReset={activeColPrefs.reset}
           onSelectAll={() => activeColPrefs.setColumns(activeSpec.columns.map(c => c.key))}
         />
-        <div style={{ marginLeft: "auto" }}>
-          {tab === "general"
-            ? <ExportButton onClick={handleExportGeneral} disabled={filteredGeneral.length === 0} label="Export XLSX" />
-            : <ExportButton onClick={handleExportSpecial} disabled={special.length === 0} label="Export XLSX" />
-          }
+        <div className="ml-auto">
+          <ExportButton onClick={handleExportGeneral} disabled={filteredGeneral.length === 0} label="Export XLSX" />
         </div>
       </div>
 
@@ -617,107 +553,65 @@ export default function BookingEnquiriesPage() {
         <div className="w-full overflow-x-auto">
 
           {/* ── WEBSITE BOOKINGS ── */}
-          {tab === "general" && (
-            <div style={{ minWidth: generalMinWidth }}>
-              <div
-                className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
-                style={{ gridTemplateColumns: generalGridTemplate }}
-              >
-                {genCols.map(k => (
-                  <div key={k} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                    {GENERAL_COL_CFG[k]?.label ?? k}
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-col divide-y divide-slate-100">
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: generalGridTemplate }}>
-                      {genCols.map(k => <Skeleton key={k} className="h-3.5 w-24" />)}
-                    </div>
-                  ))
-                ) : filteredGeneral.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500 text-[13px]">
-                    {search || activeFilterCount ? "No bookings match your search or filters." : "No website booking enquiries found."}
-                  </div>
-                ) : (
-                  filteredGeneral.map(b => (
-                    <div
-                      key={b.id}
-                      onClick={() => setSelectedGeneral(b)}
-                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-                      style={{ gridTemplateColumns: generalGridTemplate }}
-                    >
-                      {genCols.map(k => (
-                        <div key={k} className="min-w-0">
-                          <GeneralCell b={b} colKey={k} />
-                        </div>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
+          <div style={{ minWidth: generalMinWidth }}>
+            <div
+              className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
+              style={{ gridTemplateColumns: generalGridTemplate }}
+            >
+              {genCols.map(k => (
+                <div key={k} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
+                  {GENERAL_COL_CFG[k]?.label ?? k}
+                </div>
+              ))}
             </div>
-          )}
-
-          {/* ── SPECIAL ENQUIRIES ── */}
-          {tab === "special" && (
-            <div style={{ minWidth: specialMinWidth }}>
-              <div
-                className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
-                style={{ gridTemplateColumns: specialGridTemplate }}
-              >
-                {specCols.map(k => (
-                  <div key={k} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
-                    {SPECIAL_COL_CFG[k]?.label ?? k}
+            <div className="flex flex-col divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: generalGridTemplate }}>
+                    {genCols.map(k => <Skeleton key={k} className="h-3.5 w-24" />)}
                   </div>
-                ))}
-              </div>
-              <div className="flex flex-col divide-y divide-slate-100">
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: specialGridTemplate }}>
-                      {specCols.map(k => <Skeleton key={k} className="h-3.5 w-24" />)}
-                    </div>
-                  ))
-                ) : special.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500 text-[13px]">
-                    {search ? "No enquiries match your search." : "No special enquiries found."}
+                ))
+              ) : filteredGeneral.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-[13px]">
+                  {search || activeFilterCount
+                    ? "No bookings match your search or filters."
+                    : section === "booking"
+                      ? "No website booking enquiries found."
+                      : `No ${section.replace(/_/g, " ")} trips found.`}
+                </div>
+              ) : (
+                filteredGeneral.map(b => (
+                  <div
+                    key={b.id}
+                    onClick={() => setSelectedGeneral(b)}
+                    className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                    style={{ gridTemplateColumns: generalGridTemplate }}
+                  >
+                    {genCols.map(k => (
+                      <div key={k} className="min-w-0">
+                        <GeneralCell b={b} colKey={k} />
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  special.map(s => (
-                    <div
-                      key={s.id}
-                      onClick={() => setSelectedSpecial(s)}
-                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
-                      style={{ gridTemplateColumns: specialGridTemplate }}
-                    >
-                      {specCols.map(k => (
-                        <div key={k} className="min-w-0">
-                          <SpecialCell s={s} colKey={k} />
-                        </div>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
 
         </div>
       </div>
 
-      {/* Detail sidebars */}
+      </>
+
+      {/* New Trip sidebar */}
+      <NewTripSidebar open={newTripOpen} onClose={() => setNewTripOpen(false)} />
+
+      {/* Detail sidebar */}
       <WebsiteBookingDetailSidebar
         key={selectedGeneral?.id ?? "booking-detail-closed"}
         booking={selectedGeneral}
         onClose={() => setSelectedGeneral(null)}
         onAssigned={() => setRefreshTick(v => v + 1)}
-      />
-      <WebsiteGeneralEnquiryDetailSidebar
-        key={selectedSpecial?.id ?? "enquiry-detail-closed"}
-        enquiry={selectedSpecial}
-        onClose={() => setSelectedSpecial(null)}
       />
     </div>
   );

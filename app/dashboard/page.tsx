@@ -129,40 +129,47 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* ── Success toast ── */}
       {paySuccess && (
-        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, background: "#DCFCE7", border: "1.5px solid #86EFAC", borderRadius: 12, padding: "12px 18px", fontSize: 13, fontWeight: 700, color: "#15803D", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="fixed top-5 right-5 z-[9999] bg-[#DCFCE7] border-[1.5px] border-[#86EFAC] rounded-xl px-[18px] py-3 text-[13px] font-bold text-[#15803D] shadow-[0_4px_20px_rgba(0,0,0,0.1)] flex items-center gap-[10px]">
           <span>✓</span> {paySuccess}
-          <button onClick={() => setPaySuccess(null)} style={{ marginLeft: 8, background: "none", border: "none", cursor: "pointer", color: "#15803D", fontSize: 18, lineHeight: 1 }}>×</button>
+          <button onClick={() => setPaySuccess(null)} className="ml-2 bg-transparent border-none cursor-pointer text-[#15803D] text-[18px] leading-none">×</button>
         </div>
       )}
 
       {/* ── Recharge modal ── */}
       {modalOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(15,23,42,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 18, padding: "28px 28px 24px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <p style={{ fontSize: 16, fontWeight: 800, color: "#0F172A" }}>Add Money to Wallet</p>
-              <button onClick={() => { setModalOpen(false); setPayError(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#94A3B8", lineHeight: 1 }}>×</button>
+        <div className="fixed inset-0 z-[9000] bg-[rgba(15,23,42,0.45)] flex items-center justify-center">
+          <div className="bg-white rounded-[18px] px-7 pt-7 pb-6 w-[360px] shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
+            <div className="flex justify-between items-center mb-5">
+              <p className="text-base font-extrabold text-slate-900">Add Money to Wallet</p>
+              <button onClick={() => { setModalOpen(false); setPayError(null); }} className="bg-transparent border-none cursor-pointer text-[22px] text-slate-400 leading-none">×</button>
             </div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Amount (₹)</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-2">Amount (₹)</p>
             <input
               type="number" min={100} max={100000} placeholder="e.g. 5000"
               value={amount} onChange={(e) => { setAmount(e.target.value); setPayError(null); }}
-              style={{ width: "100%", height: 44, border: `1.5px solid ${payError ? "#FCA5A5" : "#E2E8F0"}`, borderRadius: 10, padding: "0 14px", fontSize: 15, fontWeight: 700, color: "#0F172A", outline: "none", boxSizing: "border-box", marginBottom: 8 }}
+              style={{ border: `1.5px solid ${payError ? "#FCA5A5" : "#E2E8F0"}` }}
+              className="w-full h-11 rounded-[10px] px-[14px] text-[15px] font-bold text-slate-900 outline-none box-border mb-2"
             />
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            <div className="flex gap-2 mb-4">
               {[500, 1000, 2000, 5000].map((q) => (
                 <button key={q} onClick={() => { setAmount(String(q)); setPayError(null); }}
-                  style={{ flex: 1, height: 30, borderRadius: 7, border: `1.5px solid ${amount === String(q) ? "#2563EB" : "#E2E8F0"}`, background: amount === String(q) ? "#EFF6FF" : "#F8FAFC", color: amount === String(q) ? "#2563EB" : "#64748B", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>
+                  style={{
+                    border: `1.5px solid ${amount === String(q) ? "#2563EB" : "#E2E8F0"}`,
+                    background: amount === String(q) ? "#EFF6FF" : "#F8FAFC",
+                    color: amount === String(q) ? "#2563EB" : "#64748B",
+                  }}
+                  className="flex-1 h-[30px] rounded-[7px] text-[11.5px] font-bold cursor-pointer">
                   ₹{q >= 1000 ? `${q / 1000}k` : q}
                 </button>
               ))}
             </div>
-            {payError && <p style={{ fontSize: 12, color: "#DC2626", fontWeight: 600, marginBottom: 12 }}>{payError}</p>}
+            {payError && <p className="text-xs text-[#DC2626] font-semibold mb-3">{payError}</p>}
             <button onClick={handleRecharge} disabled={paying}
-              style={{ width: "100%", height: 44, borderRadius: 10, background: paying ? "#93C5FD" : "#2563EB", border: "none", color: "#fff", fontSize: 14, fontWeight: 800, cursor: paying ? "not-allowed" : "pointer" }}>
+              style={{ background: paying ? "#93C5FD" : "#2563EB", cursor: paying ? "not-allowed" : "pointer" }}
+              className="w-full h-11 rounded-[10px] border-none text-white text-sm font-extrabold">
               {paying ? "Processing…" : `Pay ₹${Number(amount) > 0 ? Number(amount).toLocaleString("en-IN") : "—"}`}
             </button>
-            <p style={{ fontSize: 10.5, color: "#94A3B8", textAlign: "center", marginTop: 12 }}>Secured by Razorpay · UPI, Cards, Net Banking, Wallets &amp; EMI</p>
+            <p className="text-[10.5px] text-slate-400 text-center mt-3">Secured by Razorpay · UPI, Cards, Net Banking, Wallets &amp; EMI</p>
           </div>
         </div>
       )}
