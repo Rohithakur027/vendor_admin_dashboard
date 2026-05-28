@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   superadminApi,
   type WebsiteBookingEnquiry,
   type WebsiteGeneralEnquiry,
 } from "@/lib/api";
-import { MessageSquare, Inbox, ArrowRight, GripVertical } from "lucide-react";
+import { MessageSquare, Inbox, ArrowRight } from "lucide-react";
 import { SearchBar } from "@/components/SearchBar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportButton } from "@/components/ExportButton";
@@ -262,30 +262,6 @@ export default function BookingEnquiriesPage() {
   const genColPrefs  = useColumnPreferences("generalBookingEnquiries");
   const specColPrefs = useColumnPreferences("specialBookingEnquiries");
 
-  // Custom ordering lists of IDs saved in localStorage
-  const [generalOrder, setGeneralOrder] = useState<(string | number)[]>([]);
-  const [specialOrder, setSpecialOrder] = useState<(string | number)[]>([]);
-
-  // Drag and drop local states
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
-  // Load order from localStorage on client-side mount
-  useEffect(() => {
-    try {
-      const savedGeneral = localStorage.getItem("superadmin_general_enquiries_order");
-      if (savedGeneral) {
-        setGeneralOrder(JSON.parse(savedGeneral));
-      }
-      const savedSpecial = localStorage.getItem("superadmin_special_enquiries_order");
-      if (savedSpecial) {
-        setSpecialOrder(JSON.parse(savedSpecial));
-      }
-    } catch (e) {
-      console.error("Failed to load table orders from localStorage", e);
-    }
-  }, []);
-
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -336,37 +312,8 @@ export default function BookingEnquiriesPage() {
     };
   }, [tab, search, refreshTick]);
 
-  // Sort helper to apply saved custom order lists
-  const applyCustomOrder = useCallback(
-    <T extends { id: string | number }>(itemsList: T[], orderIds: (string | number)[]): T[] => {
-      if (!orderIds || orderIds.length === 0) return itemsList;
-      const orderMap = new Map<string | number, number>();
-      orderIds.forEach((id, idx) => orderMap.set(id, idx));
-
-      return [...itemsList].sort((a, b) => {
-        const aHas = orderMap.has(a.id);
-        const bHas = orderMap.has(b.id);
-        if (aHas && bHas) {
-          return orderMap.get(a.id)! - orderMap.get(b.id)!;
-        }
-        if (aHas) return -1;
-        if (bHas) return 1;
-        return 0;
-      });
-    },
-    []
-  );
-
-  const sortedGeneral = useMemo(() => {
-    return applyCustomOrder(general, generalOrder);
-  }, [general, generalOrder, applyCustomOrder]);
-
-  const sortedSpecial = useMemo(() => {
-    return applyCustomOrder(special, specialOrder);
-  }, [special, specialOrder, applyCustomOrder]);
-
   const filteredGeneral = useMemo(() => {
-    return sortedGeneral.filter((b) => {
+    return general.filter((b) => {
       if (timingFilter === "instant" && b.isScheduled) return false;
       if (timingFilter === "scheduled" && !b.isScheduled) return false;
 
@@ -381,79 +328,10 @@ export default function BookingEnquiriesPage() {
 
       return true;
     });
-  }, [sortedGeneral, timingFilter, categoryFilter]);
+  }, [general, timingFilter, categoryFilter]);
 
   const activeFilterCount = (timingFilter ? 1 : 0) + (categoryFilter ? 1 : 0);
   const draftFilterCount = (draftTimingFilter ? 1 : 0) + (draftCategoryFilter ? 1 : 0);
-
-  // Drag-and-drop event handlers
-  const handleDragStart = (
-    e: React.DragEvent,
-    index: number
-  ) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", index.toString());
-  };
-
-  const handleDragOver = (
-    e: React.DragEvent,
-    index: number
-  ) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-    setDragOverIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (
-    e: React.DragEvent,
-    targetIndex: number
-  ) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === targetIndex) {
-      handleDragEnd();
-      return;
-    }
-
-    if (tab === "general") {
-      const updatedFiltered = [...filteredGeneral];
-      const [movedItem] = updatedFiltered.splice(draggedIndex, 1);
-      updatedFiltered.splice(targetIndex, 0, movedItem);
-
-      const reorderedIds = updatedFiltered.map((item) => item.id);
-      const remainingIds = general
-        .map((item) => item.id)
-        .filter((id) => !reorderedIds.includes(id));
-      const newOrder = [...reorderedIds, ...remainingIds];
-
-      setGeneralOrder(newOrder);
-      localStorage.setItem("superadmin_general_enquiries_order", JSON.stringify(newOrder));
-    } else {
-      const updatedFiltered = [...sortedSpecial];
-      const [movedItem] = updatedFiltered.splice(draggedIndex, 1);
-      updatedFiltered.splice(targetIndex, 0, movedItem);
-
-      const reorderedIds = updatedFiltered.map((item) => item.id);
-      const remainingIds = special
-        .map((item) => item.id)
-        .filter((id) => !reorderedIds.includes(id));
-      const newOrder = [...reorderedIds, ...remainingIds];
-
-      setSpecialOrder(newOrder);
-      localStorage.setItem("superadmin_special_enquiries_order", JSON.stringify(newOrder));
-    }
-
-    handleDragEnd();
-  };
 
   function handleExportGeneral() {
     exportToXlsx("website-bookings.xlsx", filteredGeneral.map(b => {
@@ -543,11 +421,11 @@ export default function BookingEnquiriesPage() {
   const genCols  = genColPrefs.columns;
   const specCols = specColPrefs.columns;
 
-  const generalGridTemplate = `24px ${genCols.map(k => GENERAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ")}`;
-  const specialGridTemplate = `24px ${specCols.map(k => SPECIAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ")}`;
+  const generalGridTemplate = genCols.map(k => GENERAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ");
+  const specialGridTemplate = specCols.map(k => SPECIAL_COL_CFG[k]?.grid ?? "minmax(0,1fr)").join(" ");
 
-  const generalMinWidth = Math.max(800, genCols.reduce((acc, k) => acc + (GENERAL_COL_CFG[k]?.minPx ?? 120), 0) + (genCols.length - 1) * 16) + 32;
-  const specialMinWidth = Math.max(700, specCols.reduce((acc, k) => acc + (SPECIAL_COL_CFG[k]?.minPx ?? 120), 0) + (specCols.length - 1) * 16) + 32;
+  const generalMinWidth = Math.max(800, genCols.reduce((acc, k) => acc + (GENERAL_COL_CFG[k]?.minPx ?? 120), 0) + (genCols.length - 1) * 16);
+  const specialMinWidth = Math.max(700, specCols.reduce((acc, k) => acc + (SPECIAL_COL_CFG[k]?.minPx ?? 120), 0) + (specCols.length - 1) * 16);
 
   const activeColPrefs = tab === "general" ? genColPrefs : specColPrefs;
   const activeTableKey = tab === "general" ? "generalBookingEnquiries" as const : "specialBookingEnquiries" as const;
@@ -555,26 +433,6 @@ export default function BookingEnquiriesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: FONT }}>
-      <style>{`
-        .drag-row {
-          transition: background-color 0.2s ease, transform 0.2s ease, border 0.2s ease;
-        }
-        .drag-row:hover {
-          background-color: #f8fafc !important;
-        }
-        .drag-row:hover .drag-handle {
-          opacity: 1;
-        }
-        .drag-handle {
-          opacity: 0.4;
-          transition: opacity 0.2s ease;
-        }
-        .drag-handle:hover {
-          opacity: 1;
-          color: #2563EB;
-        }
-      `}</style>
-
       <div>
         <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0F172A" }}>Booking Enquiries</h2>
         <p style={{ fontSize: 13, color: "#64748B", marginTop: 3 }}>
@@ -765,7 +623,6 @@ export default function BookingEnquiriesPage() {
                 className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
                 style={{ gridTemplateColumns: generalGridTemplate }}
               >
-                <div />
                 {genCols.map(k => (
                   <div key={k} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
                     {GENERAL_COL_CFG[k]?.label ?? k}
@@ -776,7 +633,6 @@ export default function BookingEnquiriesPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: generalGridTemplate }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                       {genCols.map(k => <Skeleton key={k} className="h-3.5 w-24" />)}
                     </div>
                   ))
@@ -785,46 +641,20 @@ export default function BookingEnquiriesPage() {
                     {search || activeFilterCount ? "No bookings match your search or filters." : "No website booking enquiries found."}
                   </div>
                 ) : (
-                  filteredGeneral.map((b, i) => {
-                    const isDragged = draggedIndex === i;
-                    const isDragOver = dragOverIndex === i;
-
-                    return (
-                      <div
-                        key={b.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, i)}
-                        onDragOver={(e) => handleDragOver(e, i)}
-                        onDragLeave={handleDragLeave}
-                        onDragEnd={handleDragEnd}
-                        onDrop={(e) => handleDrop(e, i)}
-                        onClick={() => setSelectedGeneral(b)}
-                        className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors drag-row"
-                        style={{
-                          gridTemplateColumns: generalGridTemplate,
-                          backgroundColor: isDragOver
-                            ? "rgba(37, 99, 235, 0.06)"
-                            : isDragged
-                            ? "rgba(241, 245, 249, 0.5)"
-                            : "transparent",
-                          opacity: isDragged ? 0.45 : 1,
-                          outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
-                          outlineOffset: "-2px",
-                          transform: isDragOver ? "scale(1.005)" : "none",
-                          boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
-                        }}
-                      >
-                        <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
-                          <GripVertical size={13} style={{ cursor: "grab" }} />
+                  filteredGeneral.map(b => (
+                    <div
+                      key={b.id}
+                      onClick={() => setSelectedGeneral(b)}
+                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                      style={{ gridTemplateColumns: generalGridTemplate }}
+                    >
+                      {genCols.map(k => (
+                        <div key={k} className="min-w-0">
+                          <GeneralCell b={b} colKey={k} />
                         </div>
-                        {genCols.map(k => (
-                          <div key={k} className="min-w-0">
-                            <GeneralCell b={b} colKey={k} />
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })
+                      ))}
+                    </div>
+                  ))
                 )}
               </div>
             </div>
@@ -837,7 +667,6 @@ export default function BookingEnquiriesPage() {
                 className="grid items-center gap-4 px-6 py-3.5 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-[2] backdrop-blur"
                 style={{ gridTemplateColumns: specialGridTemplate }}
               >
-                <div />
                 {specCols.map(k => (
                   <div key={k} className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
                     {SPECIAL_COL_CFG[k]?.label ?? k}
@@ -848,7 +677,6 @@ export default function BookingEnquiriesPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="grid items-center gap-4 px-6 py-3.5 bg-white" style={{ gridTemplateColumns: specialGridTemplate }}>
-                      <div style={{ width: 12, height: 12, borderRadius: 3, background: "#F1F5F9" }} />
                       {specCols.map(k => <Skeleton key={k} className="h-3.5 w-24" />)}
                     </div>
                   ))
@@ -857,46 +685,20 @@ export default function BookingEnquiriesPage() {
                     {search ? "No enquiries match your search." : "No special enquiries found."}
                   </div>
                 ) : (
-                  sortedSpecial.map((s, i) => {
-                    const isDragged = draggedIndex === i;
-                    const isDragOver = dragOverIndex === i;
-
-                    return (
-                      <div
-                        key={s.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, i)}
-                        onDragOver={(e) => handleDragOver(e, i)}
-                        onDragLeave={handleDragLeave}
-                        onDragEnd={handleDragEnd}
-                        onDrop={(e) => handleDrop(e, i)}
-                        onClick={() => setSelectedSpecial(s)}
-                        className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors drag-row"
-                        style={{
-                          gridTemplateColumns: specialGridTemplate,
-                          backgroundColor: isDragOver
-                            ? "rgba(37, 99, 235, 0.06)"
-                            : isDragged
-                            ? "rgba(241, 245, 249, 0.5)"
-                            : "transparent",
-                          opacity: isDragged ? 0.45 : 1,
-                          outline: isDragOver ? "1.5px dashed #3B82F6" : "none",
-                          outlineOffset: "-2px",
-                          transform: isDragOver ? "scale(1.005)" : "none",
-                          boxShadow: isDragged ? "0 4px 12px rgba(0,0,0,0.04)" : "none",
-                        }}
-                      >
-                        <div className="drag-handle" style={{ display: "flex", alignItems: "center", color: "#94A3B8" }}>
-                          <GripVertical size={13} style={{ cursor: "grab" }} />
+                  special.map(s => (
+                    <div
+                      key={s.id}
+                      onClick={() => setSelectedSpecial(s)}
+                      className="grid items-center gap-4 px-6 py-3.5 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                      style={{ gridTemplateColumns: specialGridTemplate }}
+                    >
+                      {specCols.map(k => (
+                        <div key={k} className="min-w-0">
+                          <SpecialCell s={s} colKey={k} />
                         </div>
-                        {specCols.map(k => (
-                          <div key={k} className="min-w-0">
-                            <SpecialCell s={s} colKey={k} />
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })
+                      ))}
+                    </div>
+                  ))
                 )}
               </div>
             </div>

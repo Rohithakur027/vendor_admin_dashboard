@@ -272,7 +272,7 @@ export function DriverHistoryMap({ driverId, driverName, hours = 12, range: rang
     markerRef.current?.remove();
     const headEl = document.createElement("div");
     headEl.style.cssText = "width:46px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;transform:translateY(-8px);filter:drop-shadow(0 2px 8px rgba(37,99,235,0.35));";
-    headEl.innerHTML = `<img src="${CAR_ICON_SRC}" alt="" width="46" height="48" draggable="false" style="display:block;width:46px;height:48px;user-select:none;-webkit-user-drag:none;filter:hue-rotate(220deg) saturate(1.3) brightness(0.95);" />`;
+    headEl.innerHTML = `<img src="${CAR_ICON_SRC}" alt="" width="46" height="48" draggable="false" style="display:block;width:46px;height:48px;user-select:none;-webkit-user-drag:none;" />`;
     const headMarker = new (mapboxgl!.default.Marker)({ element: headEl })
       .setLngLat(rawCoords[0])
       .addTo(map);
